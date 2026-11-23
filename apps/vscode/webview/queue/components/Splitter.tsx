@@ -28,6 +28,7 @@ export function Splitter({ width, setWidth, min = 240, max = 600 }: Props) {
 
   return (
     <div className="relative z-10 w-0">
+      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- a focusable separator is the WAI-ARIA window splitter widget */}
       <div
         role="separator"
         aria-orientation="vertical"
@@ -57,6 +58,7 @@ export function Splitter({ width, setWidth, min = 240, max = 600 }: Props) {
           )}
         />
       </div>
+      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
     </div>
   );
 }
