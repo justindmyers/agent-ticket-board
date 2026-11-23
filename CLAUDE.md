@@ -8,7 +8,7 @@ Read `PLAN.md` for the architecture, `ROADMAP.md` for the open work, `PRODUCT.md
 | --- | --- |
 | `packages/core` | Types, the Jira and GitHub adapters, the cache, the queue model, comments, Jira moves and the sync rules. |
 | `apps/cli` | The `atb` command line tool. |
-| `apps/vscode` | The VS Code extension. `src/` is the extension host. `webview/` is the React UI. |
+| `apps/vscode` | The VS Code extension. `src/` is the extension host. `webview/` is the React UI. It has one folder for each feature (`app`, `queue`, `board`, `ticket`) and one `shared` folder. Each of these folders has `components/`, `hooks/`, `utils/` and `types/`. |
 | `apps/claude-plugin` | The Claude Code pane and the guards. |
 | `scripts` | The leak check, the docs lint and the local install. |
 | `skills` | Vendored skills. Do not edit them. |

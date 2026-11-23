@@ -1,45 +1,14 @@
-// Surfaces of the look: glass panels tinted by an accent, accent tiles, orbs and pills.
-// Every colour is an accent from the stage palette; the helpers return inline styles because
-// the accent is data (it changes with the stage), as Tailwind classes cannot be built at runtime.
-import { useEffect, useState, type CSSProperties } from 'react';
+// Accent styles are inline because the accent is data (it follows the stage),
+// and Tailwind cannot build classes at runtime.
+import type { CSSProperties } from 'react';
+import type { Accent, Theme } from '../types/theme';
+import { PALETTE } from './palette';
 
-export type Theme = 'dark' | 'light' | 'hc';
-const read = (): Theme => {
-  const c = document.body.classList;
-  return c.contains('vscode-high-contrast') || c.contains('vscode-high-contrast-light')
-    ? 'hc'
-    : c.contains('vscode-light')
-      ? 'light'
-      : 'dark';
-};
-export function useTheme() {
-  const [t, setT] = useState<Theme>(read);
-  useEffect(() => {
-    const o = new MutationObserver(() => setT(read()));
-    o.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    return () => o.disconnect();
-  }, []);
-  return t;
-}
-
-/** Stage palette. `text` is the light-theme text shade (4.5:1 on white). */
-export const PALETTE = {
-  blue: { hex: '#3A86FE', text: '#1d5fd1' },
-  aqua: { hex: '#64E4ED', text: '#0b6f78' },
-  amber: { hex: '#FFBE0C', text: '#7d5700' },
-  green: { hex: '#1EC46E', text: '#13804a' },
-  violet: { hex: '#A78BFA', text: '#6d28d9' },
-  red: { hex: '#FA4045', text: '#c8262b' },
-  neutral: { hex: '#96969D', text: '#55555c' }
-} as const;
-export type Accent = keyof typeof PALETTE;
-
-/** Accent as text, readable in the current theme. */
-export const ink = (a: Accent, t: Theme): string | undefined =>
-  t === 'hc' ? undefined : t === 'light' ? PALETTE[a].text : PALETTE[a].hex;
 const hx = (a: Accent) => PALETTE[a].hex;
 
-/** The big glass panel (the ticket header). `loud` when the ticket waits for you. */
+export const ink = (a: Accent, t: Theme): string | undefined =>
+  t === 'hc' ? undefined : t === 'light' ? PALETTE[a].text : PALETTE[a].hex;
+
 export function panel(a: Accent, t: Theme, loud: boolean): CSSProperties {
   const c = hx(a);
   if (t === 'hc') {
@@ -65,7 +34,6 @@ export function panel(a: Accent, t: Theme, loud: boolean): CSSProperties {
   };
 }
 
-/** A row or chip with a horizontal accent wash (queue rows, nav pills). */
 export function wash(
   a: Accent,
   t: Theme,
@@ -101,7 +69,6 @@ export function wash(
   };
 }
 
-/** The square icon tile (radial accent, thin accent border, soft glow). */
 export function tile(a: Accent, t: Theme, size: 'sm' | 'lg' = 'sm'): CSSProperties {
   const c = hx(a);
   if (t === 'hc') {
@@ -120,7 +87,6 @@ export function tile(a: Accent, t: Theme, size: 'sm' | 'lg' = 'sm'): CSSProperti
     : { color: c, borderColor: `${c}55`, background: `${c}14` };
 }
 
-/** A small glowing sphere (status of a queue row). */
 export function orb(a: Accent, t: Theme): CSSProperties {
   const c = hx(a);
   if (t === 'hc') {
@@ -138,13 +104,11 @@ export function orb(a: Accent, t: Theme): CSSProperties {
   };
 }
 
-/** Glow on an icon in a section header. */
 export const iconGlow = (a: Accent, t: Theme): CSSProperties =>
   t === 'hc'
     ? {}
     : { color: ink(a, t), filter: t === 'dark' ? `drop-shadow(0 0 6px ${hx(a)})` : undefined };
 
-/** A small tinted pill ("Average", status words). */
 export const pill = (a: Accent, t: Theme): CSSProperties =>
   t === 'hc'
     ? {}
