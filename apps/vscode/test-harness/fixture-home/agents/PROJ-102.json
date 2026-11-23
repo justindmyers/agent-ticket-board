@@ -1,0 +1,91 @@
+{
+  "stage": "testing",
+  "need": {
+    "kind": "decision",
+    "ask": "Ready to test. 3 of 3 requirements have evidence.",
+    "actions": [
+      {
+        "id": "openApp",
+        "label": "Open app"
+      },
+      {
+        "id": "approve",
+        "label": "Approve"
+      },
+      {
+        "id": "comment",
+        "label": "Send feedback"
+      }
+    ]
+  },
+  "app": "http://localhost:3001/map",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Back restores the previous zoom and center.",
+      "check": "Test: restores view on popstate",
+      "evidence": {
+        "kind": "test",
+        "label": "test passes"
+      },
+      "met": true
+    },
+    {
+      "id": "R2",
+      "text": "Forward applies the view again.",
+      "check": "Click path: pan, Back, Forward",
+      "evidence": {
+        "kind": "screenshot",
+        "label": "screenshot"
+      },
+      "met": true
+    },
+    {
+      "id": "R3",
+      "text": "A small drag adds one history entry.",
+      "check": "Test: debounces moveend",
+      "evidence": {
+        "kind": "test",
+        "label": "test passes"
+      },
+      "met": true
+    }
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "text": "Add a view-history hook, test first",
+      "covers": ["R1", "R3"],
+      "state": "done"
+    },
+    {
+      "n": 2,
+      "text": "Connect the hook to the map",
+      "covers": ["R1", "R2"],
+      "state": "done"
+    },
+    {
+      "n": 3,
+      "text": "Debounce, and skip moves that the code makes",
+      "covers": ["R3"],
+      "state": "done"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Type check",
+      "ok": true
+    },
+    {
+      "name": "Lint",
+      "ok": true
+    },
+    {
+      "name": "Tests (changed files)",
+      "ok": true,
+      "note": "14 passed"
+    }
+  ],
+  "review": "2 rounds. 5 findings: 4 fixed, 1 dropped as false.",
+  "branch": "fix/PROJ-102-map-history"
+}

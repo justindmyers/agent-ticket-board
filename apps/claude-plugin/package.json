@@ -1,0 +1,10 @@
+{
+  "name": "@agent-ticket-board/claude-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pretest": "node -e \"require('fs').existsSync('hooks/paths.gen.ts')||require('fs').writeFileSync('hooks/paths.gen.ts','export const NODE = \\'node\\'\\nexport const ATB = \\'atb.cjs\\'\\n')\"",
+    "test": "claude plugin test"
+  }
+}

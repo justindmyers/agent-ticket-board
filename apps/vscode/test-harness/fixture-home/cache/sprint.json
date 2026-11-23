@@ -1,0 +1,582 @@
+{
+  "at": "2026-01-15T10:05:00.000Z",
+  "tickets": [
+    {
+      "key": "PROJ-101",
+      "summary": "Show and sort by item count on each project card",
+      "status": "In Progress",
+      "type": "Story",
+      "priority": "Medium",
+      "labels": [],
+      "points": 3,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Each project card and list row needs the number of items in the project."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The card and the list row show the item count."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Archived items show as \"3 (1 archived)\"."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The list sorts by item count in both directions."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Agent notes"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Count archived items, but label them."
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-102",
+      "summary": "Restore the map view on Back and Forward",
+      "status": "In Progress",
+      "type": "Bug",
+      "priority": "High",
+      "labels": [],
+      "points": 2,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Back in the browser resets the map to the default view."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Back restores the previous zoom and center."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Forward applies the view again."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "A small drag adds one history entry."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-103",
+      "summary": "Mobile navigation drawer",
+      "status": "Code Review",
+      "type": "Story",
+      "priority": "Medium",
+      "labels": [],
+      "points": 5,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "On narrow screens the top navigation does not fit."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "A menu button opens a drawer."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The drawer closes on Escape and on a link press."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-104",
+      "summary": "Landing page for projects",
+      "status": "Code Review",
+      "type": "Story",
+      "priority": "Medium",
+      "labels": [],
+      "points": 3,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "A landing page lists the projects of the user."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The page shows a card for each project."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "An empty state shows when there are no projects."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-105",
+      "summary": "Saved filters",
+      "status": "Verifying",
+      "type": "Story",
+      "priority": "Low",
+      "labels": [],
+      "points": 2,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Users want to keep a filter set."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "A user can save the current filters with a name."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-106",
+      "summary": "Settings page",
+      "status": "Done",
+      "type": "Task",
+      "priority": "Low",
+      "labels": [],
+      "points": 3,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Move the settings into one page."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "All settings show on one page."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-107",
+      "summary": "Export a report as CSV",
+      "status": "To Do",
+      "type": "Story",
+      "priority": "Medium",
+      "labels": [],
+      "points": null,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Users copy table data by hand."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "An Export button downloads the table as a CSV file."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-108",
+      "summary": "Fix the sign-in redirect loop",
+      "status": "Code Review",
+      "type": "Bug",
+      "priority": "Highest",
+      "labels": [],
+      "points": 1,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "After a session ends, sign-in redirects in a loop."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Sign-in after a timeout opens the home page once."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    }
+  ]
+}

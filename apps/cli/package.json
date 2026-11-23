@@ -1,0 +1,19 @@
+{
+  "name": "@agent-ticket-board/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "atb": "dist/atb.cjs"
+  },
+  "scripts": {
+    "build": "esbuild src/atb.ts --bundle --platform=node --format=cjs --outfile=dist/atb.cjs --log-level=warning",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agent-ticket-board/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
+}

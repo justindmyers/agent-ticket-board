@@ -1,0 +1,13 @@
+{
+  "name": "agent-ticket-board",
+  "owner": {
+    "name": "Agent Ticket Board contributors"
+  },
+  "plugins": [
+    {
+      "name": "agent-ticket-board",
+      "source": "./apps/claude-plugin",
+      "description": "Agent Ticket Board pane for Claude Code, plus the git push and Jira write guards"
+    }
+  ]
+}

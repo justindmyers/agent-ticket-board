@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+
+/* Design tokens from DESIGN.md. Generic names only.
+   The look: a near-black ground, translucent glass panels tinted by one accent colour,
+   ink (white in dark themes) at stepped opacities, and glows from the accent of the current stage.
+   VS Code puts one theme class on <body>. */
+:root,
+.vscode-dark {
+  --atb-ground: #050608;
+  --atb-base: rgb(10 11 14);
+  --atb-ink: #ffffff;
+  --atb-problem: #fa4045;
+  --atb-agent: #a78bfa;
+  --atb-agent-bg: rgb(123 102 250 / 0.14);
+  --atb-agent-ring: rgb(167 139 250 / 0.45);
+  --atb-muted: rgb(255 255 255 / 0.58);
+  --atb-soft: rgb(255 255 255 / 0.78);
+  color-scheme: dark;
+}
+.vscode-light {
+  --atb-ground: #f4f5f8;
+  --atb-base: rgb(255 255 255);
+  --atb-ink: #0f172a;
+  --atb-problem: #c8262b;
+  --atb-agent: #6d28d9;
+  --atb-agent-bg: #ede9fe;
+  --atb-agent-ring: #c4b5fd;
+  --atb-muted: rgb(15 23 42 / 0.7);
+  --atb-soft: rgb(15 23 42 / 0.84);
+  color-scheme: light;
+}
+/* High contrast: VS Code colours. The components also drop tint, blur and glow (see surfaces.ts). */
+.vscode-high-contrast,
+.vscode-high-contrast-light {
+  --atb-ground: var(--vscode-editor-background);
+  --atb-base: var(--vscode-editor-background);
+  --atb-ink: var(--vscode-foreground);
+  --atb-problem: var(--vscode-errorForeground);
+  --atb-agent: var(--vscode-editorWarning-foreground);
+  --atb-agent-bg: transparent;
+  --atb-agent-ring: var(--vscode-editorWarning-foreground);
+  --atb-muted: var(--vscode-foreground);
+  --atb-soft: var(--vscode-foreground);
+}
+
+@custom-variant hc (&:where(.vscode-high-contrast *, .vscode-high-contrast-light *));
+@custom-variant light (&:where(.vscode-light *));
+
+@theme inline {
+  --color-ground: var(--atb-ground);
+  --color-base: var(--atb-base);
+  --color-ink: var(--atb-ink);
+  --color-problem: var(--atb-problem);
+  --color-agent: var(--atb-agent);
+  --color-agent-bg: var(--atb-agent-bg);
+  --color-agent-ring: var(--atb-agent-ring);
+  --color-muted: var(--atb-muted);
+  --color-soft: var(--atb-soft);
+  --font-sans: var(--vscode-font-family, system-ui), sans-serif;
+  --font-mono: var(--vscode-editor-font-family, Menlo, monospace);
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-breathe: breathe 2.6s ease-in-out infinite;
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply m-0 bg-ground font-sans text-[13px] leading-normal text-soft antialiased;
+  }
+  :focus {
+    outline: none;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--atb-ink) 14%, transparent) transparent;
+  }
+}
+
+/* Ticket text from Jira (ADF rendered to HTML). */
+@layer components {
+  .prose-ticket {
+    @apply leading-relaxed text-soft;
+  }
+  .prose-ticket p {
+    @apply mb-2 last:mb-0;
+  }
+  .prose-ticket ul,
+  .prose-ticket ol {
+    @apply my-1 mb-2.5 pl-5;
+  }
+  .prose-ticket ul {
+    @apply list-disc marker:text-ink/30;
+  }
+  .prose-ticket ol {
+    @apply list-decimal marker:text-ink/40;
+  }
+  .prose-ticket li {
+    @apply my-1;
+  }
+  .prose-ticket pre {
+    @apply overflow-x-auto rounded-lg border border-ink/[0.07] bg-ink/[0.03] px-2.5 py-2;
+  }
+  .prose-ticket code {
+    @apply rounded bg-ink/[0.06] px-1 font-mono text-[12px] text-ink/85;
+  }
+  .prose-ticket strong {
+    @apply font-semibold text-ink/90;
+  }
+}
+
+/* VS Code injects its own kbd style (unlayered), which beats Tailwind layers; reset it here, unlayered. */
+kbd {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: color-mix(in srgb, currentColor 28%, transparent) !important;
+  color: inherit !important;
+  vertical-align: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

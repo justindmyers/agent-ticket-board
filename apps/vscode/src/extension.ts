@@ -1,0 +1,459 @@
+import * as vscode from 'vscode';
+import {
+  addComment,
+  agentFor,
+  agentMayMove,
+  detail,
+  findPr,
+  FLOWS,
+  flowFor,
+  grouped,
+  listComments,
+  loadState,
+  moveTicket,
+  PRS,
+  readCache,
+  refreshPrs,
+  refreshSprint,
+  setAgentMayMove,
+  setAfterMerge,
+  jiraPanel,
+  STATUS,
+  ticketUrl,
+  type Snapshot,
+  type Ticket
+} from '@agent-ticket-board/core';
+
+// Jira writes: a status change only, after the developer confirms it here, or by the agent on a
+// ticket where the developer allowed it. Agent records are sample files until the service exists.
+
+type Msg =
+  | { type: 'ready' | 'refresh' | 'openBoard' }
+  | { type: 'openTicket' | 'select'; key: string }
+  | { type: 'move'; key: string; from?: string; to: string }
+  | { type: 'setAgentMove'; key: string; allow: boolean }
+  | { type: 'setAfterMerge'; key: string; to: string | null }
+  | { type: 'comment'; key: string; text: string; run?: boolean }
+  | { type: 'action'; key: string; id: string }
+  | { type: 'openJira'; key: string }
+  | { type: 'openUrl'; url: string };
+
+const REFRESH_MS = 5 * 60_000;
+const SAMPLE_ACTIONS: Record<string, string> = {
+  approve: 'Approve',
+  startPlanning: 'Start planning',
+  fix: 'Fix',
+  pause: 'Pause agent',
+  replan: 'Re-plan',
+  openPlan: 'Open plan file',
+  openWorktree: 'Open worktree'
+};
+
+let cache: Snapshot | undefined;
+let pending = 0;
+let updating = false;
+let loading: Promise<void> | undefined;
+const views = new Set<vscode.Webview>();
+let board: vscode.WebviewPanel | undefined;
+let inbox: vscode.WebviewPanel | undefined;
+let inboxKey: string | undefined;
+let sidebarVisible = false;
+const tried = new Set<string>();
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const open = (url: string) => vscode.env.openExternal(vscode.Uri.parse(url));
+const post = (m: unknown) => views.forEach((w) => w.postMessage(m));
+
+// The editor tab shows the queue only when the sidebar queue is hidden: never two queues at once.
+const postLayout = () => inbox?.webview.postMessage({ type: 'layout', queue: !sidebarVisible });
+
+function nonce() {
+  return Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+}
+
+function shaped() {
+  return cache!.tickets.map((t) => {
+    STATUS[t.key] = t.status;
+    return { ...t, agent: agentFor(t.key), comments: undefined, description: undefined };
+  });
+}
+
+function broadcast() {
+  if (!cache) {
+    return;
+  }
+  const tickets = shaped();
+  post({ type: 'data', at: cache.at, tickets, groups: grouped(tickets), updating, pending });
+}
+
+async function loadPr(key: string) {
+  try {
+    PRS[key] = await findPr(key);
+  } catch {
+    // Keep the old value. gh can be signed out.
+  }
+}
+
+async function loadPrs() {
+  await refreshPrs(findPr);
+  broadcast();
+  if (inboxKey) {
+    void sendTicket(inboxKey, true);
+  }
+  void autoSync();
+}
+
+async function doMove(key: string, to: string, by: 'you' | 'agent', from?: string) {
+  try {
+    await moveTicket(key, to, by, from);
+    const t = cache?.tickets.find((x) => x.key === key);
+    if (t) {
+      t.status = to;
+    }
+    broadcast();
+    void sendTicket(key, true);
+    const who = by === 'agent' ? ' by the agent (allowed for this ticket)' : '';
+    vscode.window.setStatusBarMessage(`${key} moved to ${to} in Jira${who}`, 6000);
+    setTimeout(() => void refresh(true), 3000);
+  } catch (e) {
+    void vscode.window.showErrorMessage(`${key}: Jira status not changed. ${errorText(e)}`);
+    broadcast();
+  }
+}
+
+/** A merged ticket that Jira has not caught up with. The agent moves it only where the developer allowed it. */
+async function autoSync() {
+  if (!cache) {
+    return;
+  }
+  for (const t of cache.tickets) {
+    const f = flowFor(t.key, t.status);
+    const to = f?.need?.from === 'sync' ? f.need.to : undefined;
+    if (!to || tried.has(`${t.key}:${to}`) || !(await agentMayMove(t.key))) {
+      continue;
+    }
+    tried.add(`${t.key}:${to}`);
+    await doMove(t.key, to, 'agent', t.status);
+  }
+}
+
+// Show the disk cache at once, then refresh in the background and fill in as data arrives.
+async function refresh(force = false) {
+  if (!cache) {
+    const c = await readCache();
+    if (c.tickets.length) {
+      cache = c;
+    }
+  }
+  broadcast();
+  if (loading) {
+    return loading;
+  }
+  if (cache?.at && !force && Date.now() - Date.parse(cache.at) < REFRESH_MS) {
+    return;
+  }
+  updating = true;
+  broadcast();
+  if (!cache) {
+    post({ type: 'loading' });
+  }
+  loading = (async () => {
+    try {
+      await refreshSprint((s) => {
+        cache = s;
+        pending = s.pending;
+        broadcast();
+      });
+      if (inboxKey) {
+        void sendTicket(inboxKey, true);
+      }
+      void loadPrs();
+    } catch (e) {
+      post({ type: cache ? 'warn' : 'error', message: errorText(e) });
+    } finally {
+      loading = undefined;
+      updating = false;
+      pending = 0;
+      broadcast();
+    }
+  })();
+  return loading;
+}
+
+// Ticket pane: draw from the cache at once, then get the fresh detail and draw again.
+async function sendTicket(key: string, cachedOnly = false) {
+  if (!inbox) {
+    return;
+  }
+  const w = inbox.webview;
+  const msg = async (t: Ticket, fresh: boolean) =>
+    w.postMessage({
+      type: 'ticket',
+      fresh,
+      ticket: t,
+      flow: flowFor(key, t.status),
+      comments: await listComments(key),
+      jira: await jiraPanel(key, PRS[key])
+    });
+  if (!cache) {
+    const c = await readCache();
+    if (c.tickets.length) {
+      cache = c;
+    }
+  }
+  const cached = cache?.tickets.find((t) => t.key === key);
+  if (cached) {
+    await msg(cached, cachedOnly && cached.description !== undefined);
+  }
+  if (cachedOnly) {
+    return;
+  }
+  if (FLOWS[key] && PRS[key] === undefined) {
+    void loadPr(key).then(() => {
+      broadcast();
+      if (inboxKey === key) {
+        void sendTicket(key, true);
+      }
+    });
+  }
+  try {
+    const d = await detail(key);
+    if (inboxKey === key) {
+      await msg(d, true);
+    }
+  } catch (e) {
+    if (!cached) {
+      void w.postMessage({ type: 'error', message: errorText(e) });
+    }
+  }
+}
+
+async function confirmMove(key: string, to: string, fromStatus?: string) {
+  const t = cache?.tickets.find((x) => x.key === key);
+  const from = fromStatus ?? t?.status;
+  if (!to || to === from) {
+    return;
+  }
+  const ok = await vscode.window.showWarningMessage(
+    `Move ${key} to ${to} in Jira?`,
+    {
+      modal: true,
+      detail: `${t?.summary ?? ''}\n\nJira status: ${from} → ${to}. Only the status changes.`
+    },
+    `Move to ${to}`
+  );
+  if (!ok) {
+    broadcast();
+    return;
+  }
+  await doMove(key, to, 'you', from);
+}
+
+async function runAction(key: string, id: string) {
+  const f = flowFor(key);
+  if (id.startsWith('move:')) {
+    return confirmMove(key, id.slice(5), STATUS[key]);
+  }
+  if (id === 'openJira') {
+    const url = ticketUrl(key);
+    return url ? open(url) : undefined;
+  }
+  if (id === 'openChat') {
+    return f?.session
+      ? open(`vscode://anthropic.claude-code/open?session=${f.session}`)
+      : undefined;
+  }
+  if (id === 'openApp' && f?.app) {
+    return open(f.app);
+  }
+  if (id === 'openPr') {
+    if (PRS[key] === undefined) {
+      await loadPr(key);
+    }
+    const pr = PRS[key];
+    return pr
+      ? open(pr.url)
+      : vscode.window.showInformationMessage(`${key}: no pull request found on GitHub.`);
+  }
+  return vscode.window.showInformationMessage(
+    `${key}: ${SAMPLE_ACTIONS[id] ?? id}. Not built yet: nothing started.`
+  );
+}
+
+async function handle(m: Msg, ctx: vscode.ExtensionContext) {
+  switch (m.type) {
+    case 'ready':
+      postLayout();
+      if (inboxKey) {
+        post({ type: 'current', key: inboxKey });
+      }
+      return refresh();
+    case 'refresh':
+      return refresh(true);
+    case 'openBoard':
+      return openBoard(ctx);
+    case 'openTicket':
+      return openInbox(ctx, m.key);
+    case 'select':
+      inboxKey = m.key;
+      post({ type: 'current', key: m.key });
+      if (inbox) {
+        inbox.title = sidebarVisible ? m.key : 'My sprint';
+      }
+      return sendTicket(m.key);
+    case 'move':
+      return confirmMove(m.key, m.to, m.from);
+    case 'setAgentMove':
+      await setAgentMayMove(m.key, !!m.allow);
+      void sendTicket(m.key, true);
+      return autoSync();
+    case 'setAfterMerge':
+      await setAfterMerge(m.key, m.to);
+      broadcast();
+      void sendTicket(m.key, true);
+      return autoSync();
+    case 'comment': {
+      const text = String(m.text ?? '').trim();
+      if (!text) {
+        return;
+      }
+      await addComment(m.key, text, !!m.run);
+      if (m.run) {
+        void vscode.window.showInformationMessage(
+          `${m.key}: comment saved. Not built yet: the agent does not resume.`
+        );
+      }
+      return sendTicket(m.key, true);
+    }
+    case 'action':
+      return runAction(m.key, String(m.id));
+    case 'openJira':
+      return runAction(m.key, 'openJira');
+    case 'openUrl':
+      return open(m.url);
+  }
+}
+
+// React + Tailwind webview, built by Vite into media/webview.
+function webviewHtml(
+  webview: vscode.Webview,
+  ctx: vscode.ExtensionContext,
+  mode: 'split' | 'sidebar' | 'board'
+) {
+  const n = nonce();
+  const uri = (f: string) =>
+    webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, 'media', 'webview', f));
+  const csp = [
+    "default-src 'none'",
+    `img-src ${webview.cspSource} https:`,
+    `style-src ${webview.cspSource} 'unsafe-inline'`,
+    `font-src ${webview.cspSource}`,
+    `script-src 'nonce-${n}'`
+  ].join('; ');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Agent Ticket Board</title>
+<meta http-equiv="Content-Security-Policy" content="${csp};">
+<link rel="stylesheet" href="${uri('inbox.css')}"></head><body data-mode="${mode}"><div id="root"></div>
+<script type="module" nonce="${n}" src="${uri('inbox.js')}"></script></body></html>`;
+}
+
+function createPanel(
+  ctx: vscode.ExtensionContext,
+  id: string,
+  title: string,
+  mode: 'split' | 'board'
+) {
+  const p = vscode.window.createWebviewPanel(id, title, vscode.ViewColumn.Active, {
+    enableScripts: true,
+    retainContextWhenHidden: true,
+    localResourceRoots: [vscode.Uri.joinPath(ctx.extensionUri, 'media')]
+  });
+  p.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.svg');
+  p.webview.html = webviewHtml(p.webview, ctx, mode);
+  p.webview.onDidReceiveMessage((m: Msg) => handle(m, ctx));
+  views.add(p.webview);
+  return p;
+}
+
+function openInbox(ctx: vscode.ExtensionContext, key?: string) {
+  if (inbox) {
+    inbox.reveal(vscode.ViewColumn.Active, true);
+    if (key) {
+      void inbox.webview.postMessage({ type: 'select', key });
+    }
+    return;
+  }
+  const p = createPanel(ctx, 'agentTicketBoard.inbox', 'My sprint', 'split');
+  inbox = p;
+  p.onDidDispose(() => {
+    views.delete(p.webview);
+    inbox = undefined;
+    inboxKey = undefined;
+    post({ type: 'current', key: null });
+  });
+  setTimeout(() => {
+    postLayout();
+    if (key) {
+      void inbox?.webview.postMessage({ type: 'select', key });
+    }
+  }, 300);
+}
+
+function openBoard(ctx: vscode.ExtensionContext) {
+  if (board) {
+    return board.reveal();
+  }
+  const p = createPanel(ctx, 'agentTicketBoard.board', 'Board', 'board');
+  board = p;
+  p.onDidDispose(() => {
+    views.delete(p.webview);
+    board = undefined;
+  });
+}
+
+export async function activate(ctx: vscode.ExtensionContext) {
+  await loadState();
+  // Sync with Jira and GitHub every 5 minutes while a view is open.
+  const timer = setInterval(() => {
+    if (views.size) {
+      void refresh(true);
+    }
+  }, REFRESH_MS);
+  ctx.subscriptions.push(
+    { dispose: () => clearInterval(timer) },
+    vscode.commands.registerCommand('agentTicketBoard.board', () => openBoard(ctx)),
+    vscode.commands.registerCommand('agentTicketBoard.inbox', () => openInbox(ctx)),
+    vscode.commands.registerCommand('agentTicketBoard.refresh', () => refresh(true)),
+    vscode.window.registerWebviewViewProvider(
+      'agentTicketBoard.queue',
+      {
+        resolveWebviewView(view) {
+          const w = view.webview;
+          w.options = {
+            enableScripts: true,
+            localResourceRoots: [vscode.Uri.joinPath(ctx.extensionUri, 'media')]
+          };
+          w.html = webviewHtml(w, ctx, 'sidebar');
+          views.add(w);
+          sidebarVisible = view.visible;
+          postLayout();
+          view.onDidChangeVisibility(() => {
+            sidebarVisible = view.visible;
+            postLayout();
+            if (view.visible && inboxKey) {
+              void w.postMessage({ type: 'current', key: inboxKey });
+            }
+          });
+          view.onDidDispose(() => {
+            views.delete(w);
+            sidebarVisible = false;
+            postLayout();
+          });
+          w.onDidReceiveMessage((m: Msg) => handle(m, ctx));
+        }
+      },
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
+}
+
+export function deactivate() {}

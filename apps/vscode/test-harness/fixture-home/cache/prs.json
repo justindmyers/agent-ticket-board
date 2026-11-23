@@ -1,0 +1,37 @@
+{
+  "PROJ-101": null,
+  "PROJ-102": null,
+  "PROJ-103": {
+    "number": 41,
+    "url": "https://github.com/example/app/pull/41",
+    "state": "Draft",
+    "draft": true,
+    "checks": "2 of 6 failing",
+    "failing": 2,
+    "reviews": "Waiting for review",
+    "comments": 3,
+    "branch": "feature/PROJ-103-mobile-nav"
+  },
+  "PROJ-104": {
+    "number": 42,
+    "url": "https://github.com/example/app/pull/42",
+    "state": "Merged",
+    "draft": false,
+    "checks": "6 passing",
+    "failing": 0,
+    "reviews": "Merged",
+    "comments": 2,
+    "branch": "feature/PROJ-104-landing"
+  },
+  "PROJ-108": {
+    "number": 43,
+    "url": "https://github.com/example/app/pull/43",
+    "branch": "hotfix/PROJ-108-sign-in",
+    "state": "Merged",
+    "draft": false,
+    "checks": "6 passing",
+    "failing": 0,
+    "reviews": "Merged",
+    "comments": 0
+  }
+}

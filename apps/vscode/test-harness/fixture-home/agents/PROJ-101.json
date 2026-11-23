@@ -1,0 +1,70 @@
+{
+  "stage": "planning",
+  "need": {
+    "kind": "decision",
+    "ask": "Plan ready. 3 requirements, 4 steps.",
+    "actions": [
+      {
+        "id": "approve",
+        "label": "Approve plan"
+      },
+      {
+        "id": "comment",
+        "label": "Comment"
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "The card and the list row show the item count.",
+      "check": "Test: ProjectCard renders the count"
+    },
+    {
+      "id": "R2",
+      "text": "Archived items show as \"3 (1 archived)\".",
+      "check": "Test: formatItemCount"
+    },
+    {
+      "id": "R3",
+      "text": "The list sorts by item count in both directions.",
+      "check": "Click path: Projects, sort by Items"
+    }
+  ],
+  "questions": [
+    {
+      "q": "Count archived items?",
+      "a": "Yes, show them as \"X (Y archived)\"."
+    },
+    {
+      "q": "Card, list row, or both?",
+      "a": "Both."
+    }
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "text": "Add an item-count query hook, test first",
+      "covers": ["R1"],
+      "state": "todo"
+    },
+    {
+      "n": 2,
+      "text": "Show the count on the card and the list row",
+      "covers": ["R1", "R2"],
+      "state": "todo"
+    },
+    {
+      "n": 3,
+      "text": "Add the sort option",
+      "covers": ["R3"],
+      "state": "todo"
+    },
+    {
+      "n": 4,
+      "text": "Tests for the format and the sort",
+      "covers": ["R2", "R3"],
+      "state": "todo"
+    }
+  ]
+}

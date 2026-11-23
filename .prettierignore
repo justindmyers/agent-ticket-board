@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+**/dist/**
+**/media/webview/**
+*.md
+design/
+.github/

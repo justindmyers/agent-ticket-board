@@ -1,0 +1,7 @@
+# Use the default gitleaks rules. Skip folders that git ignores.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignored and generated folders"
+paths = ['''(^|/)node_modules/''', '''(^|/)dist/''', '''^\.impeccable/''', '''media/webview/''', '''test-harness/out/''']

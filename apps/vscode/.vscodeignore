@@ -1,0 +1,7 @@
+src/**
+webview/**
+test-harness/**
+node_modules/**
+tsconfig.json
+vite.config.ts
+dist/*.vsix

@@ -1,0 +1,80 @@
+{
+  "name": "agent-ticket-board-vscode",
+  "displayName": "Agent Ticket Board",
+  "version": "0.1.0",
+  "publisher": "agent-ticket-board",
+  "private": true,
+  "license": "MIT",
+  "description": "Your Jira sprint as a queue, a ticket page and a board, with an agent session for each ticket.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agent-ticket-board/agent-ticket-board"
+  },
+  "type": "commonjs",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentTicketBoard",
+          "title": "Agent Ticket Board",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentTicketBoard": [
+        {
+          "type": "webview",
+          "id": "agentTicketBoard.queue",
+          "name": "My sprint"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agentTicketBoard.inbox",
+        "title": "Agent Ticket Board: Open My Sprint"
+      },
+      {
+        "command": "agentTicketBoard.board",
+        "title": "Agent Ticket Board: Open Board"
+      },
+      {
+        "command": "agentTicketBoard.refresh",
+        "title": "Agent Ticket Board: Refresh from Jira"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "vite build && esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.js --log-level=warning",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p webview",
+    "package": "pnpm build && vsce package --no-dependencies --out dist/agent-ticket-board.vsix",
+    "test:ui": "pnpm build && pnpm --filter @agent-ticket-board/cli build && node test-harness/run-inbox.cjs"
+  },
+  "dependencies": {
+    "@agent-ticket-board/core": "workspace:*",
+    "@mdi/js": "^7.4.47",
+    "react": "^19.3.1",
+    "react-aria-components": "^1.22.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/vscode": "~1.90.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "@vscode/vsce": "^4.1.1",
+    "axe-core": "^4.14.1",
+    "playwright-core": "^1.65.1",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.3.8"
+  }
+}

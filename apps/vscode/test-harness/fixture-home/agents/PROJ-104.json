@@ -1,0 +1,32 @@
+{
+  "stage": "development",
+  "steps": [
+    {
+      "n": 1,
+      "text": "Address review comment: empty state text",
+      "covers": [],
+      "state": "done"
+    },
+    {
+      "n": 2,
+      "text": "Address review comment: card grid on narrow screens",
+      "covers": [],
+      "state": "current"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Type check",
+      "ok": null
+    },
+    {
+      "name": "Lint",
+      "ok": null
+    },
+    {
+      "name": "Tests (changed files)",
+      "ok": null
+    }
+  ],
+  "branch": "feature/PROJ-104-landing"
+}

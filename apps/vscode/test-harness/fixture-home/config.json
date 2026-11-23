@@ -1,0 +1,21 @@
+{
+  "tracker": {
+    "kind": "jira-acli",
+    "site": "example.atlassian.net",
+    "project": "PROJ",
+    "jql": "project = PROJ AND assignee = currentUser() AND sprint in openSprints()",
+    "pointsField": "customfield_00000",
+    "columns": ["To Do", "In Progress", "Code Review", "Verifying", "Blocked", "Done"],
+    "finished": ["Done", "Verifying"],
+    "afterMerge": "Verifying",
+    "afterMergeRules": [
+      {
+        "branch": "^(hotfix|infra)/",
+        "to": null
+      }
+    ]
+  },
+  "repo": {
+    "path": null
+  }
+}

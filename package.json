@@ -1,0 +1,38 @@
+{
+  "name": "agent-ticket-board",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "tsc --noEmit && pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "test": "vitest run && pnpm --filter @agent-ticket-board/claude-plugin test",
+    "test:ui": "pnpm --filter agent-ticket-board-vscode test:ui",
+    "leak-check": "tsx scripts/leak-check.ts",
+    "docs:lint": "tsx scripts/docs-lint.ts",
+    "precommit": "pnpm typecheck && pnpm lint && tsx scripts/leak-check.ts --staged && pnpm docs:lint",
+    "install-local": "tsx scripts/install-local.ts",
+    "prepare": "git config core.hooksPath .githooks || true"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.74.0",
+    "vitest": "^5.1.1"
+  }
+}

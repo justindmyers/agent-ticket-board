@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.vsix
+apps/vscode/media/webview/
+.scratch/
+apps/vscode/test-harness/out/
+.DS_Store
+*.tmp
+apps/claude-plugin/hooks/paths.gen.ts
+.claude/settings.local.json
+.impeccable/

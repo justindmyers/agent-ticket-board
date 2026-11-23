@@ -1,0 +1,6 @@
+{
+  "name": "agent-ticket-board",
+  "version": "0.1.0",
+  "description": "Agent Ticket Board pane for Claude Code, plus the git push and Jira write guards",
+  "license": "MIT"
+}

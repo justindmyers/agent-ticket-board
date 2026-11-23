@@ -1,0 +1,3 @@
+#!/bin/sh
+# Type check, lint, leak check and docs lint before each commit. Do not skip with --no-verify.
+exec pnpm precommit
