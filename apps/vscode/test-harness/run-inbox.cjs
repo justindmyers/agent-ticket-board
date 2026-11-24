@@ -133,6 +133,15 @@ function page(theme, mode) {
     return p;
   }
   async function axe(p, label) {
+    // Contrast is checked on the settled page: a fade still running blends text into its background.
+    await p.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => {}))
+      )
+    );
     await p.addScriptTag({ content: axeSrc });
     const r = await p.evaluate(() =>
       window.axe.run(document, {
