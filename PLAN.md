@@ -82,8 +82,8 @@ Each stage is a row in the workflow config. A row names the skills, the helper a
 
 | Stage | What happens | Stops for the developer |
 |---|---|---|
-| Planning | The agent reads the ticket and writes numbered requirements. Each requirement gets a check: a test or a click path. The agent asks only the questions that change what it builds. Then it writes small steps, and each step names the requirements that it covers. | Yes: "Approve plan and start" |
-| Development | Worker agents do one step each and run the targeted check for that step. Then reviewer agents check the diff (correctness, reuse, style, UI), and a verifier removes false findings. The review runs 3 rounds at most. One final gate follows: type check, then lint and tests for the changed files. | No |
+| Planning | The agent reads the ticket and the code. It looks up linked tickets and pull requests with read-only commands. It writes numbered requirements. Each requirement gets a check: a test or a click path. The agent asks at most 3 questions, and only questions that block the build. It decides the rest and lists each decision as an assumption. After the developer answers, the next plan is final: it cannot ask more questions. Then it writes small steps, and each step names the requirements that it covers. | Yes: "Approve plan and start" |
+| Development | The steps are code changes and commands only. Browser, device and manual checks go to Testing. Worker agents do one step each and run the targeted check for that step. Then reviewer agents check the diff (correctness, reuse, style, UI), and a verifier removes false findings. The review runs 3 rounds at most. One final gate follows: type check, then lint and tests for the changed files. | No |
 | Testing | The developer tests the change. The Testing tab shows each requirement with its evidence: a passing test or a screenshot. Feedback goes back to Development. | Yes: "Approve" |
 | Code review | After the approval: commit, push, CI, then a draft pull request with screenshots. Another person reviews the pull request on the git host. The tab shows the pull request, its checks and its review comments. The stage ends when the pull request merges. | Waits for the reviewer |
 
@@ -108,7 +108,14 @@ Each stage is a row in the workflow config. A row names the skills, the helper a
 
 - **Engine.** The Claude Agent SDK runs the agent with the developer's own Claude Code sign-in. The board never reads or stores credentials.
 - **One session for each ticket.** The session starts when the ticket appears. Before Start, the session is read-only: the agent can discuss, read code, check readiness and draft points. Start switches the same session to build mode.
-- **Open chat.** The VS Code extension opens the session in the official Claude Code panel with `vscode://anthropic.claude-code/open?session=<id>`. The desktop app opens it with `claude --desktop --resume <id>`. A manual test showed that the VS Code link works.
+- **Settings in agent sessions.** Agent sessions load only the settings of the target repository (`settingSources: ['project', 'local']`, `strictMcpConfig: true`). They do not load the developer's own CLAUDE.md, MCP servers or plugins. The board adds its guard plugin.
+- **Continue in chat.** The Claude Code panel does not show sessions that the Agent SDK starts. Thus the board hands off a summary, not the session:
+  1. The board writes a handoff file in `~/.agent-ticket-board/tickets/<KEY>/`. It has the ticket, the stage, the result so far, the open questions and the path of the agent transcript.
+  2. The board opens a new panel chat in the worktree with `vscode://anthropic.claude-code/open?prompt=<text>`. The prompt tells the chat to read the handoff file. The developer sends it.
+  3. The developer iterates in the chat with the normal setup.
+  4. The chat runs `atb handback <KEY>` with a summary, and a revised plan if there is one. The board shows the stage result as "Changed in chat".
+- **Exact session.** "Continue in terminal" runs `claude --resume <id>` in the worktree, with the same settings as the agent.
+- **Outside work.** If the worktree changes outside the board, the ticket page shows the changed files and the new commits. The developer can use them and continue. The next agent run starts a new session from the handback and the current diff.
 - **Guards.** A plugin hook refuses these commands and tells the agent why:
   - `git push` and `gh pr create`, until the ticket has the developer's approval.
   - Any tracker write.
@@ -116,6 +123,25 @@ Each stage is a row in the workflow config. A row names the skills, the helper a
 - **Models.** Read-only mode uses a mid-tier model. Build mode uses the top model. The developer can override the model for each ticket.
 - **Limits.** Each run has a cap on turns or cost. At the cap, the agent stops at a safe point, writes a handoff note in the comment thread and waits.
 - **Parallel builds.** The cap is configurable (default 3). Extra Start clicks go into a queue. A heavy-job lock lets only one install, type check or build run at a time.
+
+### Audit log
+
+Each ticket keeps a full record of what happened, so that the developer can audit a failure. The record is in `~/.agent-ticket-board/tickets/<KEY>/`.
+
+- **Timeline.** `events.jsonl` has one line for each event, with the time and the source. Events include:
+  - Runs: queued, started, stopped, finished and failed, with the error and its stack.
+  - Record changes: the fields before and after.
+  - Developer actions: answers, approvals, moves, adopt, comments and handbacks.
+  - Service decisions: slots, the queue, cost caps and process kills.
+- **Runs.** Each run has its own folder, `runs/<run id>/`, with:
+  - The prompt and the session options (no secrets).
+  - Every SDK message, in order (`messages.jsonl`).
+  - The raw structured output, before validation.
+  - The error output of the agent process, the cost, the tokens and the session id.
+- **Tracker calls.** Each tracker and git host call that the service makes, with the command and the exit code.
+- **Tools.** `atb audit <KEY>` shows the timeline. "Copy debug bundle" makes one archive of the folder, with tokens removed.
+- **Privacy.** The log has ticket text and code. It stays on this computer. The board never sends or commits it.
+- **Retention.** The board keeps the log until the ticket is finished and a configured time passes. A size cap removes the oldest runs first.
 
 ## 7. Processes and ports
 
@@ -288,6 +314,17 @@ Done when these 3 conditions are true:
 Done when an approved ticket gets a draft pull request with no manual steps.
 
 **M4: Workflow settings.** A settings page for the workflow and skills, swappable skills, pre-plan, drift, overlap and grouping.
+
+### Status
+
+M1 is done. In M2, these parts work in both clients:
+
+- The service runs agent sessions with slots, a queue and Stop. Each ticket has an audit log.
+- Planning gives requirements, steps, at most one round of questions, and assumptions.
+- Development builds the approved plan in a worktree, and shows live step progress and the final gate.
+- A problem says what is wrong and why. When only checks remain that the build cannot run, "Move to Testing" comes first.
+
+Development is one agent session for now. The reviewer agents and the verifier come in M3. Testing is the next stage to build.
 
 ## 15. Open questions
 

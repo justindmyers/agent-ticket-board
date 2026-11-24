@@ -50,18 +50,37 @@ To do:
 
 Before you build, check these items:
 
-- [ ] A session that the Agent SDK starts can continue in the VS Code Claude Code panel.
-- [ ] The guard plugin loads in a session that the Agent SDK starts.
+- [x] A session that the Agent SDK starts can continue in the VS Code Claude Code panel. Result: no. The panel hides sessions that the SDK starts. `claude --resume <session>` in a terminal in the same folder continues them.
+- [x] The guard plugin loads in a session that the Agent SDK starts. Result: yes. It refused `git push`.
+- [x] Agent sessions load only the project settings. They do not load the user's CLAUDE.md or MCP servers (`settingSources: ['project', 'local']`, `strictMcpConfig: true`).
 
 Build:
 
-- [ ] Service with a local API. It owns all processes and sessions.
+- [x] Service with a local API (`atb serve`). It listens on 127.0.0.1 only and needs a token. It owns all agent processes, each in its own process group. The clients start it when it does not run.
+- [x] At start, the service stops the processes that a crashed service left.
 - [ ] Menu bar app (SwiftUI). It shows the service state. "Open at Login" is on, and the user can turn it off. Stop and Quit stop all processes.
-- [ ] Worktree for each ticket, from the configured script.
+- [x] Worktree for each ticket, from the configured script (`<script> <branch> <folder>`). One worktree is made at a time.
 - [ ] Port leases for the app under test, and the test handoff link.
-- [ ] Sessions in read-only mode and build mode, with slots and a queue.
-- [ ] "Start planning" and the other stage actions start real work. Now they show a message only.
+- [x] Sessions in read-only mode, with slots (default 3), a queue and Stop.
+- [x] The plan's questions come first on the Planning tab. Each has the reason, options and a recommended option, or free text. Re-plan uses the answers.
+- [x] Sessions in build mode: edits in the worktree, an allowlist of commands, and live step progress. The agent does not commit.
+- [x] Earlier answers stay with the plan, and the developer can change them.
+- [x] Planning looks up linked tickets and pull requests with read-only `gh` and `acli` commands. The guard refuses GitHub writes.
+- [x] One round of questions: at most 3 on the first plan, none after the developer answers. The agent lists its assumptions instead.
+- [x] Audit log for each ticket (PLAN section 6). It has the timeline, and the prompt, messages and raw output of each run. Open it with `atb audit <KEY>`, "Show audit log" or "Copy debug bundle". A size cap (200 MB for each ticket) removes the oldest runs first.
+- [ ] Audit log retention by time after the ticket is finished, as a setting.
+- [x] "Start planning", "Re-plan" and "Try again" start a planning run, in VS Code and in the Claude Code pane. The plan goes to the Planning tab for approval.
+- [x] "Approve plan and start" and "Try again" start a build run. A clean final gate moves the ticket to Testing.
+- [x] Stop, and every failed run, leave a next step with a button. A ticket that does not run always offers something to click.
+- [x] A problem says what is wrong in one short line, with the agent's reason under it. The list shows the reason as a tooltip.
+- [x] "Move to Testing" moves a build with a clean gate to Testing when only checks remain that the build cannot run.
+- [ ] Testing stage: evidence for each requirement, and the developer's feedback back to Development.
+- [ ] The Code review actions start real work. Now they show a message only.
 - [ ] "Comment and resume" sends the comment to the agent session.
+- [ ] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
+- [ ] `atb handback <KEY>` records the result of a chat. The ticket page shows "Changed in chat".
+- [ ] The ticket page shows work that changed outside the board since the last agent run.
+- [ ] "Continue in terminal" resumes the exact agent session.
 - [ ] The guard refuses `git push` before approval, in every session.
 
 ## M3: Review and pull request
