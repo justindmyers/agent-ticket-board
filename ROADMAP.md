@@ -74,7 +74,8 @@ Build:
 - [x] Stop, and every failed run, leave a next step with a button. A ticket that does not run always offers something to click.
 - [x] A problem says what is wrong in one short line, with the agent's reason under it. The list shows the reason as a tooltip.
 - [x] "Move to Testing" moves a build with a clean gate to Testing when only checks remain that the build cannot run.
-- [ ] Testing stage: evidence for each requirement, and the developer's feedback back to Development.
+- [x] Testing stage: the service starts the app of the worktree on a free build port. It opens the test browser of the ticket with `playwright-cli`. The developer logs in once. The browser stays open between test runs. The agent checks each requirement in the live app or with its test, takes screenshots with `atb shots`, views them and fixes what looks wrong. The developer approves the evidence.
+- [ ] Testing feedback: "Not right" with a note sends the change back for a fix.
 - [ ] The Code review actions start real work. Now they show a message only.
 - [ ] "Comment and resume" sends the comment to the agent session.
 - [ ] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
@@ -107,4 +108,4 @@ Build:
 
 ## Open questions
 
-- The design check (impeccable) flags the glow on "needs you" items as a style cliche. The glow stays for now, only on items that need the developer. Is this correct?
+- The design check (impeccable) flags the glow on "needs you" items as a style cliche. The glow stays for now, only on items that need the developer. Is this right?
