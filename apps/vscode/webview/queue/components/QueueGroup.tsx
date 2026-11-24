@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiChevronRight } from '@mdi/js';
+import { mdiChevronDown } from '@mdi/js';
 import { Disclosure, DisclosurePanel, Heading, ListBox } from 'react-aria-components';
 import { Button } from '../../shared/components/Button';
 import { Dot } from '../../shared/components/Dot';
@@ -43,7 +43,14 @@ export function QueueGroup({
           variant="ghost"
           className="h-8 w-full justify-start gap-2 rounded-lg px-2 text-[11px] font-medium tracking-[0.08em] uppercase"
         >
-          <Icon path={open ? mdiChevronDown : mdiChevronRight} size={14} className="text-muted" />
+          <Icon
+            path={mdiChevronDown}
+            size={14}
+            className={cx(
+              'text-muted transition-transform duration-200 ease-soft motion-reduce:transition-none',
+              !open && '-rotate-90'
+            )}
+          />
           <Dot color={groupDot(group.group, group.state)} />
           <span
             className={cx(
@@ -57,7 +64,7 @@ export function QueueGroup({
         </Button>
       </Heading>
 
-      <DisclosurePanel>
+      <DisclosurePanel className="h-(--disclosure-panel-height) overflow-clip transition-[height] duration-200 ease-soft motion-reduce:transition-none">
         <ListBox
           aria-label={group.group}
           className="pt-1 outline-none"

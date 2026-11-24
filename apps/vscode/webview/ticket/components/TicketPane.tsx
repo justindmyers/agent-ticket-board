@@ -14,6 +14,7 @@ import { TicketNav } from './TicketNav';
 import { TicketRail } from './TicketRail';
 import { TicketSkeleton } from './TicketSkeleton';
 import { TicketTitle } from './TicketTitle';
+import { Collapse } from '../../shared/components/Collapse';
 import { AdoptNotice } from './AdoptNotice';
 import { TrackerNotice } from './TrackerNotice';
 
@@ -56,10 +57,18 @@ export function TicketPane({ d, tab, setTab, draft, setDraft, onBack, theme }: P
 
           <TicketTitle d={d} accent={accent} stageIcon={stage?.icon} theme={theme} />
 
-          {f?.closed && <FinishedNotice text={f.closed.text} theme={theme} />}
-          {!f && d.tracker && !d.adopt && <TrackerNotice tracker={d.tracker} theme={theme} />}
-          {!f && d.adopt && <AdoptNotice ticketKey={d.ticket.key} offer={d.adopt} theme={theme} />}
-          {need && <NeedBanner need={need} act={act} theme={theme} />}
+          <Collapse isOpen={!!f?.closed}>
+            {f?.closed && <FinishedNotice text={f.closed.text} theme={theme} />}
+          </Collapse>
+          <Collapse isOpen={!f && !!d.tracker?.notice && !d.adopt}>
+            {d.tracker && <TrackerNotice tracker={d.tracker} theme={theme} />}
+          </Collapse>
+          <Collapse isOpen={!f && !!d.adopt}>
+            {d.adopt && <AdoptNotice ticketKey={d.ticket.key} offer={d.adopt} theme={theme} />}
+          </Collapse>
+          <Collapse isOpen={!!need}>
+            {need && <NeedBanner need={need} act={act} theme={theme} />}
+          </Collapse>
 
           <StageTabList current={si} theme={theme} />
         </header>
@@ -71,7 +80,7 @@ export function TicketPane({ d, tab, setTab, draft, setDraft, onBack, theme }: P
                 <TabPanel
                   key={s.id}
                   id={s.id}
-                  className="grid gap-3 outline-none focus-visible:rounded-xl focus-visible:ring-2 focus-visible:ring-ink/30"
+                  className="grid animate-fade-in gap-3 outline-none focus-visible:rounded-xl focus-visible:ring-2 focus-visible:ring-ink/30"
                 >
                   <StageBody id={s.id} d={d} act={act} theme={theme} />
                 </TabPanel>

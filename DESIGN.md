@@ -148,6 +148,19 @@ The views use the VS Code UI font and the editor mono font for ticket keys. No w
 
 Depth comes from translucency and blur, not from heavy shadows. Cards: card background, 1px border, 1px ring, a soft shadow and `backdrop-filter: blur(12px)`. Overlays (menus, the move dialog): the same surface at a higher opacity with a stronger shadow. The glow on a `needs-you` item is a 0 0 12px shadow in the state color at 35% opacity.
 
+## Motion
+
+Motion shows where content comes from and where it goes. It never asks for attention.
+
+- Content that changes height, such as notices and banners, uses the shared `Collapse` component. It animates height and opacity, so the layout around it does not jump.
+- Queue groups use the height transition of the react-aria disclosure panel. The chevron turns.
+- Items that move to a new place, such as board cards, use the framer-motion `layout` glide.
+- A ticket page fades up when it opens. A stage tab fades in. Menus and selects scale in from their trigger.
+- Keyframes and `--animate-*` tokens live in `styles.css` only. Durations and the ease curve live in `shared/utils/motion.ts`.
+- The ease is a soft deceleration. Enter and collapse take about 200 ms.
+- With reduced motion, framer-motion durations are zero and the CSS animations stop. Opacity fades can stay.
+- A selected row changes color only. It never changes size.
+
 ## Shapes
 
 Radius: 4px for chips inside rows, 6px for buttons and inputs, 10px for cards and the banner, 16px for dialogs. Status dots are 8px circles.

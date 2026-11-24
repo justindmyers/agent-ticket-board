@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { mdiChevronLeft, mdiChevronRight } from '@mdi/js';
 import { Button } from '../../shared/components/Button';
 import { Dot } from '../../shared/components/Dot';
@@ -8,6 +9,7 @@ import { send } from '../../shared/utils/vscodeApi';
 import type { BoardTicket } from '../types/board';
 import { statusDot } from '../utils/columns';
 import { DRAG_TYPE, readDragCard } from '../utils/drag';
+import { EASE, LAYOUT_SECONDS } from '../../shared/utils/motion';
 import { BoardCard } from './BoardCard';
 
 type Props = {
@@ -33,6 +35,7 @@ export function BoardColumn({
   statuses,
   theme
 }: Props) {
+  const reduce = useReducedMotion();
   return (
     <section
       aria-label={`${status}, ${items.length} tickets`}
@@ -86,7 +89,16 @@ export function BoardColumn({
               />
             ))
           ) : items.length ? (
-            items.map((t) => <BoardCard key={t.key} t={t} theme={theme} statuses={statuses} />)
+            items.map((t) => (
+              <motion.div
+                key={t.key}
+                layout="position"
+                layoutId={t.key}
+                transition={{ duration: reduce ? 0 : LAYOUT_SECONDS, ease: EASE }}
+              >
+                <BoardCard t={t} theme={theme} statuses={statuses} />
+              </motion.div>
+            ))
           ) : (
             <p className="m-0 px-1 py-3 text-center text-[12px] text-muted">Nothing here</p>
           )}

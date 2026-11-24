@@ -167,15 +167,17 @@ export function App() {
         style={theme === 'dark' ? ambientGlow(glowHex) : undefined}
       >
         {selected ? (
-          <TicketPane
-            d={detail?.ticket.key === selected ? detail : null}
-            tab={tabs[selected]}
-            setTab={(t) => setTabs((x) => ({ ...x, [selected]: t }))}
-            draft={drafts[selected] ?? ''}
-            setDraft={(s) => setDrafts((x) => ({ ...x, [selected]: s }))}
-            onBack={narrow && !solo ? () => setPage(false) : undefined}
-            theme={theme}
-          />
+          <div key={selected} className="animate-fade-up">
+            <TicketPane
+              d={detail?.ticket.key === selected ? detail : null}
+              tab={tabs[selected]}
+              setTab={(t) => setTabs((x) => ({ ...x, [selected]: t }))}
+              draft={drafts[selected] ?? ''}
+              setDraft={(s) => setDrafts((x) => ({ ...x, [selected]: s }))}
+              onBack={narrow && !solo ? () => setPage(false) : undefined}
+              theme={theme}
+            />
+          </div>
         ) : (
           <p className="p-6 text-muted">Select a ticket in the sidebar.</p>
         )}

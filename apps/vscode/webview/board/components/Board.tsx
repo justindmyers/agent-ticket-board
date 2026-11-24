@@ -1,3 +1,4 @@
+import { LayoutGroup } from 'framer-motion';
 import { useState } from 'react';
 import { usePersisted } from '../../shared/hooks/usePersisted';
 import type { Snapshot } from '../../shared/types/host';
@@ -24,20 +25,22 @@ export function Board({ data, theme }: Props) {
       <h1 className="sr-only">Agent Ticket Board: board</h1>
       <BoardHeader data={data} total={tickets.length} needsN={needsN} theme={theme} />
       <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-5 pb-5">
-        {statuses.map((s) => (
-          <BoardColumn
-            key={s}
-            status={s}
-            items={tickets.filter((t) => t.status === s)}
-            loading={!data}
-            closed={!!collapsed[s]}
-            onToggle={() => setCollapsed((c) => ({ ...c, [s]: !c[s] }))}
-            over={over === s}
-            setOver={setOver}
-            statuses={statuses}
-            theme={theme}
-          />
-        ))}
+        <LayoutGroup>
+          {statuses.map((s) => (
+            <BoardColumn
+              key={s}
+              status={s}
+              items={tickets.filter((t) => t.status === s)}
+              loading={!data}
+              closed={!!collapsed[s]}
+              onToggle={() => setCollapsed((c) => ({ ...c, [s]: !c[s] }))}
+              over={over === s}
+              setOver={setOver}
+              statuses={statuses}
+              theme={theme}
+            />
+          ))}
+        </LayoutGroup>
       </div>
     </main>
   );

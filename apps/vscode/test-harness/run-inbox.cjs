@@ -359,6 +359,54 @@ function page(theme, mode) {
     () => window.__sent.filter((m) => m.type === 'adopt').at(-1) ?? null
   );
   await rh.close();
+  // Motion: count the animations that are running in the page right after each change.
+  kb.motion = {};
+  for (const reduced of [false, true]) {
+    const mp = await open('dark', 'split', 1400, 900);
+    await mp.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+    const running = () =>
+      mp.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter((a) => a.playState === 'running')
+            .map((a) => a.animationName || a.transitionProperty || 'js').length
+      );
+    const m = {};
+    await mp.click('[role=option][data-key="PROJ-101"]');
+    await mp.waitForTimeout(30);
+    m.ticketEnter = await running();
+    await mp.waitForTimeout(600);
+    await mp.getByRole('tab', { name: /Testing/ }).click();
+    await mp.waitForTimeout(30);
+    m.tabSwitch = await running();
+    await mp.waitForTimeout(600);
+    const group = mp.locator('[data-queue] h3 button, [data-queue] [slot=trigger]').first();
+    const panel = mp.locator('[data-queue] [role=group], [data-queue] .overflow-clip').first();
+    const h0 = await panel.evaluate((el) => el.getBoundingClientRect().height);
+    await group.click();
+    await mp.waitForTimeout(60);
+    m.groupMidHeight = Math.round(await panel.evaluate((el) => el.getBoundingClientRect().height));
+    m.groupStartHeight = Math.round(h0);
+    await mp.waitForTimeout(600);
+    m.groupEndHidden = await panel.evaluate((el) => el.hasAttribute('hidden'));
+    await group.click();
+    await mp.waitForTimeout(600);
+    await mp
+      .getByRole('button', { name: /More/ })
+      .first()
+      .click()
+      .catch(() => {});
+    await mp.waitForTimeout(20);
+    m.popoverEntering = await mp.evaluate(
+      () =>
+        !!document.querySelector('[data-entering]') ||
+        document.getAnimations().some((a) => a.animationName === 'popIn')
+    );
+    await mp.keyboard.press('Escape');
+    kb.motion[reduced ? 'reduced' : 'normal'] = m;
+    await mp.close();
+  }
   kb.trackerLabels = {};
   for (const key of ['PROJ-105', 'PROJ-106', 'PROJ-107']) {
     const rh2 = await open('dark', 'split', 1400, 900);
