@@ -1,8 +1,5 @@
-// Leak check: finds private words (employer, people, project keys) and secrets before a commit.
-// The deny list stays outside the repository: ~/.agent-ticket-board/denylist.txt (one regex per line),
-// or the file in ATB_DENYLIST. CI has no deny list, so CI runs only gitleaks.
-//   pnpm leak-check            all tracked and new files
-//   pnpm leak-check --staged   staged files only (the pre-commit hook)
+// Finds private words and secrets before a commit. The deny list stays outside the repository
+// (~/.agent-ticket-board/denylist.txt or ATB_DENYLIST); `--staged` checks staged files only.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';

@@ -1,9 +1,8 @@
 import { CONFIG } from './config';
 import type { AfterMerge, Flow, Pr } from './types';
 
-// Reconcile the local agent record with the tracker (status) and GitHub (pull request).
-// The tracker owns the status, GitHub owns the code, and the local record yields to both.
-// When the tracker is behind GitHub, the developer approves the move (or allows the agent to do it).
+// The local agent record yields to the tracker (status) and GitHub (code). When the tracker is behind
+// GitHub, the developer approves the move, or allows the agent to make it.
 export function reconcile(
   f: Flow | null,
   status: string | undefined,

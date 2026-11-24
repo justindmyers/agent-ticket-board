@@ -1,16 +1,5 @@
-// atb: the shared command line. Every client can call it; the Claude Code pane uses it.
-//   atb sprint [--cached]                 sprint snapshot as JSON (cached: from ~/.agent-ticket-board/cache)
-//   atb ticket <KEY> [--cached]           ticket detail, agent record, comments and group
-//   atb comment <KEY> <text> [--run]      a comment for the agent (never sent to Jira)
-//   atb move <KEY> <STATUS>               the agent moves a ticket (only where the developer allowed it)
-//   atb move <KEY> <STATUS> --approved    a move that the developer approved in a client
-//   atb agent-may-move <KEY> on|off       the developer's permission for one ticket
-//   atb after-merge <KEY> <STATUS>|default   the status for this ticket after its merge
-//   atb adopt <KEY> [--stage=<stage>]     take over the local work for a ticket (writes the agent record)
-//   atb ignore <KEY>                      hide the local branch for a ticket
-//   atb detect [--repo=<path>] [--only=tracker|repo]   proposed config values; writes nothing
-//   atb config [set <key> <json>]          the config, or one value that the developer accepted
-//   atb settings [--detect] [--only=…] [--repo=…] | atb settings save <json>   the settings view
+// atb: the shared command line for every client; the Claude Code pane reaches core only through it.
+// Run it with no command for the usage. JSON goes to stdout.
 import {
   addComment,
   agentFor,
@@ -47,12 +36,19 @@ import {
   isStage
 } from '@agent-ticket-board/core';
 
-const USAGE =
-  'usage: atb sprint [--cached] | atb ticket <KEY> [--cached] | atb comment <KEY> <text> [--run] | ' +
-  'atb move <KEY> <STATUS> [--approved] | atb agent-may-move <KEY> on|off | atb after-merge <KEY> <STATUS>|default | ' +
-  'atb adopt <KEY> [--stage=<stage>] | atb ignore <KEY> | ' +
-  'atb detect [--repo=<path>] [--only=tracker|repo] | atb config [set <key> <json>] | ' +
-  'atb settings [--detect] [--only=tracker|repo] | atb settings save <json>\n';
+const USAGE = `usage:
+  atb sprint [--cached]                  sprint snapshot (cached: from ~/.agent-ticket-board/cache)
+  atb ticket <KEY> [--cached]            ticket detail, agent record, comments and group
+  atb comment <KEY> <text> [--run]       a comment for the agent (never sent to Jira)
+  atb move <KEY> <STATUS> [--approved]   a Jira move by the agent, or one that the developer approved
+  atb agent-may-move <KEY> on|off        the developer's permission for one ticket
+  atb after-merge <KEY> <STATUS>|default the status for this ticket after its merge
+  atb adopt <KEY> [--stage=<stage>]      take over the local work for a ticket (agent record only)
+  atb ignore <KEY>                       hide the local branch for a ticket
+  atb detect [--repo=<path>] [--only=tracker|repo]   proposed config values; writes nothing
+  atb config [set <key> <json>]          the config, or one value that the developer accepted
+  atb settings [--detect] [--only=…] | atb settings save <json>   the settings view
+`;
 
 const [cmd, ...rest] = process.argv.slice(2);
 const flags = new Set(rest.filter((a) => a.startsWith('--')));

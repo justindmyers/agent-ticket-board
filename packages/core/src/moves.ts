@@ -5,10 +5,8 @@ import { EVENTS_FILE } from './paths';
 import { loadSettings, updateSettings } from './settings';
 import { TOOL_ENV } from './jira';
 
-// Jira status changes: the only Jira write the board makes, for one ticket at a time.
-//   by 'you':   the developer approved this move in a client (a confirmation dialog).
-//   by 'agent': only where the developer turned on "Let the agent update the Jira status" for that ticket.
-// Comments, fields, labels and other tickets are never written. Each move goes into events.jsonl.
+// Jira status changes, the only Jira write: approved by the developer ('you'), or by the agent where the
+// developer allowed it for that ticket. Nothing else is written. Each move goes into events.jsonl.
 const KEY = /^[A-Z][A-Z0-9]+-\d+$/;
 
 export type MoveEvent = {

@@ -38,8 +38,8 @@ To do:
 - [x] Bring the webview code to the coding standards: one component in each file, folders for each kind of file, fewer comments.
 - [x] Make the lint rules enforce more of the standards. ESLint now runs all the React hook rules, one component in each file, jsx-a11y and Prettier, with no warnings. The hook runs `lint:fix` on staged files only.
 - [ ] Bring the Claude Code pane (`apps/claude-plugin/hooks/register.ts`) to the coding standards. It is one large file, and it copies the stage colors and the stage list from the webview. Move the shared values into `packages/core`.
-- [ ] Shorten the header comments that have more than 2 lines (`register.ts`, `atb.ts`, `moves.ts`, `reconcile.ts`, `install-local.ts`, `leak-check.ts`).
-- [ ] Animate the enter and the exit of the popovers and the menus, with `motion-reduce:animate-none`.
+- [x] Shorten the header comments that have more than 2 lines.
+- [x] Animate the enter and the exit of the popovers and the menus. Reduced motion stops the animations.
 - [ ] Add vitest component tests (jsdom) with an accessibility check. Now only the Playwright harness checks the UI.
 - [x] Ticket pages and colors follow the Jira state when the board has no agent work for a ticket. A "Not started statuses" setting sets which statuses mean that no work started.
 - [x] The board reads local git work for each ticket: a branch with the ticket key, and the changed files in its worktree. A not-started ticket with local work shows as started.
