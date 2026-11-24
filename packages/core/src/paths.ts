@@ -11,3 +11,5 @@ export const TICKETS_FILE = join(HOME, 'tickets.json');
 export const EVENTS_FILE = join(HOME, 'events.jsonl');
 export const AGENTS_DIR = join(HOME, 'agents');
 export const IGNORED_FILE = join(HOME, 'ignored-work.json');
+/** One folder for each ticket: handoff files and run logs. */
+export const TICKETS_DIR = join(HOME, 'tickets');
