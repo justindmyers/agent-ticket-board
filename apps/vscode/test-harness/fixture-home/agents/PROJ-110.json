@@ -40,6 +40,7 @@
     "state": "running",
     "stage": "development",
     "started": "2026-01-05T09:00:00Z",
-    "model": "opus"
+    "model": "opus",
+    "activity": "Editing EdgesList.tsx"
   }
 }

@@ -73,3 +73,118 @@ export function runLine(
   const cost = run.cost === undefined ? '' : `, $${run.cost.toFixed(2)}`;
   return `The last agent run ${how} (${run.model}${cost}).`;
 }
+
+type RunLike = { state: string; stage?: string; model: string; waiting?: string; app?: string };
+
+/** The title, the caption and the colour of a queued or running agent run. */
+export function runText(run: RunLike): {
+  title: string;
+  caption: string;
+  accent: 'blue' | 'aqua' | 'amber';
+} {
+  const accent = run.stage === 'development' ? 'aqua' : run.stage === 'testing' ? 'amber' : 'blue';
+  if (run.state === 'queued') {
+    return {
+      title: 'Queued',
+      caption: 'Every agent slot is busy. The run starts when one is free.',
+      accent
+    };
+  }
+  if (run.stage === 'testing') {
+    return run.waiting === 'login'
+      ? {
+          title: 'Log in to test',
+          caption:
+            'A browser window opened for this ticket. Log in there. The test continues by itself.',
+          accent
+        }
+      : {
+          title: 'Testing now',
+          caption: `The agent checks each requirement in the live app${run.app ? ` at ${run.app}` : ''} with ${run.model}, and fixes what looks wrong.`,
+          accent
+        };
+  }
+  if (run.stage === 'development') {
+    return {
+      title: 'Building now',
+      caption: `The agent changes code in the ticket's worktree with ${run.model}. It does not commit or push.`,
+      accent
+    };
+  }
+  return {
+    title: 'Planning now',
+    caption: `The agent reads the ticket and the code with ${run.model}. It changes no files.`,
+    accent
+  };
+}
+
+/** A screenshot's short name: its colour scheme and size ("dark 390×844"), or the file name. */
+export function shotLabel(path: string) {
+  const file = path.split('/').pop() ?? path;
+  const m = /(light|dark)-(\d+)x(\d+)\.png$/.exec(file);
+  return m ? `${m[1]} ${m[2]}×${m[3]}` : file;
+}
+
+/** The cost of a ticket's agent runs so far, or null before the first run. */
+export function spentText(spent: number | undefined) {
+  return spent === undefined ? null : `$${spent.toFixed(2)} so far`;
+}
+
+/** What the agent does now, in a few words, from one tool call. Null for calls that show elsewhere. */
+export function activityText(tool: string, input: Record<string, unknown>): string | null {
+  const file = String(input.file_path ?? '');
+  const name = file.split('/').pop() ?? '';
+  if (tool === 'Bash') {
+    const cmd = String(input.command ?? '').trim();
+    const pw = /playwright-cli(?:\s+-s=\S+)?\s+(\S+)\s*(\S*)/.exec(cmd);
+    if (pw) {
+      if (pw[1] === 'goto' || pw[1] === 'open') {
+        return `Opening ${pw[2] ? pw[2].replace(/^https?:\/\/[^/]+/, '') || '/' : 'the app'}`;
+      }
+      if (pw[1] === 'snapshot' || pw[1] === 'find') {
+        return 'Reading the page';
+      }
+      if (pw[1] === 'screenshot') {
+        return 'Taking a screenshot';
+      }
+      return 'Using the page';
+    }
+    const shots = /\sshots?\s+\S+\s+(\S+)/.exec(cmd);
+    if (shots) {
+      return `Taking screenshots: ${shots[1]}`;
+    }
+    const first = cmd.split('\n')[0] ?? '';
+    return `Running ${first.length > 70 ? first.slice(0, 69) + '…' : first}`;
+  }
+  if (tool === 'Read') {
+    return /\.png$/i.test(file) ? `Viewing a screenshot: ${shotLabel(file)}` : `Reading ${name}`;
+  }
+  if (tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit') {
+    return `Editing ${name}`;
+  }
+  if (tool === 'Grep' || tool === 'Glob') {
+    return 'Searching the code';
+  }
+  return null;
+}
+
+export const SHOT_FILE = /-(light|dark)-(\d+x\d+)\.png$/;
+
+/** The set name of a screenshot: the name given to the screenshot command (R2-list). */
+export const shotSet = (nameOrPath: string) =>
+  (nameOrPath.split('/').pop() ?? '').replace(SHOT_FILE, '');
+
+/** The shots of one requirement, grouped by set in their order. */
+export function shotGroups(shots: string[]) {
+  const groups: { set: string; shots: string[] }[] = [];
+  for (const p of shots) {
+    const set = shotSet(p);
+    const g = groups.find((x) => x.set === set);
+    if (g) {
+      g.shots.push(p);
+    } else {
+      groups.push({ set, shots: [p] });
+    }
+  }
+  return groups;
+}

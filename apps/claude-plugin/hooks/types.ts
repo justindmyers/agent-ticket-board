@@ -32,6 +32,9 @@ export type Flow = {
     stage?: string;
     model: string;
     cost?: number;
+    waiting?: 'login';
+    app?: string;
+    activity?: string;
   };
   closed?: { reason: string; text: string };
   need?: {
@@ -45,8 +48,6 @@ export type Flow = {
     id: string;
     text: string;
     check: string;
-    met?: boolean;
-    evidence?: { label: string };
   }[];
   questions?: { q: string; a?: string; why?: string; options?: string[]; recommended?: number }[];
   answered?: { q: string; a: string }[];
@@ -54,6 +55,12 @@ export type Flow = {
   steps?: { n: number; text: string; covers: string[]; state: string; note?: string }[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
+  evidence?: Record<
+    string,
+    { ok: boolean; test?: string; shots?: string[]; seen?: string; note?: string }
+  >;
+  approved?: string;
+  spent?: number;
   app?: string;
   pr?: {
     number: number;

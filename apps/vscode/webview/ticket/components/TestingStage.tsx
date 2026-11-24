@@ -1,70 +1,51 @@
-import { mdiFormatListChecks, mdiOpenInNew } from '@mdi/js';
-import { Bullet } from '../../shared/components/Bullet';
-import { Button } from '../../shared/components/Button';
-import { Icon } from '../../shared/components/Icon';
-import { Pill } from '../../shared/components/Pill';
+import { mdiFormatListChecks, mdiRobotOutline } from '@mdi/js';
+import { runActive } from '@agent-ticket-board/core/look';
 import { Section } from '../../shared/components/Section';
 import type { Flow } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import type { Act } from '../types/ticket';
-import { TicketRow } from './TicketRow';
+import { EvidenceRow } from './EvidenceRow';
+import { RunSection } from './RunSection';
 import { TicketRows } from './TicketRows';
 
 type Props = { f: Flow; act: Act; theme: Theme };
 
 export function TestingStage({ f, act, theme }: Props) {
-  const met = f.requirements?.filter((r) => r.met).length ?? 0;
+  const reqs = f.requirements ?? [];
+  const passing = reqs.filter((r) => f.evidence?.[r.id]?.ok).length;
 
   return (
-    <Section
-      icon={mdiFormatListChecks}
-      title="Test checklist"
-      caption="What to try, with the agent's evidence for each"
-      aside={`${met} of ${f.requirements?.length ?? 0}`}
-      accent="amber"
-      theme={theme}
-    >
-      {f.app && (
-        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-ink/[0.07] bg-ink/[0.03] px-3 py-2">
-          <span className="text-[11px] tracking-[0.08em] text-muted uppercase">App</span>
-          <span className="min-w-0 flex-1 font-mono text-[12px] [overflow-wrap:anywhere] text-soft">
-            {f.app}
-          </span>
-          <Button onPress={() => act('openApp')}>
-            <Icon path={mdiOpenInNew} size={14} />
-            Open
-          </Button>
-        </div>
+    <>
+      {f.run?.stage === 'testing' && runActive(f) && (
+        <RunSection run={f.run} act={act} theme={theme} />
       )}
 
-      <TicketRows>
-        {f.requirements?.map((r) => (
-          <TicketRow
-            key={r.id}
-            state={r.met ? 'done' : 'todo'}
-            lead={r.id}
-            theme={theme}
-            end={
-              r.evidence ? (
-                <Pill accent="green" theme={theme}>
-                  {r.evidence.label}
-                </Pill>
-              ) : (
-                <span className="text-[11px] text-muted">No evidence</span>
-              )
-            }
-            sub={
-              <>
-                <span className="font-mono">{r.id}</span>
-                <Bullet />
-                {r.check}
-              </>
-            }
-          >
-            {r.text}
-          </TicketRow>
-        ))}
-      </TicketRows>
-    </Section>
+      <Section
+        icon={mdiFormatListChecks}
+        title="Evidence"
+        caption="The agent checked each requirement in the live app or with its test, and viewed every screenshot."
+        aside={`${passing} of ${reqs.length}`}
+        accent="amber"
+        theme={theme}
+      >
+        <TicketRows>
+          {reqs.map((r) => (
+            <EvidenceRow key={r.id} req={r} ev={f.evidence?.[r.id]} act={act} theme={theme} />
+          ))}
+        </TicketRows>
+      </Section>
+
+      {f.review && f.evidence && (
+        <Section
+          icon={mdiRobotOutline}
+          title="Agent summary"
+          caption={f.review}
+          accent="violet"
+          theme={theme}
+        >
+          <span />
+        </Section>
+      )}
+    </>
   );
 }

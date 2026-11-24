@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import {
+  approveTesting,
   audit,
   CONFIG,
   errorData,
@@ -21,6 +22,8 @@ import {
 import { Processes } from './processes';
 import { Runs } from './runs';
 import { createApi } from './server';
+
+export { parseSizes, TestBrowser } from './browser';
 
 export const log = (line: string) => {
   mkdirSync(dirname(SERVICE_LOG), { recursive: true });
@@ -116,6 +119,13 @@ export async function serve() {
     }),
     'POST /tickets/:key/plan': async ({ key }) => runs.plan(key!),
     'POST /tickets/:key/develop': async ({ key }) => runs.develop(key!),
+    'POST /tickets/:key/test': async ({ key }) => runs.test(key!),
+    // Approval ends Testing: the ticket's test browser closes as well.
+    'POST /tickets/:key/approve-testing': async ({ key }) => {
+      const f = await approveTesting(key!);
+      await runs.closeBrowser(key!);
+      return f;
+    },
     'POST /tickets/:key/stop': async ({ key }) => ({ stopped: await runs.stop(key!) }),
     'POST /shutdown': async () => {
       setTimeout(() => void shutdown('asked by a client'), 10);

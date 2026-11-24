@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { accentOf, planStartable, runActive, runLine, STAGES, STATE_ACCENT } from './look';
+import {
+  accentOf,
+  activityText,
+  planStartable,
+  runActive,
+  runLine,
+  runText,
+  shotLabel,
+  spentText,
+  STAGES,
+  STATE_ACCENT
+} from './look';
 
 describe('accentOf', () => {
   it.each([
@@ -60,5 +71,66 @@ describe('runLine', () => {
     );
     expect(runLine({ state: 'running', model: 'sonnet' })).toBeNull();
     expect(runLine(undefined)).toBeNull();
+  });
+});
+
+describe('runText', () => {
+  const run = { state: 'running' as const, model: 'sonnet' };
+  it('says what each stage does, and when Testing waits for the login', () => {
+    expect(runText({ ...run, stage: 'planning' }).title).toBe('Planning now');
+    expect(runText({ ...run, stage: 'development' })).toMatchObject({
+      title: 'Building now',
+      accent: 'aqua'
+    });
+    expect(runText({ ...run, stage: 'testing', app: 'http://localhost:3002/' })).toEqual({
+      title: 'Testing now',
+      caption:
+        'The agent checks each requirement in the live app at http://localhost:3002/ with sonnet, and fixes what looks wrong.',
+      accent: 'amber'
+    });
+    expect(runText({ ...run, stage: 'testing', waiting: 'login' })).toEqual({
+      title: 'Log in to test',
+      caption:
+        'A browser window opened for this ticket. Log in there. The test continues by itself.',
+      accent: 'amber'
+    });
+    expect(runText({ ...run, state: 'queued', stage: 'testing' }).title).toBe('Queued');
+  });
+});
+
+describe('shotLabel and spentText', () => {
+  it('names a screenshot by its scheme and size', () => {
+    expect(shotLabel('/s/PROJ-7/R2-sorted-dark-390x844.png')).toBe('dark 390×844');
+    expect(shotLabel('/s/other.png')).toBe('other.png');
+  });
+  it('shows the cost so far', () => {
+    expect(spentText(6.674)).toBe('$6.67 so far');
+    expect(spentText(undefined)).toBeNull();
+  });
+});
+
+describe('activityText', () => {
+  it('says in a few words what the agent does now', () => {
+    const bash = (command: string) => activityText('Bash', { command });
+    expect(
+      bash('pnpm exec playwright-cli -s=kb-X goto http://localhost:3002/94/settings/edges')
+    ).toBe('Opening /94/settings/edges');
+    expect(bash('pnpm exec playwright-cli -s=kb-X snapshot')).toBe('Reading the page');
+    expect(bash('pnpm exec playwright-cli -s=kb-X click e12')).toBe('Using the page');
+    expect(bash('/x/browser.sh shots PROJ-1 R2-states')).toBe('Taking screenshots: R2-states');
+    expect(bash('pnpm --filter nq test:once src/a.test.ts')).toBe(
+      'Running pnpm --filter nq test:once src/a.test.ts'
+    );
+    expect(activityText('Read', { file_path: '/s/R2-dark-390x844.png' })).toBe(
+      'Viewing a screenshot: dark 390×844'
+    );
+    expect(activityText('Read', { file_path: '/w/src/EdgesList.tsx' })).toBe(
+      'Reading EdgesList.tsx'
+    );
+    expect(activityText('Edit', { file_path: '/w/src/EdgesList.tsx' })).toBe(
+      'Editing EdgesList.tsx'
+    );
+    expect(activityText('Grep', { pattern: 'x' })).toBe('Searching the code');
+    expect(activityText('mcp__board__step', {})).toBeNull();
   });
 });

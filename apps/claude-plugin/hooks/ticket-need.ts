@@ -1,5 +1,5 @@
 import type { EngineInterface } from 'claude-code';
-import { agentRun, toTesting } from './cli';
+import { agentRun, approveTested, toTesting } from './cli';
 import { hex, notBuilt, type Ctx } from './kit';
 import { store } from './store';
 import type { Flow, Row } from './types';
@@ -40,6 +40,10 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
               if (x.id.startsWith('move:')) {
                 store.confirmMove = { key: t.key, to: x.id.slice(5), from: t.status };
                 ctx.redraw();
+              } else if (x.id === 'startTesting') {
+                void agentRun($, t.key, 'test');
+              } else if (x.id === 'approveTesting') {
+                void approveTested($, t.key);
               } else if (x.id === 'toTesting') {
                 void toTesting($, t.key);
               } else if (x.id === 'startPlanning' || x.id === 'replan') {

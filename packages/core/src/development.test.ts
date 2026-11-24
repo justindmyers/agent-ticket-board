@@ -108,7 +108,10 @@ describe('applyBuild', () => {
     expect(f.need).toEqual({
       kind: 'decision',
       ask: 'Ready to test: 2 of 2 steps done, and the gate passed',
-      actions: [{ id: 'openWorktree', label: 'Open worktree' }]
+      actions: [
+        { id: 'startTesting', label: 'Start testing' },
+        { id: 'openWorktree', label: 'Open worktree' }
+      ]
     });
   });
 

@@ -2,53 +2,33 @@
   "stage": "testing",
   "need": {
     "kind": "decision",
-    "ask": "Ready to test. 3 of 3 requirements have evidence.",
+    "ask": "Tested: 3 of 3 requirements pass, with evidence.",
     "actions": [
       {
-        "id": "openApp",
-        "label": "Open app"
+        "id": "approveTesting",
+        "label": "Approve for code review"
       },
       {
-        "id": "approve",
-        "label": "Approve"
-      },
-      {
-        "id": "comment",
-        "label": "Send feedback"
+        "id": "openWorktree",
+        "label": "Open worktree"
       }
     ]
   },
-  "app": "http://localhost:3001/map",
   "requirements": [
     {
       "id": "R1",
       "text": "Back restores the previous zoom and center.",
-      "check": "Test: restores view on popstate",
-      "evidence": {
-        "kind": "test",
-        "label": "test passes"
-      },
-      "met": true
+      "check": "Test: restores view on popstate"
     },
     {
       "id": "R2",
       "text": "Forward applies the view again.",
-      "check": "Click path: pan, Back, Forward",
-      "evidence": {
-        "kind": "screenshot",
-        "label": "screenshot"
-      },
-      "met": true
+      "check": "Click path: pan, Back, Forward"
     },
     {
       "id": "R3",
       "text": "A small drag adds one history entry.",
-      "check": "Test: debounces moveend",
-      "evidence": {
-        "kind": "test",
-        "label": "test passes"
-      },
-      "met": true
+      "check": "Test: debounces moveend"
     }
   ],
   "steps": [
@@ -86,6 +66,35 @@
       "note": "14 passed"
     }
   ],
-  "review": "2 rounds. 5 findings: 4 fixed, 1 dropped as false.",
-  "branch": "fix/PROJ-102-map-history"
+  "review": "All three pass. R2 needed one fix: Forward skipped the first entry.",
+  "branch": "fix/PROJ-102-map-history",
+  "evidence": {
+    "R1": {
+      "ok": true,
+      "test": "pnpm vitest run src/map/useViewHistory.test.ts"
+    },
+    "R2": {
+      "ok": true,
+      "shots": [
+        "/shots/PROJ-102/R2-forward-light-1400x900.png",
+        "/shots/PROJ-102/R2-forward-dark-1400x900.png",
+        "/shots/PROJ-102/R2-forward-light-3440x1440.png",
+        "/shots/PROJ-102/R2-forward-dark-3440x1440.png",
+        "/shots/PROJ-102/R2-forward-light-390x844.png",
+        "/shots/PROJ-102/R2-forward-dark-390x844.png",
+        "/shots/PROJ-102/R2-forward-phone-menu-light-1400x900.png",
+        "/shots/PROJ-102/R2-forward-phone-menu-dark-1400x900.png",
+        "/shots/PROJ-102/R2-forward-phone-menu-light-3440x1440.png",
+        "/shots/PROJ-102/R2-forward-phone-menu-dark-3440x1440.png",
+        "/shots/PROJ-102/R2-forward-phone-menu-light-390x844.png",
+        "/shots/PROJ-102/R2-forward-phone-menu-dark-390x844.png"
+      ],
+      "seen": "After Back and Forward the map shows the panned view again, at the same zoom."
+    },
+    "R3": {
+      "ok": true,
+      "test": "pnpm vitest run src/map/useViewHistory.test.ts -t debounce"
+    }
+  },
+  "spent": 6.67
 }

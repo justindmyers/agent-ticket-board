@@ -135,6 +135,24 @@ export const CONFIG_SECTIONS: ConfigSection[] = [
         label: 'Ports for builds',
         help: 'The first and the last port that a build can lease.',
         kind: 'portRange'
+      },
+      {
+        key: 'app.loginCheck',
+        label: 'Login service',
+        help: 'host:port of a service that must run before Testing, such as a login service.',
+        kind: 'optionalText'
+      },
+      {
+        key: 'app.themeKey',
+        label: 'Theme storage key',
+        help: 'A localStorage key that the app reads its colour scheme from. Screenshots set it.',
+        kind: 'optionalText'
+      },
+      {
+        key: 'app.shotSizes',
+        label: 'Screenshot sizes',
+        help: 'Each size, like 1400x900, in light and in dark.',
+        kind: 'list'
       }
     ]
   }

@@ -14,9 +14,9 @@ export type Agent = {
 };
 
 import type { TrackerState } from '@agent-ticket-board/core/look';
-import type { AgentRun, Answered, Question } from '@agent-ticket-board/core/types';
+import type { AgentRun, Answered, Evidence, Question } from '@agent-ticket-board/core/types';
 
-export type { AgentRun, Answered, Question, TrackerState };
+export type { AgentRun, Answered, Evidence, Question, TrackerState };
 
 export type LocalWork = { branch: string; worktree: string | null; changed: number; label: string };
 
@@ -51,8 +51,6 @@ export type Flow = {
     id: string;
     text: string;
     check: string;
-    evidence?: { kind: string; label: string };
-    met?: boolean;
   }[];
   questions?: Question[];
   answered?: Answered[];
@@ -66,6 +64,9 @@ export type Flow = {
   }[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
+  evidence?: Record<string, Evidence>;
+  approved?: string;
+  spent?: number;
   app?: string;
   pr?: {
     number: number;

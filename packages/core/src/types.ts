@@ -28,8 +28,6 @@ export type Req = {
   id: string;
   text: string;
   check: string;
-  evidence?: { kind: 'test' | 'screenshot'; label: string };
-  met?: boolean;
 };
 
 /** A planning question. `recommended` is the index of the option that the agent recommends. */
@@ -43,6 +41,15 @@ export type Question = {
 
 /** An answer from an earlier plan. */
 export type Answered = { q: string; a: string };
+
+/** The evidence that one requirement works: a passing test, or screenshots that the agent checked. */
+export type Evidence = {
+  ok: boolean;
+  test?: string;
+  shots?: string[];
+  seen?: string;
+  note?: string;
+};
 
 export type Step = {
   n: number;
@@ -77,6 +84,12 @@ export type AgentRun = {
   session?: string;
   cost?: number;
   error?: string;
+  /** Testing: the run waits for the developer to log in to the browser. */
+  waiting?: 'login';
+  /** Testing: the address of the worktree's app. */
+  app?: string;
+  /** What the agent does now, from its last tool call. */
+  activity?: string;
 };
 
 /** The local agent record for one ticket. The service writes it; every client reads it. */
@@ -92,6 +105,14 @@ export type Flow = {
   steps?: Step[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
+  /** Testing: the evidence for each requirement id. */
+  evidence?: Record<string, Evidence>;
+  /** When the developer approved the tested change. */
+  approved?: string;
+  /** The cost of every agent run of this ticket, in US dollars. */
+  spent?: number;
+  /** Testing: the port of the last test run. The next run uses it again, so the login stays valid. */
+  testPort?: number;
   app?: string;
   pr?: Pr;
   branch?: string;

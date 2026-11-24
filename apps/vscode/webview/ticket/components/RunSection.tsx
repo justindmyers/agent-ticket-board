@@ -1,4 +1,5 @@
 import { mdiProgressClock } from '@mdi/js';
+import { runText } from '@agent-ticket-board/core/look';
 import { Button } from '../../shared/components/Button';
 import { Section } from '../../shared/components/Section';
 import type { AgentRun } from '../../shared/types/host';
@@ -9,28 +10,28 @@ type Props = { run: AgentRun; act: Act; theme: Theme };
 
 /** A queued or running agent run, with Stop. */
 export function RunSection({ run, act, theme }: Props) {
-  const queued = run.state === 'queued';
-  const building = run.stage === 'development';
+  const { title, caption, accent } = runText(run);
 
   return (
     <Section
       icon={mdiProgressClock}
-      title={queued ? 'Queued' : building ? 'Building now' : 'Planning now'}
-      caption={
-        queued
-          ? 'Every agent slot is busy. The run starts when one is free.'
-          : building
-            ? `The agent changes code in the ticket's worktree with ${run.model}. It does not commit or push.`
-            : `The agent reads the ticket and the code with ${run.model}. It changes no files.`
-      }
-      accent={building ? 'aqua' : 'blue'}
+      title={title}
+      caption={caption}
+      accent={accent}
       theme={theme}
-      running={!queued}
+      running={run.state !== 'queued'}
       aside={
         <Button variant="default" className="-my-1" onPress={() => act('stopRun')}>
           Stop
         </Button>
       }
-    />
+    >
+      {run.activity && run.state === 'running' && !run.waiting && (
+        <p className="text-xs text-soft" aria-live="polite">
+          <span className="text-muted">Now: </span>
+          {run.activity}
+        </p>
+      )}
+    </Section>
   );
 }

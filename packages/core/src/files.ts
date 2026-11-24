@@ -10,9 +10,12 @@ export async function readJson<T>(file: string, fallback: T): Promise<T> {
 }
 
 // Atomic write: two clients can write at the same time, and a reader never sees half a file.
+let writes = 0;
+
 export async function writeJson(file: string, data: unknown) {
   await mkdir(dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  // A counter as well as the time: two writes in the same millisecond must not share a temporary file.
+  const tmp = `${file}.${process.pid}.${Date.now()}.${++writes}.tmp`;
   await writeFile(tmp, JSON.stringify(data, null, 2));
   await rename(tmp, file);
 }

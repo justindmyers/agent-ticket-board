@@ -1,4 +1,13 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import {
+  applyTest,
+  canTest,
+  CONFIG,
+  parseTest,
+  TEST_SCHEMA,
+  testPrompt,
+  TICKETS_DIR,
   applyBuild,
   applyPlan,
   BUILD_SCHEMA,
@@ -13,11 +22,12 @@ import {
   type Flow,
   type Ticket
 } from '@agent-ticket-board/core';
+import type { AppEnv } from './runs';
 
 // What differs between the stages that an agent runs: the checks before a run, the model and the
 // cost cap, the tools, the prompt, the answer shape and how the answer goes into the record.
 
-export type StageId = 'planning' | 'development';
+export type StageId = 'planning' | 'development' | 'testing';
 
 export const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
 
@@ -82,13 +92,14 @@ export type StageSpec = {
   refuse: (f: Flow | null) => string | null;
   /** The record when the run is queued. */
   begin: (f: Flow | null) => Flow;
-  prompt: (t: Ticket, f: Flow, comments: string[]) => string;
+  /** `app` is set for Testing: the worktree's live app and browser. */
+  prompt: (t: Ticket, f: Flow, comments: string[], app?: AppEnv) => string;
   tools: string[];
   allowed: string[];
   /** The answer's JSON schema, for the record at the start of the run. */
   schema: (f: Flow) => Record<string, unknown>;
   /** The record after a valid answer. */
-  apply: (f: Flow, output: unknown) => Flow;
+  apply: (f: Flow, output: unknown, key: string) => Flow;
   /** Counts for the audit log. */
   counts: (f: Flow) => Record<string, unknown>;
 };
@@ -140,6 +151,38 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
       steps: f.steps?.length,
       gate: f.checks?.map((c) => `${c.name}: ${c.ok ? 'ok' : 'failed'}`)
     })
+  },
+  testing: {
+    stage: 'testing',
+    model: 'sonnet',
+    budgetUsd: 3,
+    retry: 'startTesting',
+    refuse: canTest,
+    begin: (f) => {
+      const { approved: _a, ...rest } = withoutNeed(f!);
+      void _a;
+      return { ...rest, stage: 'testing' };
+    },
+    prompt: (t, f, comments, app) =>
+      testPrompt(t, f, comments, {
+        url: app!.url,
+        session: app!.session,
+        shots: app!.shots,
+        mocked: app!.mocked,
+        commands: commandsOf(testAllowed())
+      }),
+    tools: BUILD_TOOLS,
+    get allowed() {
+      return testAllowed();
+    },
+    schema: () => TEST_SCHEMA,
+    // The agent names its screenshot sets; the evidence gets every file of each set.
+    apply: (f, output, key) => applyTest(f, parseTest(output), shotFilesOf(key)),
+    counts: (f) => ({
+      passing: Object.values(f.evidence ?? {}).filter((e) => e.ok).length,
+      requirements: f.requirements?.length,
+      shots: Object.values(f.evidence ?? {}).reduce((n, e) => n + (e.shots?.length ?? 0), 0)
+    })
   }
 };
 
@@ -147,4 +190,16 @@ function withoutNeed(f: Flow): Flow {
   const { need: _need, ...rest } = f;
   void _need;
   return rest;
+}
+
+/** Testing: the build commands, the browser CLI, and the board's own screenshot command. */
+export function testAllowed(shots = `${process.execPath} ${process.argv[1]} shots`) {
+  return [...BUILD_ALLOWED, 'Bash(pnpm exec playwright-cli:*)', `Bash(${shots}:*)`];
+}
+
+/** The screenshot files of a ticket, and the sizes in their order. */
+function shotFilesOf(key: string) {
+  const dir = join(TICKETS_DIR, key, 'shots');
+  const files = existsSync(dir) ? readdirSync(dir).map((n) => join(dir, n)) : [];
+  return { files, sizes: CONFIG.app.shotSizes };
 }

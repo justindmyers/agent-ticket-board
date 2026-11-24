@@ -1,5 +1,6 @@
 // atb: the shared command line for every client; the Claude Code pane reaches core only through it.
 // Run it with no command for the usage. JSON goes to stdout.
+import { execFileSync } from 'node:child_process';
 import {
   addComment,
   agentFor,
@@ -43,9 +44,10 @@ import {
   bundle,
   readTimeline,
   timelineText,
+  loadFlow,
   moveToTesting
 } from '@agent-ticket-board/core';
-import { serve } from '@agent-ticket-board/service';
+import { parseSizes, serve, TestBrowser } from '@agent-ticket-board/service';
 
 const USAGE = `usage:
   atb sprint [--cached]                  sprint snapshot (cached: from ~/.agent-ticket-board/cache)
@@ -63,6 +65,11 @@ const USAGE = `usage:
   atb audit <KEY> [--json] [--tail=N]    the ticket's audit timeline
   atb audit <KEY> --bundle               one archive of the ticket's audit log, tokens removed
   atb to-testing <KEY>                   move a finished build with a clean gate to Testing
+  atb test <KEY>                         test the build in the live app and collect evidence
+  atb shots <KEY> <NAME> [--focus=<T>]   screenshots of the test browser's page, light and dark, each size;
+                                         --focus scrolls a heading text or CSS selector to the top first
+  atb open-shot <KEY> <PATH>             open a screenshot from the ticket's evidence
+  atb approve-testing <KEY>              approve a tested change for code review
   atb develop <KEY>                      start building the approved plan in the ticket's worktree
   atb plan <KEY>                         start a planning run (starts the service if it does not run)
   atb stop <KEY>                         stop the agent run of a ticket
@@ -151,7 +158,45 @@ async function main() {
     const save = flags.has('--earlier') ? saveEarlierAnswer : saveAnswer;
     return out(await save(key, Number(args[1]), args.slice(2).join(' ')));
   }
-  if ((cmd === 'plan' || cmd === 'develop' || cmd === 'stop') && key) {
+  if (cmd === 'open-shot' && key && args[1]) {
+    // Only a screenshot that the ticket's evidence lists, never any path.
+    const f = await loadFlow(key);
+    const listed = Object.values(f?.evidence ?? {}).some((x) => x.shots?.includes(args[1]!));
+    if (!listed) {
+      throw new Error(`${key}: that screenshot is not in the ticket's evidence.`);
+    }
+    execFileSync(process.platform === 'darwin' ? 'open' : 'xdg-open', [args[1]!]);
+    return out({ opened: args[1] });
+  }
+  if (cmd === 'shots' && key && args[1]) {
+    // The agent's screenshot set: the current page of the ticket's test browser, light and dark, each size.
+    const f = await loadFlow(key);
+    if (!f?.worktree) {
+      throw new Error(`${key}: the ticket has no worktree.`);
+    }
+    const browser = new TestBrowser(key, { cwd: f.worktree, env: process.env });
+    const focus = option('focus') ?? null;
+    const { files, misses } = await browser.shots(
+      args[1],
+      parseSizes(CONFIG.app.shotSizes),
+      CONFIG.app.themeKey,
+      focus
+    );
+    process.stdout.write(`${files.join('\n')}\n`);
+    if (misses.length) {
+      // The shots show the top of the page there, not the part that they are for.
+      process.stdout.write(
+        `The focus target ${JSON.stringify(focus)} was not found at ${misses.join(', ')}. Give a heading text or a CSS selector that is on the page, and take the set again.\n`
+      );
+      process.exitCode = 2;
+    }
+    return;
+  }
+  if (cmd === 'approve-testing' && key) {
+    const info = await ensureService(process.argv[1]!);
+    return out(await callService(info, `/tickets/${key}/approve-testing`, {}));
+  }
+  if ((cmd === 'plan' || cmd === 'develop' || cmd === 'test' || cmd === 'stop') && key) {
     const info = cmd !== 'stop' ? await ensureService(process.argv[1]!) : await serviceInfo();
     if (!info) {
       return out({ stopped: false });

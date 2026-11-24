@@ -18,6 +18,14 @@ export function agentFor(key: string): Agent | null {
   const cur = (f.steps ?? []).findIndex((s) => s.state === 'current');
   const progress =
     f.stage === 'development' && cur >= 0 ? `${cur + 1}/${f.steps!.length}` : undefined;
+  if (f.run?.state === 'running' && f.run.waiting === 'login') {
+    return {
+      stage: f.stage,
+      stageLabel,
+      kind: 'decision',
+      ask: 'Log in to the browser window to test.'
+    };
+  }
   if (f.run?.state === 'running') {
     return { stage: f.stage, stageLabel, kind: 'running', ...(progress ? { progress } : {}) };
   }

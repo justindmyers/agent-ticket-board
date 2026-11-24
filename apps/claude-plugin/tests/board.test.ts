@@ -38,8 +38,8 @@ const decision = {
   stage: 'testing',
   stageLabel: 'Testing',
   kind: 'decision',
-  ask: 'Ready to test. 3 of 3 requirements have evidence.',
-  action: { id: 'openApp', label: 'Open app' }
+  ask: 'Tested: 1 of 1 requirements pass, with evidence.',
+  action: { id: 'approveTesting', label: 'Approve for code review' }
 };
 const SPRINT = {
   at: '2026-11-23T18:39:01Z',
@@ -85,24 +85,23 @@ const TICKET = {
   jiraUrl: 'https://example.atlassian.net/browse/PROJ-102',
   flow: {
     stage: 'testing',
-    app: 'http://localhost:3001/map',
+    spent: 6.67,
     need: {
       kind: 'decision',
-      ask: 'Ready to test. 3 of 3 requirements have evidence.',
+      ask: 'Tested: 1 of 1 requirements pass, with evidence.',
       actions: [
-        { id: 'openApp', label: 'Open app' },
-        { id: 'approve', label: 'Approve' }
+        { id: 'approveTesting', label: 'Approve for code review' },
+        { id: 'openWorktree', label: 'Open worktree' }
       ]
     },
-    requirements: [
-      {
-        id: 'R1',
-        text: 'Back restores view',
-        check: 'Test: popstate',
-        met: true,
-        evidence: { kind: 'test', label: 'test passes' }
+    requirements: [{ id: 'R1', text: 'Back restores view', check: 'Click path: zoom, go back' }],
+    evidence: {
+      R1: {
+        ok: true,
+        shots: ['/shots/PROJ-102/R1-back-light-1400x900.png'],
+        seen: 'The map is back at the zoom it had.'
       }
-    ],
+    },
     steps: [{ n: 1, text: 'Hook', covers: ['R1'], state: 'done' }]
   },
   sections: [
@@ -192,7 +191,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     let ui = await $.ui.mount({ ...PANE, surface });
     expect(await ui.find({ type: 'Text', text: /2 need you|1 need you/ })).toBeDefined();
     expect(await ui.find({ key: 'grp-Needs you' })).toBeDefined();
-    expect(await ui.find({ type: 'Text', text: /Ready to test/ })).toBeDefined();
+    expect(await ui.find({ type: 'Text', text: /Tested: 1 of 1 requirements pass/ })).toBeDefined();
     // Done starts collapsed; Verifying collapses on press.
     expect(await ui.find({ key: 'open-PROJ-106' })).toBeUndefined();
     await ui.press({ key: 'grp-Verifying' });
@@ -205,8 +204,23 @@ for (const surface of ['desktop', 'terminal'] as const) {
 
     ui = await $.ui.mount({ ...PANE, surface });
     expect(await ui.find({ type: 'Text', text: /Agent needs you/ })).toBeDefined();
-    expect(await ui.find({ key: 'act-openApp' })).toBeDefined();
-    expect(await ui.find({ type: 'Text', text: /Test checklist/ })).toBeDefined();
+    expect({
+      approve: !!(await ui.find({ key: 'act-approveTesting' })),
+      evidence: !!(await ui.find({ type: 'Text', text: /Evidence/ })),
+      seen: !!(await ui.find({ type: 'Text', text: /The map is back at the zoom it had\./ })),
+      shot: !!(await ui.find({ key: 'shot-R1-0-0' })),
+      spent: !!(await ui.find({ type: 'Text', text: /\$6\.67 so far/ }))
+    }).toEqual({ approve: true, evidence: true, seen: true, shot: true, spent: true });
+    await ui.press({ key: 'shot-R1-0-0' });
+    await tick();
+    expect(calls).toContainEqual([
+      'open-shot',
+      'PROJ-102',
+      '/shots/PROJ-102/R1-back-light-1400x900.png'
+    ]);
+    await ui.press({ key: 'act-approveTesting' });
+    await tick();
+    expect(calls).toContainEqual(['approve-testing', 'PROJ-102']);
     await ui.press({ key: 'tab-planning' });
     await ui.unmount();
     ui = await $.ui.mount({ ...PANE, surface });
@@ -664,7 +678,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
         flow = {
           stage: 'development',
           steps,
-          run: { state: 'running', stage: 'development', model: 'opus' }
+          run: { state: 'running', stage: 'development', model: 'opus', activity: 'Editing a.ts' }
         };
       }
       return printed(a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : {});
@@ -684,6 +698,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await ui.unmount();
     ui = await $.ui.mount({ ...PANE, surface });
     expect(await ui.find({ type: 'Text', text: /^Building now$/ })).toBeDefined();
+    expect(await ui.find({ type: 'Text', text: /^Now: Editing a\.ts$/ })).toBeDefined();
     expect(await ui.find({ type: 'Text', text: /Do it\s+\(now\)/ })).toBeDefined();
     await ui.unmount();
   });

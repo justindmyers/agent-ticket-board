@@ -28,7 +28,17 @@ export type Config = {
     branch: string;
     prTitle: string | null;
   };
-  app: { devCommand: string | null; ownerPort: number; buildPorts: [number, number] };
+  app: {
+    devCommand: string | null;
+    ownerPort: number;
+    buildPorts: [number, number];
+    /** host:port of a service that must answer before Testing, for example a login service. */
+    loginCheck: string | null;
+    /** A localStorage key that the app reads its colour scheme from at load. Screenshots set it. */
+    themeKey: string | null;
+    /** The screenshot sizes, like 1400x900. Each is taken in light and in dark. */
+    shotSizes: string[];
+  };
 };
 
 export const DEFAULTS: Config = {
@@ -52,7 +62,14 @@ export const DEFAULTS: Config = {
     branch: '{type}/{key}-{slug}',
     prTitle: null
   },
-  app: { devCommand: null, ownerPort: 3000, buildPorts: [3001, 3005] }
+  app: {
+    devCommand: null,
+    ownerPort: 3000,
+    buildPorts: [3001, 3005],
+    loginCheck: null,
+    themeKey: null,
+    shotSizes: ['1400x900', '3440x1440', '390x844']
+  }
 };
 
 export const CONFIG: Config = structuredClone(DEFAULTS);

@@ -335,6 +335,31 @@ function page(theme, mode) {
   const rh = await open('dark', 'split', 1400, 900);
   await rh.click('[role=option][data-key="PROJ-102"]');
   await rh.waitForTimeout(300);
+  // Testing: the evidence of each requirement, and a screenshot button that asks the host to open it.
+  kb.evidence = await rh.evaluate(() => ({
+    rows: document.querySelectorAll('[aria-label="Evidence"] li').length,
+    passes: [...document.querySelectorAll('[aria-label="Evidence"] li')].filter((li) =>
+      li.textContent.includes('Passes')
+    ).length,
+    spent: document.body.textContent.includes('$6.67 so far')
+  }));
+  await axe(rh, 'dark/ticket-testing');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-testing.png') });
+  await rh.evaluate(() => (window.__sent.length = 0));
+  await rh
+    .getByRole('button', { name: 'Open the R2-forward dark 1400×900 screenshot of R2' })
+    .click();
+  kb.shotSent = await rh.evaluate(() => window.__sent.find((m) => m.type === 'action'));
+  await rh.click('[role=option][data-key="PROJ-112"]');
+  await rh.waitForTimeout(300);
+  kb.loginRun = await rh.evaluate(() => {
+    const s = document.querySelector('[aria-label="Log in to test"]');
+    return s ? { text: s.textContent, running: s.classList.contains('run-border') } : null;
+  });
+  await axe(rh, 'dark/ticket-login');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-login.png') });
+  await rh.click('[role=option][data-key="PROJ-102"]');
+  await rh.waitForTimeout(300);
   kb.rowHeights = await rh.evaluate(() =>
     [...document.querySelectorAll('[data-queue] [role=option]')].map((o) => ({
       key: o.dataset.key,
@@ -440,7 +465,13 @@ function page(theme, mode) {
     .catch(() => {});
   kb.buildSection = await rh.evaluate(() => {
     const s = document.querySelector('[aria-label="Building now"]');
-    return s ? { text: s.textContent, running: s.classList.contains('run-border') } : null;
+    return s
+      ? {
+          text: s.textContent,
+          running: s.classList.contains('run-border'),
+          now: s.querySelector('[aria-live]')?.textContent
+        }
+      : null;
   });
   await axe(rh, 'dark/ticket-building');
   await rh.screenshot({ path: path.join(OUT, 'ticket-building.png') });

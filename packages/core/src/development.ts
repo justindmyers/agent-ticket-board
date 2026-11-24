@@ -168,7 +168,7 @@ export function applyBuild(f: Flow, r: BuildResult): Flow {
       ? {
           kind: 'decision',
           ask: `Ready to test: ${finished} of ${total} steps done, and the gate passed`,
-          actions: [openTree]
+          actions: [{ id: 'startTesting', label: 'Start testing' }, openTree]
         }
       : {
           kind: 'problem',
@@ -223,7 +223,10 @@ export function acceptBuild(f: Flow): Flow {
       ask: `Ready to test: ${finished} of ${steps.length} steps done.${
         open.length ? ` Check step${open.length > 1 ? 's' : ''} ${open.join(', ')} in Testing.` : ''
       }`,
-      actions: [{ id: 'openWorktree', label: 'Open worktree' }]
+      actions: [
+        { id: 'startTesting', label: 'Start testing' },
+        { id: 'openWorktree', label: 'Open worktree' }
+      ]
     }
   };
 }

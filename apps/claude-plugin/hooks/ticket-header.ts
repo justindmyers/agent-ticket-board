@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code';
 import { accentHex, hex, kit, type Ctx } from './kit';
-import { STAGES } from './look.gen';
+import { STAGES, spentText } from './look.gen';
 import { store } from './store';
 import { ticketAdopt } from './ticket-adopt';
 import { ticketNeed } from './ticket-need';
@@ -55,7 +55,8 @@ export function ticketHeader($: EngineInterface, ctx: Ctx, d: Detail) {
           t.type,
           t.points == null ? 'Not pointed' : t.points + ' pts',
           t.priority && t.priority + ' priority',
-          t.status + ' in Jira'
+          t.status + ' in Jira',
+          spentText(f?.spent)
         ]
           .filter(Boolean)
           .join('  •  ')

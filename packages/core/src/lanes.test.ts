@@ -111,3 +111,46 @@ describe('the list row of a need', () => {
     });
   });
 });
+
+describe('a stopped test run', () => {
+  it('offers Test again', () => {
+    FLOWS['PROJ-13'] = {
+      stage: 'testing',
+      run: { ...run('stopped')!, stage: 'testing' },
+      worktree: '/w'
+    };
+    expect(flowFor('PROJ-13')?.need).toEqual({
+      kind: 'decision',
+      ask: 'Testing was stopped.',
+      actions: [{ id: 'startTesting', label: 'Test again' }]
+    });
+  });
+});
+
+describe('a test run that waits for the login', () => {
+  it('needs the developer, and says so in the list', () => {
+    FLOWS['PROJ-14'] = {
+      stage: 'testing',
+      run: { ...run('running')!, stage: 'testing', waiting: 'login' }
+    };
+    expect(agentFor('PROJ-14')).toMatchObject({
+      kind: 'decision',
+      ask: 'Log in to the browser window to test.'
+    });
+  });
+});
+
+describe('a stopped build whose last gate passed', () => {
+  it('offers Move to Testing as well', () => {
+    FLOWS['PROJ-15'] = {
+      stage: 'development',
+      run: { ...run('stopped')!, stage: 'development' },
+      steps: [{ n: 1, text: 'a', covers: [], state: 'done' }],
+      checks: [{ name: 'Tests', ok: true }]
+    };
+    expect(flowFor('PROJ-15')?.need?.actions).toEqual([
+      { id: 'toTesting', label: 'Move to Testing' },
+      { id: 'startDevelopment', label: 'Start again' }
+    ]);
+  });
+});

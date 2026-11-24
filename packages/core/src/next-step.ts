@@ -18,7 +18,20 @@ export function restingNeed(f: Flow): Need | null {
     return {
       kind: 'decision',
       ask: `Building was stopped. ${done} of ${f.steps?.length ?? 0} steps are done.`,
-      actions: [{ id: 'startDevelopment', label: 'Start again' }]
+      actions: [
+        // A gate that passed before the stop still counts: the developer can test what is there.
+        ...(f.checks?.length && f.checks.every((c) => c.ok)
+          ? [{ id: 'toTesting', label: 'Move to Testing' }]
+          : []),
+        { id: 'startDevelopment', label: 'Start again' }
+      ]
+    };
+  }
+  if (f.stage === 'testing' && (f.run?.state === 'stopped' || f.run?.state === 'failed')) {
+    return {
+      kind: 'decision',
+      ask: 'Testing was stopped.',
+      actions: [{ id: 'startTesting', label: 'Test again' }]
     };
   }
   return null;

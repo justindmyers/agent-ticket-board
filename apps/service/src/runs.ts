@@ -1,4 +1,8 @@
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { createWriteStream } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { createConnection, createServer } from 'node:net';
 import {
   createSdkMcpServer,
   tool,
@@ -10,6 +14,7 @@ import {
 import PQueue from 'p-queue';
 import { z } from 'zod';
 import {
+  activityText,
   audit,
   branchName,
   CONFIG,
@@ -26,8 +31,9 @@ import {
   type Flow,
   type Ticket
 } from '@agent-ticket-board/core';
+import { sessionOf, TestBrowser } from './browser';
 import type { Processes } from './processes';
-import { STAGE_SPECS, type StageId, type StageSpec } from './stages';
+import { STAGE_SPECS, testAllowed, type StageId, type StageSpec } from './stages';
 
 // Agent runs: a queue with a fixed number of slots, one run at a time for each ticket, and Stop.
 // Worktrees are made one at a time (their install is heavy). Every step goes into the audit log.
@@ -56,7 +62,32 @@ export type RunDeps = {
   worktree?: typeof ensureWorktree;
   slots?: number;
   now?: () => string;
+  /** How long Testing waits for the app to listen. Tests make it short. */
+  appTimeoutMs?: number;
+  /** A desktop notification. Default: terminal-notifier, or osascript. */
+  notify?: (message: string) => void;
+  /** The ticket's test browser. Default: the board's own playwright-cli browser. */
+  browser?: (key: string, cwd: string) => BrowserLike;
+  /** The command that takes a screenshot set. Default: this CLI's `shots`. */
+  shotsCommand?: string;
 };
+
+function desktopNotify(message: string) {
+  const title = 'Agent Ticket Board';
+  execFile(
+    'terminal-notifier',
+    ['-title', title, '-message', message, '-sound', 'default'],
+    (e) => {
+      if (e) {
+        execFile(
+          'osascript',
+          ['-e', `display notification ${JSON.stringify(message)} with title "${title}"`],
+          () => undefined
+        );
+      }
+    }
+  );
+}
 
 /** PATH with the usual folders of command-line tools (Homebrew and /usr/local) added once. */
 export function toolPath(path = '') {
@@ -69,12 +100,102 @@ export function toolPath(path = '') {
   return parts.join(':');
 }
 
+/** Where a test run works: the worktree, the app's address and the browser. */
+export type AppEnv = {
+  cwd: string;
+  url: string;
+  session: string;
+  shots: string;
+  mocked: boolean;
+};
+
+export type BrowserLike = Pick<
+  TestBrowser,
+  'isOpen' | 'open' | 'goto' | 'waitLogin' | 'close' | 'runCode' | 'routes'
+>;
+
+/** True when something accepts a TCP connection at host:port within 2 seconds. */
+export function answers(hostPort: string) {
+  const [host, port] = hostPort.split(':');
+  return new Promise<boolean>((resolve) => {
+    const s = createConnection({ host: host || 'localhost', port: Number(port) });
+    const done = (ok: boolean) => {
+      s.destroy();
+      resolve(ok);
+    };
+    s.setTimeout(2000, () => done(false));
+    s.once('connect', () => done(true));
+    s.once('error', () => done(false));
+  });
+}
+
+/** True when something accepts a connection on the port, over IPv4 or IPv6 localhost. */
+async function inUse(port: number) {
+  return (await answers(`127.0.0.1:${port}`)) || (await answersV6(port));
+}
+
+function answersV6(port: number) {
+  return new Promise<boolean>((resolve) => {
+    const s = createConnection({ host: '::1', port });
+    const done = (ok: boolean) => {
+      s.destroy();
+      resolve(ok);
+    };
+    s.setTimeout(2000, () => done(false));
+    s.once('connect', () => done(true));
+    s.once('error', () => done(false));
+  });
+}
+
+/**
+ * True when nothing uses the port. A bind on the wildcard address is not enough: on macOS it
+ * succeeds while another server holds 127.0.0.1 on the same port. So also try to connect.
+ */
+async function portFree(port: number) {
+  if (await inUse(port)) {
+    return false;
+  }
+  return new Promise<boolean>((resolve) => {
+    const s = createServer();
+    s.once('error', () => resolve(false));
+    s.listen(port, '127.0.0.1', () => s.close(() => resolve(true)));
+  });
+}
+
+/** True when a process of the group `pgid` (the app that the board started) listens on the port. */
+async function groupListens(port: number, pgid: number) {
+  const run = (cmd: string, args: string[]) =>
+    new Promise<string>((resolve) =>
+      execFile(cmd, args, (_e, out) => resolve(typeof out === 'string' ? out : ''))
+    );
+  const pids = (await run('lsof', [`-tiTCP:${port}`, '-sTCP:LISTEN'])).split(/\s+/).filter(Boolean);
+  for (const pid of pids) {
+    if (Number((await run('ps', ['-o', 'pgid=', '-p', pid])).trim()) === pgid) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function waitFor(check: () => Promise<boolean>, ms: number) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (await check()) {
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return false;
+}
+
 export class Runs {
   private queue: PQueue;
   /** Worktree setup runs `pnpm install`: one at a time. */
   private heavy = new PQueue({ concurrency: 1 });
   private active = new Map<string, AbortController>();
   private logs = new Map<string, RunLog>();
+  /** The tickets whose test app this service started. Only those get closed. */
+  private apps = new Set<string>();
   private now: () => string;
   private slots: number;
 
@@ -95,6 +216,10 @@ export class Runs {
 
   develop(key: string) {
     return this.start(key, 'development');
+  }
+
+  test(key: string) {
+    return this.start(key, 'testing');
   }
 
   /** Queues a run of one stage. Returns at once; the run updates the record as it goes. */
@@ -144,6 +269,8 @@ export class Runs {
       return false;
     }
     ac.abort();
+    // A test run's app and browser go first: Stop means the developer is done with them.
+    await this.stopApp(key, true);
     const left = await this.d.processes.stop(key);
     this.active.delete(key);
     await audit(key, 'developer', 'run.stopped', { run: FLOWS[key]?.run?.id, stillAlive: left });
@@ -170,14 +297,21 @@ export class Runs {
     await audit(key, 'service', 'run.started', { run: FLOWS[key]?.run?.id, stage: spec.stage });
     try {
       const t = await this.d.ticket(key);
-      const cwd = spec.stage === 'development' ? await this.worktree(key, t, log) : this.d.repo()!;
-      const prompt = spec.prompt(t, FLOWS[key]!, await this.d.comments(key));
-      const options = this.options(key, spec, cwd, ac, log);
+      const app = spec.stage === 'testing' ? await this.startApp(key, log) : undefined;
+      const cwd =
+        spec.stage === 'development'
+          ? await this.worktree(key, t, log)
+          : (app?.cwd ?? this.d.repo()!);
+      const prompt = spec.prompt(t, FLOWS[key]!, await this.d.comments(key), app);
+      const options = this.options(key, spec, cwd, ac, log, app);
       await log.prompt(prompt, options as Record<string, unknown>);
       for await (const m of this.d.query({ prompt, options })) {
         await log.message(m);
         if (ac.signal.aborted) {
           return;
+        }
+        if (m.type === 'assistant') {
+          await this.activity(key, m);
         }
         if (m.type === 'system' && m.subtype === 'init') {
           await this.patchRun(key, { session: m.session_id });
@@ -190,7 +324,152 @@ export class Runs {
       if (!ac.signal.aborted) {
         await this.fail(key, spec, e instanceof Error ? e.message : String(e), undefined, e);
       }
+    } finally {
+      if (spec.stage === 'testing') {
+        // Stop closes the browser too; a finished or failed run keeps it for the next test run.
+        await this.stopApp(key, ac.signal.aborted);
+      }
     }
+  }
+
+  /**
+   * The live app of the ticket's worktree, for Testing: the login service answers, the dev server
+   * runs on a free build port, and the ticket's browser is open and logged in.
+   */
+  private async startApp(key: string, log: RunLog): Promise<AppEnv> {
+    const f = FLOWS[key]!;
+    const { devCommand, loginCheck, ownerPort } = CONFIG.app;
+    if (!devCommand) {
+      throw new Error('Set the dev command in Settings (App under test) first.');
+    }
+    if (loginCheck && !(await answers(loginCheck))) {
+      throw new Error(
+        `The login service at ${loginCheck} does not answer. Start it, then test again.`
+      );
+    }
+    // The same port as the ticket's last test run: the login in its browser belongs to that origin.
+    const port = await this.freePort(f.testPort);
+    const url = `http://localhost:${port}/`;
+    const env = { ...process.env, PATH: toolPath(process.env.PATH), BROWSER: 'none' };
+    this.apps.add(key);
+    const app = this.d.processes.spawn(
+      'sh',
+      ['-c', devCommand.replaceAll('{port}', String(port))],
+      { cwd: f.worktree!, env, stdio: ['ignore', 'pipe', 'pipe'] },
+      key,
+      'dev-server'
+    );
+    app.stdout?.on('data', (c: Buffer) => void log.append('app.log', c.toString()));
+    app.stderr?.on('data', (c: Buffer) => void log.append('app.log', c.toString()));
+    await audit(key, 'service', 'app.starting', { port, pid: app.pid });
+    // Ready means: this app's own process group listens on the leased port. Something else that
+    // answers there (another worktree's server) is not this ticket's app.
+    let exited = false;
+    app.once('exit', () => (exited = true));
+    const ready = await waitFor(
+      async () => exited || groupListens(port, app.pid!),
+      this.d.appTimeoutMs ?? 180_000
+    );
+    if (!ready || exited) {
+      throw new Error(
+        `The app did not start on port ${port}${exited ? ': its command ended' : ''}. See app.log in the audit log.`
+      );
+    }
+    await audit(key, 'service', 'app.ready', { port });
+    await this.write(key, { ...FLOWS[key]!, testPort: port });
+    const browser = this.browser(key, f.worktree!, env);
+    const keep = [ownerPort, Number(loginCheck?.split(':')[1])].filter((p) => p > 0);
+    if (await browser.isOpen()) {
+      await browser.routes(keep);
+      await browser.goto(url);
+      await audit(key, 'service', 'browser.reused', {});
+    } else {
+      await browser.open(url, keep);
+      await audit(key, 'service', 'browser.opened', {});
+    }
+    if (!(await browser.waitLogin(url, ownerPort, 5))) {
+      await this.patchRun(key, { waiting: 'login', app: url });
+      await audit(key, 'service', 'browser.login.wait', {});
+      (this.d.notify ?? desktopNotify)(`${key}: log in to the browser window to test.`);
+      if (!(await browser.waitLogin(url, ownerPort, 600))) {
+        await this.patchRun(key, { waiting: undefined });
+        throw new Error(
+          'You did not log in to the browser within 10 minutes. Test again when you are ready.'
+        );
+      }
+    }
+    await this.patchRun(key, { waiting: undefined, app: url });
+    await audit(key, 'service', 'browser.login.done', {});
+    // The fake API that an earlier test run wrote: load it, so this run does not build it again.
+    const mock = join(f.worktree!, '.playwright-cli', 'mock.js');
+    const mocked = existsSync(mock);
+    if (mocked) {
+      await browser.runCode(mock);
+      await audit(key, 'service', 'browser.mock.loaded', {});
+    }
+    return {
+      cwd: f.worktree!,
+      url,
+      session: sessionOf(key),
+      shots: `${this.shotsCommand()} ${key}`,
+      mocked
+    };
+  }
+
+  /** The ticket's test browser. Tests replace it. */
+  private browser(key: string, cwd: string, env: NodeJS.ProcessEnv): BrowserLike {
+    return this.d.browser?.(key, cwd) ?? new TestBrowser(key, { cwd, env });
+  }
+
+  /** The command that the agent runs to take a screenshot set: the board's own CLI. */
+  shotsCommand() {
+    return this.d.shotsCommand ?? `${process.execPath} ${process.argv[1]} shots`;
+  }
+
+  /**
+   * Stops the ticket's app after every test run, also after a failure. The browser stays open for the
+   * next test run, so the developer stays logged in; Stop closes it as well.
+   */
+  private async stopApp(key: string, closeBrowser = false) {
+    if (!this.apps.delete(key)) {
+      return;
+    }
+    const f = FLOWS[key];
+    if (closeBrowser && f?.worktree) {
+      await this.browser(key, f.worktree, process.env).close();
+      await audit(key, 'service', 'browser.closed', {});
+    }
+    const left = await this.d.processes.stop(key);
+    await audit(key, 'service', 'app.stopped', { stillAlive: left });
+  }
+
+  /** Closes the ticket's test browser, for example after the developer approved the evidence. */
+  async closeBrowser(key: string) {
+    const f = FLOWS[key] ?? (await loadFlow(key));
+    if (f?.worktree) {
+      await this.browser(key, f.worktree, {
+        ...process.env,
+        PATH: toolPath(process.env.PATH)
+      }).close();
+      await audit(key, 'service', 'browser.closed', {});
+    }
+  }
+
+  /** The first build port that nothing listens on. The developer's own port is never used. */
+  private async freePort(prefer?: number) {
+    const [first, last] = CONFIG.app.buildPorts;
+    const ok = (p: number) => p >= first && p <= last && p !== CONFIG.app.ownerPort;
+    if (prefer && ok(prefer) && (await portFree(prefer))) {
+      return prefer;
+    }
+    for (let p = first; p <= last; p++) {
+      if (p !== CONFIG.app.ownerPort && (await portFree(p))) {
+        return p;
+      }
+    }
+    throw new Error(
+      `Every build port from ${first} to ${last} is in use. Stop an app, then test again.`
+    );
   }
 
   /** The ticket's worktree: found, or made by the configured script, one at a time. */
@@ -218,7 +497,8 @@ export class Runs {
     spec: StageSpec,
     cwd: string,
     ac: AbortController,
-    log: RunLog
+    log: RunLog,
+    app?: AppEnv
   ): Options {
     const board =
       spec.stage === 'development'
@@ -250,7 +530,8 @@ export class Runs {
       cwd,
       model: spec.model,
       tools: spec.tools,
-      allowedTools: spec.allowed,
+      // Testing allows the exact screenshot command that its prompt gives the agent.
+      allowedTools: app ? testAllowed(this.shotsCommand()) : spec.allowed,
       permissionMode: 'dontAsk',
       settingSources: ['project', 'local'],
       strictMcpConfig: true,
@@ -304,8 +585,13 @@ export class Runs {
       return;
     }
     try {
-      const f = spec.apply(FLOWS[key]!, m.structured_output);
-      await this.write(key, { ...f, run: { ...f.run!, state: 'done', ended: this.now(), cost } });
+      const f = spec.apply(FLOWS[key]!, m.structured_output, key);
+      await this.write(key, {
+        ...f,
+        // The SDK's cost is the session total so far; a session can return more than one result.
+        spent: (f.spent ?? 0) + cost - (f.run?.cost ?? 0),
+        run: { ...f.run!, state: 'done', ended: this.now(), cost }
+      });
       await audit(key, 'service', 'run.done', { run: f.run?.id, cost, ...spec.counts(f) });
     } catch (e) {
       await this.fail(key, spec, e instanceof Error ? e.message : String(e), cost, e);
@@ -321,8 +607,10 @@ export class Runs {
     });
     await this.write(key, {
       ...f,
+      ...(cost === undefined ? {} : { spent: (f.spent ?? 0) + cost - (f.run?.cost ?? 0) }),
       run: {
         ...f.run!,
+        waiting: undefined,
         state: 'failed',
         ended: this.now(),
         error,
@@ -330,6 +618,19 @@ export class Runs {
       },
       need: { kind: 'problem', ask: error, actions: [{ id: spec.retry, label: 'Try again' }] }
     });
+  }
+
+  /** Shows the agent's last tool call on the ticket ("Opening /settings/edges"). */
+  private async activity(key: string, m: Extract<SDKMessage, { type: 'assistant' }>) {
+    const uses = (m.message.content as { type: string; name?: string; input?: unknown }[]).filter(
+      (c) => c.type === 'tool_use'
+    );
+    const last = uses.at(-1);
+    const text =
+      last && activityText(last.name ?? '', (last.input ?? {}) as Record<string, unknown>);
+    if (text && text !== FLOWS[key]?.run?.activity) {
+      await this.patchRun(key, { activity: text });
+    }
   }
 
   private async patchRun(key: string, patch: Partial<AgentRun>) {

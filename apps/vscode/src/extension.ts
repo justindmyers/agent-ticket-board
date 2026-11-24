@@ -348,6 +348,21 @@ async function runAction(key: string, id: string) {
       ? open(pr.url)
       : vscode.window.showInformationMessage(`${key}: no pull request found on GitHub.`);
   }
+  if (id === 'startTesting') {
+    return startRun(key, 'test').catch((e: unknown) => showError(key, e));
+  }
+  if (id === 'approveTesting') {
+    // Through the service: it also closes the ticket's test browser.
+    return startRun(key, 'approve-testing').catch((err: unknown) => showError(key, err));
+  }
+  if (id.startsWith('openShot:')) {
+    // Only a screenshot that the ticket's evidence lists, never any path the webview sends.
+    const path = id.slice('openShot:'.length);
+    const listed = Object.values(f?.evidence ?? {}).some((x) => x.shots?.includes(path));
+    return listed
+      ? vscode.commands.executeCommand('vscode.open', vscode.Uri.file(path))
+      : undefined;
+  }
   if (id === 'toTesting') {
     try {
       await moveToTesting(key);

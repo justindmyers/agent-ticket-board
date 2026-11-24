@@ -1,0 +1,30 @@
+{
+  "stage": "testing",
+  "worktree": "/code/example-app-feature-PROJ-112-archive-filter",
+  "branch": "feature/PROJ-112-archive-filter",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "An Archived filter",
+      "check": "Click path: open the list, choose Archived"
+    }
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "text": "Add the filter",
+      "covers": ["R1"],
+      "state": "done"
+    }
+  ],
+  "run": {
+    "id": "2026-01-05T09-00-00-000Z-testing",
+    "state": "running",
+    "stage": "testing",
+    "started": "2026-01-05T09:00:00Z",
+    "model": "sonnet",
+    "waiting": "login",
+    "app": "http://localhost:3002/"
+  },
+  "spent": 5.1
+}

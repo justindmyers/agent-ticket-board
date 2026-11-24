@@ -31,7 +31,7 @@ export function TicketTitle({ d, accent, stageIcon, theme }: Props) {
           {d.ticket.summary}
         </h2>
         <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-          {metaParts(d.ticket).map((x, i) => (
+          {metaParts(d.ticket, d.flow?.spent).map((x, i) => (
             <span key={i} className="flex items-center gap-1.5">
               {i > 0 && <Bullet />}
               {x}

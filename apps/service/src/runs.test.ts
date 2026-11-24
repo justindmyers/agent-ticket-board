@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
@@ -11,9 +12,24 @@ vi.hoisted(() => {
   process.env.ATB_HOME = mk(`${process.env.TMPDIR ?? '/tmp'}/atb-runs-`);
 });
 
-import { FLOWS, loadFlow, readTimeline, saveFlow, type Ticket } from '@agent-ticket-board/core';
+import {
+  CONFIG,
+  FLOWS,
+  loadFlow,
+  readTimeline,
+  saveFlow,
+  type Ticket
+} from '@agent-ticket-board/core';
 import { Processes } from './processes';
-import { BUILD_ALLOWED, PLAN_ALLOWED, PLAN_TOOLS, Runs, toolPath, type QueryFn } from './runs';
+import {
+  answers,
+  BUILD_ALLOWED,
+  PLAN_ALLOWED,
+  PLAN_TOOLS,
+  Runs,
+  toolPath,
+  type QueryFn
+} from './runs';
 
 const ticket = (key: string): Ticket => ({
   key,
@@ -71,12 +87,14 @@ function runs(query: QueryFn, extra: Partial<ConstructorParameters<typeof Runs>[
     comments: async () => ['Keep it small.'],
     changed: (k) => changed.push(k),
     now: () => '2026-01-01T00:00:00Z',
+    notify: () => undefined,
     ...extra
   });
   return { r, changed };
 }
 
-const idle = (r: Runs) => vi.waitFor(() => expect(r.list()).toEqual([]));
+const idle = (r: Runs, timeout = 1000) =>
+  vi.waitFor(() => expect(r.list()).toEqual([]), { timeout });
 
 describe('Runs.plan', () => {
   it('runs a read-only, isolated session and writes the plan for approval', async () => {
@@ -336,5 +354,259 @@ describe('toolPath', () => {
     expect(toolPath('/x:/opt/homebrew/bin')).toBe(
       '/x:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin'
     );
+  });
+});
+
+describe('Runs.test', () => {
+  const tested = {
+    requirements: [
+      {
+        id: 'R1',
+        ok: true,
+        test: '',
+        shots: ['/shots/R1-light.png'],
+        seen: 'The list works.',
+        note: ''
+      }
+    ],
+    fixes: [],
+    summary: 'R1 passes.'
+  };
+
+  /** A fake test browser: records each call, and is logged in unless told otherwise. */
+  function fakeBrowser(o: { open?: boolean; loggedIn?: boolean[] } = {}) {
+    const calls: string[] = [];
+    let open = o.open ?? false;
+    const logins = [...(o.loggedIn ?? [true])];
+    const browser = (key: string) => ({
+      isOpen: async () => open,
+      open: async (url: string, keep: number[]) => {
+        calls.push(`open ${key} ${url} keep=${keep.join(',')}`);
+        open = true;
+      },
+      goto: async (url: string) => void calls.push(`goto ${key} ${url}`),
+      runCode: async (file: string) => void calls.push(`run-code ${key} ${file}`),
+      routes: async (keep: number[]) => void calls.push(`routes ${key} keep=${keep.join(',')}`),
+      waitLogin: async (url: string, _owner: number, seconds: number) => {
+        calls.push(`wait-login ${key} ${url} ${seconds}`);
+        return logins.length > 1 ? logins.shift()! : logins[0]!;
+      },
+      close: async () => {
+        calls.push(`close ${key}`);
+        open = false;
+      }
+    });
+    return { calls, browser, reopen: () => (open = true) };
+  }
+
+  function setup() {
+    const dir = mkdtempSync(join(tmpdir(), 'atb-test-'));
+    CONFIG.app = {
+      ...CONFIG.app,
+      // A tiny live app: answers on the leased port until the run stops it.
+      devCommand: `node -e "require('http').createServer((q, r) => r.end('ok')).listen({port})"`,
+      buildPorts: [43101, 43110],
+      ownerPort: 43101,
+      loginCheck: null
+    };
+    return { dir };
+  }
+
+  const req = [{ id: 'R1', text: 'Works', check: 'Click path' }];
+
+  it('starts the app on a free build port, opens the browser, tests, then stops the app', async () => {
+    const { dir } = setup();
+    await saveFlow('PROJ-30', { stage: 'testing', worktree: dir, requirements: req });
+    const goto = {
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'Bash',
+            input: {
+              command:
+                'pnpm exec playwright-cli -s=atb-PROJ-30 goto http://localhost:43102/settings'
+            }
+          }
+        ]
+      }
+    } as unknown as SDKMessage;
+    const { query, calls: q } = fakeQuery([init, goto, success(tested)]);
+    const b = fakeBrowser();
+    const { r } = runs(query, { browser: b.browser, shotsCommand: '/bin/node /bin/atb.cjs shots' });
+    await r.test('PROJ-30');
+    await idle(r, 15_000);
+
+    const o = q[0]!.options!;
+    expect(o.cwd).toBe(dir);
+    expect(o.model).toBe('sonnet');
+    // The exact screenshot command of the prompt is allowed: a refused shots call loses the screenshot set.
+    expect(o.allowedTools).toEqual(
+      expect.arrayContaining([
+        'Bash(pnpm exec playwright-cli:*)',
+        'Bash(/bin/node /bin/atb.cjs shots:*)'
+      ])
+    );
+    expect(q[0]!.prompt).toContain('http://localhost:43102/');
+    expect(q[0]!.prompt).toContain('pnpm exec playwright-cli -s=atb-PROJ-30');
+    expect(q[0]!.prompt).toContain('/bin/node /bin/atb.cjs shots PROJ-30 <name>');
+    expect(b.calls).toEqual([
+      'open PROJ-30 http://localhost:43102/ keep=43101',
+      'wait-login PROJ-30 http://localhost:43102/ 5'
+    ]);
+    const f = await loadFlow('PROJ-30');
+    expect(f?.evidence?.R1?.ok).toBe(true);
+    expect(f?.need?.actions[0]?.id).toBe('approveTesting');
+    expect(f?.spent).toBeCloseTo(0.12);
+    expect(f?.run?.waiting).toBeUndefined();
+    expect(await answers('localhost:43102')).toBe(false);
+    const records = JSON.stringify(
+      (await readTimeline('PROJ-30')).filter((e) => e.type === 'record')
+    );
+    expect(records).toContain('Opening /settings');
+    const types = (await readTimeline('PROJ-30')).map((e) => e.type);
+    expect(types).toEqual(
+      expect.arrayContaining([
+        'app.ready',
+        'browser.opened',
+        'browser.login.done',
+        'app.stopped',
+        'run.done'
+      ])
+    );
+  });
+
+  it('loads the fake API of earlier test runs, and tells the agent to extend it', async () => {
+    const { dir } = setup();
+    mkdirSync(join(dir, '.playwright-cli'), { recursive: true });
+    writeFileSync(join(dir, '.playwright-cli', 'mock.js'), 'async (page) => {}');
+    await saveFlow('PROJ-38', { stage: 'testing', worktree: dir, requirements: req });
+    const { query, calls: q } = fakeQuery([init, success(tested)]);
+    const b = fakeBrowser();
+    const { r } = runs(query, { browser: b.browser });
+    await r.test('PROJ-38');
+    await idle(r, 15_000);
+    expect(b.calls).toContain(`run-code PROJ-38 ${join(dir, '.playwright-cli', 'mock.js')}`);
+    expect(q[0]!.prompt).toMatch(/fake API from earlier test runs is loaded/);
+  });
+
+  it('notifies and waits when the browser is not logged in', async () => {
+    const { dir } = setup();
+    await saveFlow('PROJ-36', { stage: 'testing', worktree: dir, requirements: req });
+    const notified: string[] = [];
+    const b = fakeBrowser({ loggedIn: [false, true] });
+    const { r } = runs(fakeQuery([init, success(tested)]).query, {
+      browser: b.browser,
+      notify: (m) => notified.push(m)
+    });
+    await r.test('PROJ-36');
+    await idle(r, 15_000);
+    expect(b.calls.filter((c) => c.startsWith('wait-login'))).toEqual([
+      'wait-login PROJ-36 http://localhost:43102/ 5',
+      'wait-login PROJ-36 http://localhost:43102/ 600'
+    ]);
+    expect(notified).toEqual(['PROJ-36: log in to the browser window to test.']);
+    expect((await readTimeline('PROJ-36')).map((e) => e.type)).toContain('browser.login.wait');
+  });
+
+  it('skips a build port that another app holds on localhost, and tests its own app', async () => {
+    const { dir } = setup();
+    // Other worktrees' dev servers on the first build ports: vite binds [::1] only, others 127.0.0.1.
+    const other = createServer((_q, res) => res.end('other')).listen(43102, '::1');
+    const other4 = createServer((_q, res) => res.end('other')).listen(43103, '127.0.0.1');
+    await Promise.all([other, other4].map((s) => new Promise((res) => s.once('listening', res))));
+    try {
+      await saveFlow('PROJ-32', { stage: 'testing', worktree: dir, requirements: req });
+      const { query, calls: q } = fakeQuery([init, success(tested)]);
+      const b = fakeBrowser();
+      const { r } = runs(query, { browser: b.browser });
+      await r.test('PROJ-32');
+      await idle(r, 15_000);
+      expect(q[0]!.prompt).toContain('http://localhost:43104/');
+      expect(b.calls[0]).toBe('open PROJ-32 http://localhost:43104/ keep=43101');
+    } finally {
+      other.close();
+      other4.close();
+    }
+  });
+
+  it('fails when the dev command does not listen on the leased port, and tests nothing', async () => {
+    const { dir } = setup();
+    // The command ignores {port}: whatever answers there is not this ticket's app.
+    CONFIG.app.devCommand = `node -e "require('http').createServer((q, r) => r.end('ok')).listen(43150)"`;
+    await saveFlow('PROJ-33', { stage: 'testing', worktree: dir, requirements: req });
+    const { query, calls: q } = fakeQuery([init, success(tested)]);
+    const b = fakeBrowser();
+    const { r } = runs(query, { appTimeoutMs: 3000, browser: b.browser });
+    await r.test('PROJ-33');
+    await idle(r, 15_000);
+    expect(q).toHaveLength(0);
+    expect(b.calls).toEqual([]);
+    expect((await loadFlow('PROJ-33'))?.need?.ask).toMatch(/did not start on port 43102/);
+  });
+
+  it('keeps the browser for the next test run, on the same port', async () => {
+    const { dir } = setup();
+    await saveFlow('PROJ-34', { stage: 'testing', worktree: dir, requirements: req });
+    const b = fakeBrowser();
+    const { r } = runs(fakeQuery([init, success(tested)]).query, { browser: b.browser });
+    await r.test('PROJ-34');
+    await idle(r, 15_000);
+    await saveFlow('PROJ-34', { ...(await loadFlow('PROJ-34'))!, need: undefined });
+    await r.test('PROJ-34');
+    await idle(r, 15_000);
+    expect(b.calls).toEqual([
+      'open PROJ-34 http://localhost:43102/ keep=43101',
+      'wait-login PROJ-34 http://localhost:43102/ 5',
+      'routes PROJ-34 keep=43101',
+      'goto PROJ-34 http://localhost:43102/',
+      'wait-login PROJ-34 http://localhost:43102/ 5'
+    ]);
+    expect((await loadFlow('PROJ-34'))?.testPort).toBe(43102);
+  });
+
+  it('closes the browser on Stop', async () => {
+    const { dir } = setup();
+    await saveFlow('PROJ-37', { stage: 'testing', worktree: dir, requirements: req });
+    let release!: () => void;
+    const gate = new Promise<void>((res) => (release = res));
+    const b = fakeBrowser();
+    const { r } = runs(fakeQuery([init, success(tested)], gate).query, { browser: b.browser });
+    await r.test('PROJ-37');
+    await vi.waitFor(() => expect(b.calls.some((c) => c.startsWith('wait-login'))).toBe(true), {
+      timeout: 15_000
+    });
+    await r.stop('PROJ-37');
+    release();
+    await idle(r, 15_000);
+    expect(b.calls.at(-1)).toBe('close PROJ-37');
+  });
+
+  it('counts the cost of a session once, also when it returns two results', async () => {
+    const { dir } = setup();
+    await saveFlow('PROJ-35', { stage: 'testing', worktree: dir, requirements: req, spent: 1 });
+    const second = { ...(success(tested) as object), total_cost_usd: 0.2 } as unknown as SDKMessage;
+    const b = fakeBrowser();
+    const { r } = runs(fakeQuery([init, success(tested), second]).query, { browser: b.browser });
+    await r.test('PROJ-35');
+    await idle(r, 15_000);
+    expect((await loadFlow('PROJ-35'))?.spent).toBeCloseTo(1.2);
+  });
+
+  it('says what to start when the login service does not answer, and starts nothing', async () => {
+    const { dir } = setup();
+    CONFIG.app.loginCheck = 'localhost:43199';
+    await saveFlow('PROJ-31', { stage: 'testing', worktree: dir, requirements: req });
+    const b = fakeBrowser();
+    const { r } = runs(fakeQuery([]).query, { browser: b.browser });
+    await r.test('PROJ-31');
+    await idle(r);
+    const f = await loadFlow('PROJ-31');
+    expect(f?.need?.ask).toBe(
+      'The login service at localhost:43199 does not answer. Start it, then test again.'
+    );
+    expect(f?.need?.actions[0]?.id).toBe('startTesting');
+    expect(b.calls).toEqual([]);
   });
 });

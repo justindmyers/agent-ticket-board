@@ -21,13 +21,14 @@ export * from './field-text';
 export * from './tracker-state';
 export * from './local-work';
 export * from './adopt';
-export { accentOf, PALETTE, STATE_ACCENT, type Accent } from './look';
+export { accentOf, activityText, PALETTE, STATE_ACCENT, type Accent } from './look';
 export * from './settings-view';
 export * from './planning';
 export * from './audit';
 export * from './worktree';
 export * from './development';
 export * from './next-step';
+export * from './testing';
 export * from './service-client';
 
 import { loadConfig } from './config';

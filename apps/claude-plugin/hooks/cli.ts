@@ -76,7 +76,11 @@ export function watchRun($: EngineInterface, key: string) {
 }
 
 /** Starts (`plan`) or stops an agent run through the service, then follows it. */
-export async function agentRun($: EngineInterface, key: string, verb: 'plan' | 'develop' | 'stop') {
+export async function agentRun(
+  $: EngineInterface,
+  key: string,
+  verb: 'plan' | 'develop' | 'test' | 'stop'
+) {
   try {
     await atb($, [verb, key], 30000);
   } catch (e) {
@@ -131,4 +135,24 @@ export async function toTesting($: EngineInterface, key: string) {
     return;
   }
   await reloadTicket($, key);
+}
+
+/** Approves a tested change for code review, then reloads the ticket. */
+export async function approveTested($: EngineInterface, key: string) {
+  try {
+    await atb($, ['approve-testing', key]);
+  } catch (e) {
+    $.ui.toast(`${key}: ${errorText(e)}`);
+    return;
+  }
+  await reloadTicket($, key);
+}
+
+/** Opens one of the ticket's screenshots in the system viewer. The CLI checks that the evidence lists it. */
+export async function openShot($: EngineInterface, key: string, path: string) {
+  try {
+    await atb($, ['open-shot', key, path]);
+  } catch (e) {
+    $.ui.toast(`${key}: ${errorText(e)}`);
+  }
 }

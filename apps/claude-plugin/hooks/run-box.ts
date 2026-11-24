@@ -1,7 +1,7 @@
 import type { EngineInterface, RenderElement } from 'claude-code';
 import { agentRun } from './cli';
 import { hex, kit, type Ctx } from './kit';
-import { runActive } from './look.gen';
+import { runActive, runText } from './look.gen';
 import { pulse } from './pulse';
 import type { Flow } from './types';
 
@@ -11,21 +11,16 @@ export function runBox(
   ctx: Ctx,
   key: string,
   f: Flow | null,
-  stage: 'planning' | 'development'
+  stage: 'planning' | 'development' | 'testing'
 ): RenderElement[] {
   if (!f?.run || f.run.stage !== stage || !runActive(f)) {
     return [];
   }
-  const { Box, Button } = ctx.els;
+  const { Box, Button, Text } = ctx.els;
   const { dim, sectionTitle } = kit(ctx);
   const queued = f.run.state === 'queued';
-  const color = hex(stage === 'development' ? 'aqua' : 'blue');
-  const title = queued ? 'Queued' : stage === 'development' ? 'Building now' : 'Planning now';
-  const text = queued
-    ? 'Every agent slot is busy. The run starts when one is free.'
-    : stage === 'development'
-      ? `The agent changes code in the ticket's worktree with ${f.run.model}. It does not commit or push.`
-      : `The agent reads the ticket and the code with ${f.run.model}. It changes no files.`;
+  const { title, caption: text, accent } = runText(f.run);
+  const color = hex(accent);
   return [
     Box({
       key: 'run',
@@ -43,7 +38,10 @@ export function runBox(
             Button({ key: 'stop-run', label: 'Stop', onPress: () => void agentRun($, key, 'stop') })
           ]
         }),
-        dim(text)
+        dim(text),
+        ...(f.run.activity && f.run.state === 'running' && !f.run.waiting
+          ? [Text({ wrap: 'truncate', children: ['Now: ' + f.run.activity] })]
+          : [])
       ]
     })
   ];
