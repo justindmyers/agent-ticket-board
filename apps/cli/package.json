@@ -7,11 +7,12 @@
     "atb": "dist/atb.cjs"
   },
   "scripts": {
-    "build": "esbuild src/atb.ts --bundle --platform=node --format=cjs --outfile=dist/atb.cjs --log-level=warning",
+    "build": "esbuild src/atb.ts --bundle --platform=node --format=cjs --outfile=dist/atb.cjs --log-level=warning --define:import.meta.url=__import_meta_url --banner:js=\"const __import_meta_url = require('node:url').pathToFileURL(__filename).href;\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agent-ticket-board/core": "workspace:*"
+    "@agent-ticket-board/core": "workspace:*",
+    "@agent-ticket-board/service": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.20.5"

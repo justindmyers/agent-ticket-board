@@ -6,6 +6,7 @@ import { refusal } from './guards';
 import type { Ctx } from './kit';
 import { queueView } from './queue-view';
 import { renderSettings, settings } from './settings';
+import { keepPulsing } from './pulse';
 import { store } from './store';
 import { ticketView } from './ticket-view';
 
@@ -92,6 +93,7 @@ export const register: Register = (on) => {
         (text) => $.ui.toast(text)
       );
     }
+    keepPulsing($);
     return store.open ? ticketView($, ctx, store.open) : queueView($, ctx, run);
   });
 };

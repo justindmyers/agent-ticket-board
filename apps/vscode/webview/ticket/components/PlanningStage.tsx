@@ -1,18 +1,16 @@
-import {
-  mdiChartBar,
-  mdiFormatListChecks,
-  mdiHelpCircleOutline,
-  mdiInformationOutline
-} from '@mdi/js';
+import { mdiChartBar, mdiFormatListChecks, mdiInformationOutline } from '@mdi/js';
 import { Button } from '../../shared/components/Button';
 import { Dot } from '../../shared/components/Dot';
 import { Section } from '../../shared/components/Section';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
-import { PALETTE } from '@agent-ticket-board/core/look';
-import { ink } from '../../shared/utils/surfaces';
+import { PALETTE, runActive } from '@agent-ticket-board/core/look';
 import type { Act } from '../types/ticket';
 import { canStartPlanning } from '../utils/ticket';
+import { AssumptionsSection } from './AssumptionsSection';
+import { EarlierAnswers } from './EarlierAnswers';
+import { QuestionsSection } from './QuestionsSection';
+import { RunSection } from './RunSection';
 import { TicketRow } from './TicketRow';
 import { TicketRows } from './TicketRows';
 import { TicketText } from './TicketText';
@@ -21,9 +19,14 @@ type Props = { d: Detail; act: Act; theme: Theme };
 
 export function PlanningStage({ d, act, theme }: Props) {
   const f = d.flow;
+  const draft = !!f?.questions?.some((q) => !q.a);
 
   return (
     <>
+      {f?.run?.stage === 'planning' && runActive(f) && (
+        <RunSection run={f.run} act={act} theme={theme} />
+      )}
+
       {canStartPlanning(d) && (
         <Section
           icon={mdiInformationOutline}
@@ -40,11 +43,25 @@ export function PlanningStage({ d, act, theme }: Props) {
         </Section>
       )}
 
+      {!!f?.questions?.length && (
+        <QuestionsSection ticketKey={d.ticket.key} questions={f.questions} theme={theme} />
+      )}
+
+      {!!f?.assumptions?.length && <AssumptionsSection assumptions={f.assumptions} theme={theme} />}
+
+      {!!f?.answered?.length && (
+        <EarlierAnswers ticketKey={d.ticket.key} answered={f.answered} theme={theme} />
+      )}
+
       {f?.requirements && (
         <Section
           icon={mdiFormatListChecks}
           title="Requirements"
-          caption="Each one has a check: a test or a click path"
+          caption={
+            draft
+              ? 'Draft: it can change after your answers'
+              : 'Each one has a check: a test or a click path'
+          }
           aside={f.requirements.length}
           accent="blue"
           theme={theme}
@@ -69,39 +86,15 @@ export function PlanningStage({ d, act, theme }: Props) {
         </Section>
       )}
 
-      {f?.questions && (
-        <Section
-          icon={mdiHelpCircleOutline}
-          title="Questions"
-          caption="Only the ones that change what gets built"
-          accent="violet"
-          theme={theme}
-        >
-          <TicketRows>
-            {f.questions.map((q, i) => (
-              <TicketRow
-                key={i}
-                state={q.a ? 'done' : undefined}
-                lead="?"
-                theme={theme}
-                sub={
-                  q.a || (
-                    <span style={{ color: ink('violet', theme) }}>Waiting for your answer</span>
-                  )
-                }
-              >
-                {q.q}
-              </TicketRow>
-            ))}
-          </TicketRows>
-        </Section>
-      )}
-
       {f?.steps && (
         <Section
           icon={mdiChartBar}
           title="Plan"
-          caption="Small steps; each names the requirements it covers"
+          caption={
+            draft
+              ? 'Draft: it can change after your answers'
+              : 'Small steps; each names the requirements it covers'
+          }
           aside={`${f.steps.length} steps`}
           accent="blue"
           theme={theme}

@@ -15,6 +15,15 @@ export function agentFor(key: string): Agent | null {
     const label = f.closed.reason === 'merged' ? 'Merged' : 'Finished';
     return { stage: f.stage, stageLabel: label, kind: 'finished', closed: f.closed.text };
   }
+  const cur = (f.steps ?? []).findIndex((s) => s.state === 'current');
+  const progress =
+    f.stage === 'development' && cur >= 0 ? `${cur + 1}/${f.steps!.length}` : undefined;
+  if (f.run?.state === 'running') {
+    return { stage: f.stage, stageLabel, kind: 'running', ...(progress ? { progress } : {}) };
+  }
+  if (f.run?.state === 'queued') {
+    return { stage: f.stage, stageLabel, kind: 'waiting', progress: 'queued' };
+  }
   if (f.need) {
     return {
       stage: f.stage,
@@ -25,13 +34,7 @@ export function agentFor(key: string): Agent | null {
     };
   }
   if (f.stage === 'development') {
-    const cur = (f.steps ?? []).findIndex((s) => s.state === 'current');
-    return {
-      stage: f.stage,
-      stageLabel,
-      kind: 'running',
-      progress: cur >= 0 ? `${cur + 1}/${f.steps!.length}` : undefined
-    };
+    return { stage: f.stage, stageLabel, kind: 'running', progress };
   }
   return { stage: f.stage, stageLabel, kind: 'waiting' };
 }

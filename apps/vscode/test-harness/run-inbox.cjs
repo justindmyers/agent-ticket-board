@@ -367,6 +367,76 @@ function page(theme, mode) {
   kb.adoptSent = await rh.evaluate(
     () => window.__sent.filter((m) => m.type === 'adopt').at(-1) ?? null
   );
+  // Plan questions: first on the Planning tab, answered by picking an option or typing one.
+  await rh.click('[role=option][data-key="PROJ-101"]');
+  await rh
+    .waitForFunction(() => document.getElementById('ttl-key')?.textContent === 'PROJ-101', null, {
+      timeout: 3000
+    })
+    .catch(() => {});
+  kb.questionsFirst = await rh.evaluate(() => {
+    const titles = [...document.querySelectorAll('section[aria-label]')].map((s) =>
+      s.getAttribute('aria-label')
+    );
+    return titles.indexOf('Questions') < titles.indexOf('Requirements');
+  });
+  kb.assumptions = await rh.evaluate(
+    () => document.querySelectorAll('[aria-label="Assumptions"] li').length
+  );
+  kb.answerSaveDisabled = await rh
+    .getByRole('button', { name: 'Save the answer to question 2' })
+    .isDisabled();
+  await rh
+    .getByRole('radiogroup', { name: 'Answers to question 2' })
+    .locator('label')
+    .filter({ hasText: /^Both/ })
+    .click();
+  await axe(rh, 'dark/ticket-questions');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-questions.png'), fullPage: true });
+  await rh.getByRole('button', { name: 'Save the answer to question 2' }).click();
+  await rh.getByRole('button', { name: 'Change the answer to question 1' }).click();
+  await rh
+    .getByRole('radiogroup', { name: 'Answers to question 1' })
+    .locator('label')
+    .filter({ hasText: 'Other answer' })
+    .click();
+  await rh
+    .getByRole('textbox', { name: 'Your answer to question 1' })
+    .fill('Only when the filter shows them');
+  await rh.getByRole('button', { name: 'Save the answer to question 1' }).click();
+  await rh.getByRole('button', { name: 'Show 1 earlier answers' }).click();
+  await rh.getByRole('button', { name: 'Change earlier answer 1' }).click();
+  await rh.getByRole('textbox', { name: 'Earlier answer 1' }).fill('Yes, all projects');
+  await axe(rh, 'dark/ticket-earlier-answers');
+  await rh.getByRole('button', { name: 'Save earlier answer 1' }).click();
+  kb.answersSent = await rh.evaluate(() => window.__sent.filter((m) => m.type === 'answer'));
+  // The audit log actions are in the ticket's More menu.
+  for (const name of ['Show audit log', 'Copy debug bundle']) {
+    await rh.getByRole('button', { name: 'More actions' }).click();
+    await rh.getByRole('menuitem', { name }).click();
+  }
+  kb.auditSent = await rh.evaluate(() =>
+    window.__sent
+      .filter((m) => m.type === 'action' && /^(auditLog|debugBundle)$/.test(m.id))
+      .map((m) => m.id)
+  );
+  // A planning run in progress: the Planning tab says so and offers Stop, not Start.
+  await rh.click('[role=option][data-key="PROJ-109"]');
+  await rh
+    .waitForFunction(() => document.getElementById('ttl-key')?.textContent === 'PROJ-109', null, {
+      timeout: 3000
+    })
+    .catch(() => {});
+  kb.runSection = await rh.evaluate(
+    () => document.querySelector('[aria-label="Planning now"]')?.textContent ?? null
+  );
+  kb.runStartHidden = (await rh.getByRole('button', { name: 'Start planning' }).count()) === 0;
+  await axe(rh, 'dark/ticket-running');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-running.png') });
+  await rh.getByRole('button', { name: 'Stop', exact: true }).click();
+  kb.runStopSent = await rh.evaluate(
+    () => window.__sent.filter((m) => m.type === 'action').at(-1) ?? null
+  );
   await rh.close();
   // Motion: count the animations that are running in the page right after each change.
   kb.motion = {};
@@ -413,6 +483,22 @@ function page(theme, mode) {
         document.getAnimations().some((a) => a.animationName === 'popIn')
     );
     await mp.keyboard.press('Escape');
+    // A running agent: its list row and its "Planning now" section show the travelling border.
+    await mp.click('[role=option][data-key="PROJ-109"]');
+    await mp.waitForTimeout(400);
+    m.runBorders = await mp.evaluate(
+      () =>
+        document
+          .getAnimations()
+          .filter((a) => a.animationName === 'runBorder' && a.playState === 'running').length
+    );
+    m.runBorderVisible = await mp.evaluate(() =>
+      [...document.querySelectorAll('.run-border')].map((el) => {
+        const bg = getComputedStyle(el, '::before').backgroundImage;
+        const color = getComputedStyle(el, '::before').backgroundColor;
+        return bg !== 'none' || color !== 'rgba(0, 0, 0, 0)';
+      })
+    );
     kb.motion[reduced ? 'reduced' : 'normal'] = m;
     await mp.close();
   }

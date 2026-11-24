@@ -117,3 +117,10 @@ export const pill = (a: Accent, t: Theme): CSSProperties =>
         borderColor: `${hx(a)}55`,
         background: `${hx(a)}${t === 'light' ? '1a' : '14'}`
       };
+
+/** The colour of a running agent's travelling border light (the `run-border` utility). */
+export const runColor = (a: Accent, t: Theme): CSSProperties =>
+  ({
+    '--run-color':
+      t === 'hc' ? 'var(--vscode-focusBorder)' : t === 'light' ? PALETTE[a].text : PALETTE[a].hex
+  }) as CSSProperties;

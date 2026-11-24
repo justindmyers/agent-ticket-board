@@ -34,8 +34,17 @@ import {
   adoptOffer,
   adoptWork,
   ignoreWork,
-  isStage
+  isStage,
+  callService,
+  ensureService,
+  saveAnswer,
+  saveEarlierAnswer,
+  serviceInfo,
+  bundle,
+  readTimeline,
+  timelineText
 } from '@agent-ticket-board/core';
+import { serve } from '@agent-ticket-board/service';
 
 const USAGE = `usage:
   atb sprint [--cached]                  sprint snapshot (cached: from ~/.agent-ticket-board/cache)
@@ -49,6 +58,13 @@ const USAGE = `usage:
   atb detect [--repo=<path>] [--only=tracker|repo]   proposed config values; writes nothing
   atb config [set <key> <json>]          the config, or one value that the developer accepted
   atb settings [--detect] [--only=…] | atb settings save <json>   the settings view
+  atb answer <KEY> <N> <text> [--earlier]   answer plan question N, or change earlier answer N
+  atb audit <KEY> [--json] [--tail=N]    the ticket's audit timeline
+  atb audit <KEY> --bundle               one archive of the ticket's audit log, tokens removed
+  atb plan <KEY>                         start a planning run (starts the service if it does not run)
+  atb stop <KEY>                         stop the agent run of a ticket
+  atb serve                              run the board service (clients start it for you)
+  atb service [status|stop]              the state of the service, or stop it and all its processes
 `;
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -99,6 +115,43 @@ function runDetect() {
 async function main() {
   await loadState();
   const key = args[0]?.toUpperCase();
+  if (cmd === 'serve') {
+    await serve();
+    return;
+  }
+  if (cmd === 'service') {
+    const info = await serviceInfo();
+    if (args[0] === 'stop') {
+      return out(info ? await callService(info, '/shutdown', {}) : { stopping: false });
+    }
+    return out(info ? await callService(info, '/health') : { ok: false });
+  }
+  if (cmd === 'audit' && key) {
+    if (flags.has('--bundle')) {
+      return out({ file: await bundle(key) });
+    }
+    const tail = Number(option('tail') ?? 0);
+    const events = await readTimeline(key);
+    const shown = tail > 0 ? events.slice(-tail) : events;
+    if (flags.has('--json')) {
+      return out({ events: shown, total: events.length, text: timelineText(shown) });
+    }
+    process.stdout.write(
+      shown.length ? `${timelineText(shown)}\n` : `${key}: the audit log is empty.\n`
+    );
+    return;
+  }
+  if (cmd === 'answer' && key && /^\d+$/.test(args[1] ?? '')) {
+    const save = flags.has('--earlier') ? saveEarlierAnswer : saveAnswer;
+    return out(await save(key, Number(args[1]), args.slice(2).join(' ')));
+  }
+  if ((cmd === 'plan' || cmd === 'stop') && key) {
+    const info = cmd === 'plan' ? await ensureService(process.argv[1]!) : await serviceInfo();
+    if (!info) {
+      return out({ stopped: false });
+    }
+    return out(await callService(info, `/tickets/${key}/${cmd}`, {}));
+  }
   if (cmd === 'detect') {
     return out(await runDetect());
   }

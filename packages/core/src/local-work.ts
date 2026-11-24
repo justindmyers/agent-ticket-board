@@ -1,3 +1,4 @@
+import { audit } from './audit';
 import { basename } from 'node:path';
 import { CONFIG } from './config';
 import { readJson, writeJson } from './files';
@@ -80,6 +81,7 @@ export async function ignoreWork(key: string) {
     throw new Error(`${key}: no local work to ignore.`);
   }
   await writeJson(IGNORED_FILE, { ...(await ignoredWork()), [key]: w.branch });
+  await audit(key, 'developer', 'ignore', { branch: w.branch });
   delete LOCAL[key];
 }
 

@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code';
 import { loadTicket } from './cli';
 import { accentHex, hex, needsYou, type Ctx } from './kit';
+import { pulse } from './pulse';
 import type { Row } from './types';
 
 const metaOf = (t: Row) =>
@@ -15,12 +16,14 @@ export function queueRow($: EngineInterface, ctx: Ctx, t: Row) {
   const a = t.agent;
   const accent = accentHex(a, t.state);
   const loud = needsYou(a);
+  const running = a?.kind === 'running';
 
   return Box({
     key: 'row-' + t.key,
     flexDirection: 'column',
     paddingX: 1,
     ...(loud ? { borderStyle: 'round', borderColor: accent } : {}),
+    ...(running ? { borderStyle: 'round', borderColor: pulse(accent) } : {}),
     children: [
       Box({
         key: 'm',

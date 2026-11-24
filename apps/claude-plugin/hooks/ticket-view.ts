@@ -1,3 +1,5 @@
+import { runLine } from './look.gen';
+import { ticketAudit } from './ticket-audit';
 import type { EngineInterface } from 'claude-code';
 import { kit, type Ctx } from './kit';
 import { store } from './store';
@@ -47,7 +49,8 @@ export function ticketView($: EngineInterface, ctx: Ctx, key: string) {
       ...ticketJira($, ctx, d.ticket.key, d.jira),
       rule(),
       ...ticketComments($, ctx, d),
-      ...(d.flow ? [dim('Agent data on this page is sample data.')] : [])
+      ...(runLine(d.flow?.run) ? [dim(runLine(d.flow?.run)!)] : []),
+      ...ticketAudit($, ctx, d.ticket.key)
     ]
   });
 }

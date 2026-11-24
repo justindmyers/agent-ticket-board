@@ -1,0 +1,9 @@
+{
+  "stage": "planning",
+  "run": {
+    "state": "running",
+    "stage": "planning",
+    "started": "2026-01-05T10:00:00Z",
+    "model": "sonnet"
+  }
+}

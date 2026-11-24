@@ -1,5 +1,9 @@
 import type { EngineInterface, RenderElement } from 'claude-code';
-import { hex, kit, notBuilt, type Ctx } from './kit';
+import { agentRun } from './cli';
+import { hex, kit, type Ctx } from './kit';
+import { planStartable } from './look.gen';
+import { runBox } from './run-box';
+import { assumptionRows, earlierAnswers, planQuestions } from './plan-questions';
 import type { Detail } from './types';
 
 const sectionName = (kind: string, title: string | null) =>
@@ -19,10 +23,11 @@ export function stagePlanning($: EngineInterface, ctx: Ctx, d: Detail) {
   const f = d.flow;
   const body: RenderElement[] = [];
   const startable =
-    !f &&
+    planStartable(f) &&
     !d.adopt &&
     (d.tracker ? d.tracker.state !== 'done' : /^(to do|in progress)$/i.test(t.status));
 
+  body.push(...runBox($, ctx, t.key, f, 'planning'));
   if (startable) {
     body.push(
       sectionTitle('ns', 'Not started', hex('blue')),
@@ -33,13 +38,16 @@ export function stagePlanning($: EngineInterface, ctx: Ctx, d: Detail) {
         key: 'start',
         label: 'Start planning',
         variant: 'primary',
-        onPress: () => notBuilt($, t.key, 'Start planning')
+        onPress: () => void agentRun($, t.key, 'plan')
       })
     );
   }
+  body.push(...planQuestions($, ctx, d), ...assumptionRows(ctx, d), ...earlierAnswers($, ctx, d));
+  const draft = !!f?.questions?.some((q) => !q.a);
   if (f?.requirements) {
     body.push(
       sectionTitle('req', 'Requirements', hex('blue'), String(f.requirements.length)),
+      ...(draft ? [dim('Draft: it can change after your answers.')] : []),
       ...f.requirements.map((r) =>
         Box({
           key: 'r-' + r.id,
@@ -52,29 +60,10 @@ export function stagePlanning($: EngineInterface, ctx: Ctx, d: Detail) {
       )
     );
   }
-  if (f?.questions) {
-    body.push(
-      sectionTitle('q', 'Questions', hex('violet')),
-      ...f.questions.map((q, i) =>
-        Box({
-          key: 'q' + i,
-          flexDirection: 'column',
-          children: [
-            Text({ wrap: 'wrap', children: [(q.a ? '✓ ' : '? ') + q.q] }),
-            Text({
-              color: q.a ? undefined : hex('violet'),
-              dimColor: !!q.a,
-              wrap: 'wrap',
-              children: ['    ' + (q.a ?? 'Waiting for your answer')]
-            })
-          ]
-        })
-      )
-    );
-  }
   if (f?.steps) {
     body.push(
       sectionTitle('plan', 'Plan', hex('blue'), f.steps.length + ' steps'),
+      ...(draft ? [dim('Draft: it can change after your answers.')] : []),
       ...f.steps.map((s) =>
         Text({
           wrap: 'wrap',

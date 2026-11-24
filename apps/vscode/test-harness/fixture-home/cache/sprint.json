@@ -577,6 +577,65 @@
       "reporter": "Sample Reporter",
       "comments": [],
       "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-109",
+      "summary": "Export the zone list as CSV",
+      "status": "To Do",
+      "type": "Story",
+      "priority": "Medium",
+      "labels": [],
+      "points": 2,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Users copy table data by hand."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "An Export button downloads the table as a CSV file."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
     }
   ]
 }

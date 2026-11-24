@@ -7,7 +7,7 @@ import type { Theme } from '../../shared/types/theme';
 import { needsYou, progressText } from '../../shared/utils/agent';
 import { cx } from '../../shared/utils/cx';
 import { accentOf } from '@agent-ticket-board/core/look';
-import { wash } from '../../shared/utils/surfaces';
+import { runColor, wash } from '../../shared/utils/surfaces';
 
 type Props = { t: QueueTicket; current: boolean; theme: Theme };
 
@@ -22,16 +22,24 @@ export function QueueRow({ t, current, theme }: Props) {
   const a = t.agent;
   const accent = accentOf(a, t.state);
   const needs = needsYou(a);
+  const running = a?.kind === 'running';
 
   return (
     <ListBoxItem
       id={t.key}
       textValue={`${t.key} ${t.summary}`}
-      style={({ isHovered, isSelected }) =>
-        wash(accent, theme, current || isSelected ? 'open' : isHovered ? 'hover' : 'rest', needs)
-      }
+      style={({ isHovered, isSelected }) => ({
+        ...wash(
+          accent,
+          theme,
+          current || isSelected ? 'open' : isHovered ? 'hover' : 'rest',
+          needs
+        ),
+        ...(running ? runColor(accent, theme) : {})
+      })}
       className={({ isFocusVisible }) =>
         cx(
+          running && 'run-border',
           'relative grid cursor-pointer grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1 rounded-xl border border-transparent px-3 py-1.5 outline-none',
           'transition-[background,border-color,box-shadow] duration-200 ease-soft motion-reduce:transition-none',
           isFocusVisible && 'ring-2 ring-ink/40 hc:ring-[var(--vscode-focusBorder)]'

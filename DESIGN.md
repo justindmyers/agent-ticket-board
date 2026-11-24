@@ -150,7 +150,7 @@ Depth comes from translucency and blur, not from heavy shadows. Cards: card back
 
 ## Motion
 
-Motion shows where content comes from and where it goes. It never asks for attention.
+Motion shows where content comes from and where it goes. It asks for attention in one case only: an agent that runs now.
 
 - Content that changes height, such as notices and banners, uses the shared `Collapse` component. It animates height and opacity, so the layout around it does not jump.
 - Queue groups use the height transition of the react-aria disclosure panel. The chevron turns.
@@ -160,6 +160,8 @@ Motion shows where content comes from and where it goes. It never asks for atten
 - The ease is a soft deceleration. Enter and collapse take about 200 ms.
 - With reduced motion, framer-motion durations are zero and the CSS animations stop. Opacity fades can stay.
 - A selected row changes color only. It never changes size.
+- A running agent has a moving border. A light of its color goes around its list row, its board card and its "Planning now" section. Use the `run-border` utility with `runColor`. With reduced motion, the full border shows the color and does not move.
+- In the Claude Code pane, a running agent's border pulses in brightness. The timer stops when no agent runs in the view.
 
 ## Shapes
 

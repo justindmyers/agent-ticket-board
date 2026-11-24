@@ -1,8 +1,6 @@
-import { join } from 'node:path';
-import { FLOWS, flowFor, PRS, STATUS } from './agents';
-import { writeJson } from './files';
+import { audit } from './audit';
+import { flowFor, PRS, saveFlow, STATUS } from './agents';
 import { ignoreWork, LOCAL, localLabel } from './local-work';
-import { AGENTS_DIR } from './paths';
 import { trackerState } from './tracker-state';
 import { STAGES, type Flow, type Stage } from './types';
 
@@ -33,8 +31,8 @@ export async function adoptWork(key: string, stage: Stage) {
     ...(w.worktree ? { worktree: w.worktree } : {}),
     adopted: new Date().toISOString()
   };
-  await writeJson(join(AGENTS_DIR, `${key}.json`), rec);
-  FLOWS[key] = rec;
+  await audit(key, 'developer', 'adopt', { stage, branch: w.branch, worktree: w.worktree ?? null });
+  await saveFlow(key, rec, 'developer');
   return rec;
 }
 

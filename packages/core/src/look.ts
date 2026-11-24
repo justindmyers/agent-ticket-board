@@ -51,3 +51,25 @@ export function accentOf(
   }
   return STATE_ACCENT[state ?? 'todo'];
 }
+
+/** A run that still holds the ticket: the developer can stop it, not start another. */
+export const runActive = (f: { run?: { state: string } } | null | undefined) =>
+  f?.run?.state === 'queued' || f?.run?.state === 'running';
+
+/** Planning can start with no record, or after a run that stopped before it wrote a plan. */
+export const planStartable = (
+  f: { run?: { state: string }; requirements?: unknown[]; need?: unknown } | null | undefined
+) => !f || (!runActive(f) && !f.requirements?.length && !f.need && f.run?.state === 'stopped');
+
+/** One line about the last agent run, for the ticket page. Null while a run is active. */
+export function runLine(
+  run: { state: string; model: string; cost?: number } | undefined
+): string | null {
+  if (!run || run.state === 'queued' || run.state === 'running') {
+    return null;
+  }
+  const how =
+    { done: 'finished', failed: 'failed', stopped: 'was stopped' }[run.state] ?? run.state;
+  const cost = run.cost === undefined ? '' : `, $${run.cost.toFixed(2)}`;
+  return `The last agent run ${how} (${run.model}${cost}).`;
+}

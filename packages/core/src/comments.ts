@@ -1,3 +1,4 @@
+import { audit } from './audit';
 import { COMMENTS_FILE } from './paths';
 import { readJson, writeJson } from './files';
 
@@ -31,5 +32,6 @@ export async function addComment(key: string, text: string, ran: boolean): Promi
   };
   list.push(c);
   await writeJson(COMMENTS_FILE, list);
+  await audit(key, 'developer', 'comment', { text, resume: ran });
   return c;
 }

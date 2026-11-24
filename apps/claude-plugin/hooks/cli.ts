@@ -1,4 +1,5 @@
 import type { EngineInterface } from 'claude-code';
+import { runActive } from './look.gen';
 import { ATB, NODE } from './paths.gen';
 import { store } from './store';
 import type { Detail, Sprint } from './types';
@@ -57,6 +58,51 @@ export async function loadTicket($: EngineInterface, key: string) {
     store.error = errorText(e);
   }
   $.ui.invalidate('ui.render');
+}
+
+/** While the open ticket has an active agent run, reloads it every 3 seconds. */
+export function watchRun($: EngineInterface, key: string) {
+  if (!runActive(store.detail?.flow)) {
+    return;
+  }
+  $.clock.after(3000, () => {
+    if (store.open !== key) {
+      return;
+    }
+    void reloadTicket($, key)
+      .catch(() => undefined)
+      .then(() => watchRun($, key));
+  });
+}
+
+/** Starts (`plan`) or stops an agent run through the service, then follows it. */
+export async function agentRun($: EngineInterface, key: string, verb: 'plan' | 'stop') {
+  try {
+    await atb($, [verb, key], 30000);
+  } catch (e) {
+    $.ui.toast(`${key}: ${errorText(e)}`);
+    return;
+  }
+  await reloadTicket($, key);
+  watchRun($, key);
+}
+
+/** Saves the answer to plan question `n` (1-based), then reloads the ticket. */
+export async function answer(
+  $: EngineInterface,
+  key: string,
+  n: number,
+  text: string,
+  earlier = false
+) {
+  try {
+    await atb($, ['answer', key, String(n), text, ...(earlier ? ['--earlier'] : [])]);
+    store.changing = null;
+  } catch (e) {
+    $.ui.toast(`${key}: ${errorText(e)}`);
+    return;
+  }
+  await reloadTicket($, key);
 }
 
 /** Reloads only the cached ticket detail, after a local change such as a comment. */

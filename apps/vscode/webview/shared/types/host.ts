@@ -13,8 +13,9 @@ export type Agent = {
 };
 
 import type { TrackerState } from '@agent-ticket-board/core/look';
+import type { AgentRun, Answered, Question } from '@agent-ticket-board/core/types';
 
-export type { TrackerState };
+export type { AgentRun, Answered, Question, TrackerState };
 
 export type LocalWork = { branch: string; worktree: string | null; changed: number; label: string };
 
@@ -51,7 +52,9 @@ export type Flow = {
     evidence?: { kind: string; label: string };
     met?: boolean;
   }[];
-  questions?: { q: string; a?: string }[];
+  questions?: Question[];
+  answered?: Answered[];
+  assumptions?: string[];
   steps?: { n: number; text: string; covers: string[]; state: 'done' | 'current' | 'todo' }[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
@@ -67,6 +70,7 @@ export type Flow = {
   };
   branch?: string;
   session?: string;
+  run?: AgentRun;
   closed?: { reason: 'tracker' | 'merged'; text: string };
 };
 

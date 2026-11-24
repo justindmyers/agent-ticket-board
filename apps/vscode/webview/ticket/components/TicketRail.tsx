@@ -1,3 +1,4 @@
+import { runLine } from '@agent-ticket-board/core/look';
 import { mdiInformationOutline, mdiSourceBranch } from '@mdi/js';
 import { Section } from '../../shared/components/Section';
 import type { Detail } from '../../shared/types/host';
@@ -63,9 +64,7 @@ export function TicketRail({ d, theme }: Props) {
       )}
 
       <JiraStatusSection d={d} theme={theme} />
-      {f && (
-        <p className="m-0 px-1 text-[11px] text-muted">Agent data on this page is sample data.</p>
-      )}
+      {runLine(f?.run) && <p className="m-0 px-1 text-[11px] text-muted">{runLine(f?.run)}</p>}
     </div>
   );
 }

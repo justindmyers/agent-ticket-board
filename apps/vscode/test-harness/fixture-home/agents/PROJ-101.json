@@ -2,15 +2,11 @@
   "stage": "planning",
   "need": {
     "kind": "decision",
-    "ask": "Plan ready. 3 requirements, 4 steps.",
+    "ask": "Answer 1 more question, then re-plan",
     "actions": [
       {
-        "id": "approve",
-        "label": "Approve plan"
-      },
-      {
-        "id": "comment",
-        "label": "Comment"
+        "id": "replan",
+        "label": "Re-plan without answers"
       }
     ]
   },
@@ -34,11 +30,16 @@
   "questions": [
     {
       "q": "Count archived items?",
-      "a": "Yes, show them as \"X (Y archived)\"."
+      "why": "Archived items change the number on every card.",
+      "options": ["Yes, as \"X (Y archived)\"", "No, only active items"],
+      "recommended": 0,
+      "a": "Yes, as \"X (Y archived)\""
     },
     {
       "q": "Card, list row, or both?",
-      "a": "Both."
+      "why": "The list row has less room, so it needs a shorter label.",
+      "options": ["Card only", "List row only", "Both"],
+      "recommended": 2
     }
   ],
   "steps": [
@@ -66,5 +67,12 @@
       "covers": ["R2", "R3"],
       "state": "todo"
     }
-  ]
+  ],
+  "answered": [
+    {
+      "q": "Show the count on archived projects too?",
+      "a": "No, active projects only"
+    }
+  ],
+  "assumptions": ["The count shows on desktop only", "Archived projects keep their count"]
 }

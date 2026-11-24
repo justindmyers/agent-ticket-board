@@ -1,5 +1,6 @@
 import { isEqual } from 'lodash-es';
 import * as vscode from 'vscode';
+import { startRun, stopRun, watchAgents } from './agent-runs';
 import { existsSync } from 'node:fs';
 import {
   addComment,
@@ -23,6 +24,11 @@ import {
   PRS,
   readCache,
   rememberTicket,
+  saveAnswer,
+  saveEarlierAnswer,
+  bundle,
+  readTimeline,
+  timelineText,
   refreshPrs,
   refreshSprint,
   setAgentMayMove,
@@ -53,6 +59,7 @@ type Msg =
   | { type: 'setAgentMove'; key: string; allow: boolean }
   | { type: 'setAfterMerge'; key: string; to: string | null }
   | { type: 'adopt'; key: string; stage: Stage }
+  | { type: 'answer'; key: string; n: number; text: string; earlier?: boolean }
   | { type: 'ignoreLocal'; key: string }
   | { type: 'comment'; key: string; text: string; run?: boolean }
   | { type: 'action'; key: string; id: string }
@@ -340,10 +347,43 @@ async function runAction(key: string, id: string) {
       ? open(pr.url)
       : vscode.window.showInformationMessage(`${key}: no pull request found on GitHub.`);
   }
+  if (id === 'startPlanning' || id === 'replan') {
+    return startRun(key).catch((e: unknown) => showError(key, e));
+  }
+  if (id === 'auditLog') {
+    const events = await readTimeline(key);
+    const doc = await vscode.workspace.openTextDocument({
+      content: events.length ? timelineText(events) : `${key}: the audit log is empty.`,
+      language: 'log'
+    });
+    return vscode.window.showTextDocument(doc, { preview: true });
+  }
+  if (id === 'debugBundle') {
+    try {
+      const file = await bundle(key);
+      await vscode.env.clipboard.writeText(file);
+      const pick = await vscode.window.showInformationMessage(
+        `${key}: debug bundle made, tokens removed. Its path is on the clipboard.`,
+        'Show in Finder'
+      );
+      if (pick) {
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(file));
+      }
+    } catch (e) {
+      showError(key, e);
+    }
+    return;
+  }
+  if (id === 'stopRun') {
+    return stopRun(key).catch((e: unknown) => showError(key, e));
+  }
   return vscode.window.showInformationMessage(
     `${key}: ${SAMPLE_ACTIONS[id] ?? id}. Not built yet: nothing started.`
   );
 }
+
+const showError = (key: string, e: unknown) =>
+  vscode.window.showErrorMessage(`${key}: ${e instanceof Error ? e.message : String(e)}`);
 
 async function handle(m: Msg, ctx: vscode.ExtensionContext) {
   switch (m.type) {
@@ -370,6 +410,15 @@ async function handle(m: Msg, ctx: vscode.ExtensionContext) {
       await setAgentMayMove(m.key, !!m.allow);
       void sendTicket(m.key, true);
       return autoSync();
+    case 'answer':
+      try {
+        await (m.earlier ? saveEarlierAnswer : saveAnswer)(m.key, m.n, m.text);
+        broadcast();
+        void sendTicket(m.key, true);
+      } catch (e) {
+        void vscode.window.showErrorMessage(errorText(e));
+      }
+      return;
     case 'adopt':
       try {
         await adoptWork(m.key, m.stage);
@@ -573,6 +622,12 @@ export async function activate(ctx: vscode.ExtensionContext) {
   }, REFRESH_MS);
   ctx.subscriptions.push(
     { dispose: () => clearInterval(timer) },
+    watchAgents((key) => {
+      broadcast();
+      if (inboxKey === key) {
+        void sendTicket(key, true);
+      }
+    }),
     vscode.commands.registerCommand('agentTicketBoard.board', () => openBoard(ctx)),
     vscode.commands.registerCommand('agentTicketBoard.inbox', () => openInbox(ctx)),
     vscode.commands.registerCommand('agentTicketBoard.refresh', () => refresh(true)),

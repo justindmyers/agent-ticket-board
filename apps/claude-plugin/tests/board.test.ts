@@ -489,6 +489,157 @@ test('desktop: opening a ticket reads the sprint list again, so a new status sho
   await ui.unmount();
 });
 
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: Start planning asks the service, and Stop stops the run`, async ($, on) => {
+    const calls: string[][] = [];
+    let flow: unknown = null;
+    const todo = () => ({
+      ...TICKET,
+      agent: null,
+      flow,
+      tracker: { state: 'todo', label: 'To Do in Jira', notice: '' }
+    });
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      if (a[0] === 'plan') {
+        flow = { stage: 'planning', run: { state: 'running', stage: 'planning', model: 'sonnet' } };
+      }
+      if (a[0] === 'stop') {
+        flow = { stage: 'planning', run: { state: 'stopped', stage: 'planning', model: 'sonnet' } };
+      }
+      return printed(a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? todo() : {});
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'start' });
+    await tick();
+    expect(calls).toContainEqual(['plan', 'PROJ-102']);
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(await ui.find({ type: 'Text', text: /^Planning now$/ })).toBeDefined();
+    const box = (await ui.find({ key: 'run' })) as { props?: Record<string, unknown> } | undefined;
+    expect(box?.props?.borderStyle).toBe('round');
+    expect(await ui.find({ key: 'start' })).toBeUndefined();
+    await ui.press({ key: 'stop-run' });
+    await tick();
+    expect(calls).toContainEqual(['stop', 'PROJ-102']);
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(await ui.find({ key: 'start' })).toBeDefined();
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: plan questions come first and take an option or a typed answer`, async ($, on) => {
+    const calls: string[][] = [];
+    const planned = {
+      ...TICKET,
+      flow: {
+        stage: 'planning',
+        need: { kind: 'decision', ask: 'Answer 2 questions, then re-plan', actions: [] },
+        questions: [
+          {
+            q: 'Which list?',
+            why: 'Two lists show items.',
+            options: ['Map list', 'Table'],
+            recommended: 1
+          },
+          { q: 'Mobile too?', why: 'The mobile list is separate.', options: [] }
+        ],
+        answered: [{ q: 'Earlier?', a: 'Yes' }],
+        assumptions: ['Desktop only'],
+        requirements: [{ id: 'R1', text: 'Sorts', check: 'A test' }]
+      }
+    };
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      return printed(a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? planned : {});
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'tab-planning' });
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(await ui.find({ type: 'Text', text: /Draft: it can change/ })).toBeDefined();
+    expect(await ui.find({ type: 'Text', text: /^1\. Desktop only$/ })).toBeDefined();
+    await ui.press({ key: 'opt-1-1' });
+    await tick();
+    expect(calls).toContainEqual(['answer', 'PROJ-102', '1', 'Table']);
+    await ui.input({ key: 'other-2', text: 'Desktop only' });
+    await tick();
+    expect(calls).toContainEqual(['answer', 'PROJ-102', '2', 'Desktop only']);
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'earlier-toggle' });
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'earlier-change-1' });
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.input({ key: 'earlier-input-1', text: 'No' });
+    await tick();
+    expect(calls).toContainEqual(['answer', 'PROJ-102', '1', 'No', '--earlier']);
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: the audit log shows the last events, and Debug bundle makes the archive`, async ($, on) => {
+    const calls: string[][] = [];
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      const out =
+        a[0] === 'sprint'
+          ? SPRINT
+          : a[0] === 'ticket'
+            ? TICKET
+            : a[0] === 'audit' && a.includes('--bundle')
+              ? { file: '/home/.agent-ticket-board/bundles/PROJ-102.tar.gz' }
+              : a[0] === 'audit'
+                ? { total: 2, text: '2026-01-01 10:00:00  service    run.started  run=r1' }
+                : {};
+      return printed(out);
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'audit-log' });
+    await tick();
+    expect(calls).toContainEqual(['audit', 'PROJ-102', '--json', '--tail=40']);
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(await ui.find({ type: 'Text', text: /run\.started/ })).toBeDefined();
+    await ui.press({ key: 'audit-bundle' });
+    await tick();
+    expect(calls).toContainEqual(['audit', 'PROJ-102', '--bundle']);
+    await ui.unmount();
+  });
+}
+
 test('desktop: a ticket with no agent record shows what Jira says', async ($, on) => {
   const noRecord = {
     ...TICKET,

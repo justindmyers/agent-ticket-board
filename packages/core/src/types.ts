@@ -29,6 +29,18 @@ export type Req = {
   met?: boolean;
 };
 
+/** A planning question. `recommended` is the index of the option that the agent recommends. */
+export type Question = {
+  q: string;
+  a?: string;
+  why?: string;
+  options?: string[];
+  recommended?: number;
+};
+
+/** An answer from an earlier plan. */
+export type Answered = { q: string; a: string };
+
 export type Step = {
   n: number;
   text: string;
@@ -48,12 +60,30 @@ export type Pr = {
   comments: number;
 };
 
+/** One agent run for a stage. The service writes it; `session` is the Claude Code session id. */
+export type AgentRun = {
+  /** The run's folder name in the audit log. */
+  id?: string;
+  state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
+  stage: Stage;
+  started: string;
+  model: string;
+  ended?: string;
+  session?: string;
+  cost?: number;
+  error?: string;
+};
+
 /** The local agent record for one ticket. The service writes it; every client reads it. */
 export type Flow = {
   stage: Stage;
   need?: Need;
   requirements?: Req[];
-  questions?: { q: string; a?: string }[];
+  questions?: Question[];
+  /** Answers to the questions of earlier plans. Each re-plan gets them. */
+  answered?: Answered[];
+  /** What the agent decided where the ticket is not clear. */
+  assumptions?: string[];
   steps?: Step[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
@@ -63,6 +93,7 @@ export type Flow = {
   worktree?: string;
   adopted?: string;
   session?: string;
+  run?: AgentRun;
   closed?: { reason: 'tracker' | 'merged'; text: string };
 };
 

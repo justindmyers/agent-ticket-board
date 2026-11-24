@@ -23,6 +23,10 @@ export * from './local-work';
 export * from './adopt';
 export { accentOf, PALETTE, STATE_ACCENT, type Accent } from './look';
 export * from './settings-view';
+export * from './planning';
+export * from './audit';
+export * from './next-step';
+export * from './service-client';
 
 import { loadConfig } from './config';
 import { loadAgents, loadPrCache } from './agents';

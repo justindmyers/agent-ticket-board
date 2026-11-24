@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { omit } from 'lodash-es';
+import { audit } from './audit';
 import { EVENTS_FILE } from './paths';
 import { loadSettings, updateSettings } from './settings';
 import { TOOL_ENV } from './jira';
@@ -64,6 +66,7 @@ export async function moveTicket(
     throw new Error('Not a status name');
   }
   if (by === 'agent' && !(await agentMayMove(key))) {
+    await audit(key, 'agent', 'move.refused', { to, reason: 'not allowed for this ticket' });
     throw new Error(
       `The agent may not change the Jira status of ${key}. The developer has not allowed it for this ticket.`
     );
@@ -88,6 +91,7 @@ export async function moveTicket(
   }
   await mkdir(dirname(EVENTS_FILE), { recursive: true });
   await appendFile(EVENTS_FILE, `${JSON.stringify(ev)}\n`);
+  await audit(key, ev.by === 'you' ? 'developer' : 'agent', 'move', omit(ev, ['key', 'at']));
   if (!ev.ok) {
     throw new Error(ev.error);
   }

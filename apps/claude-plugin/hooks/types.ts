@@ -26,6 +26,12 @@ export type Sprint = { at: string | null; groups: { group: string; tickets: Row[
 
 export type Flow = {
   stage: string;
+  run?: {
+    state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
+    stage?: string;
+    model: string;
+    cost?: number;
+  };
   closed?: { reason: string; text: string };
   need?: {
     kind: 'problem' | 'decision';
@@ -40,7 +46,9 @@ export type Flow = {
     met?: boolean;
     evidence?: { label: string };
   }[];
-  questions?: { q: string; a?: string }[];
+  questions?: { q: string; a?: string; why?: string; options?: string[]; recommended?: number }[];
+  answered?: { q: string; a: string }[];
+  assumptions?: string[];
   steps?: { n: number; text: string; covers: string[]; state: string }[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;

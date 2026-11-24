@@ -3,5 +3,7 @@ export const TICKET_MENU = [
   ['replan', 'Re-plan'],
   ['openPlan', 'Open plan file'],
   ['openWorktree', 'Open worktree'],
+  ['auditLog', 'Show audit log'],
+  ['debugBundle', 'Copy debug bundle'],
   ['openBoard', 'Open board']
 ] as const;

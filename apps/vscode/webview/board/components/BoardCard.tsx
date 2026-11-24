@@ -9,7 +9,7 @@ import { needsYou, progressText } from '../../shared/utils/agent';
 import { cx } from '../../shared/utils/cx';
 import { accentOf } from '@agent-ticket-board/core/look';
 import { stageOf } from '../../shared/utils/stages';
-import { pill, wash } from '../../shared/utils/surfaces';
+import { pill, runColor, wash } from '../../shared/utils/surfaces';
 import { send } from '../../shared/utils/vscodeApi';
 import type { BoardTicket } from '../types/board';
 import { DRAG_TYPE } from '../utils/drag';
@@ -21,6 +21,7 @@ export function BoardCard({ t, theme, statuses }: Props) {
   const a = t.agent;
   const accent = accentOf(a, t.state);
   const needs = needsYou(a);
+  const running = a?.kind === 'running';
   const [hover, setHover] = useState(false);
   const stage = a?.kind === 'finished' ? undefined : stageOf(a?.stage);
 
@@ -35,11 +36,13 @@ export function BoardCard({ t, theme, statuses }: Props) {
       onMouseLeave={() => setHover(false)}
       className={cx(
         'group relative grid cursor-grab gap-1.5 rounded-xl border border-ink/[0.07] bg-ink/[0.025] p-3 transition-[background,border-color,box-shadow] duration-300 ease-soft active:cursor-grabbing',
-        'hc:border-[var(--vscode-contrastBorder)] light:bg-base light:shadow-[0_1px_2px_rgb(12_29_73/0.06)]'
+        'hc:border-[var(--vscode-contrastBorder)] light:bg-base light:shadow-[0_1px_2px_rgb(12_29_73/0.06)]',
+        running && 'run-border'
       )}
-      style={
-        needs ? wash(accent, theme, 'open', true) : hover ? wash(accent, theme, 'hover') : undefined
-      }
+      style={{
+        ...(needs ? wash(accent, theme, 'open', true) : hover ? wash(accent, theme, 'hover') : {}),
+        ...(running ? runColor(accent, theme) : {})
+      }}
     >
       <div className="flex items-center gap-2">
         <Orb agent={a} accent={accent} theme={theme} className="shrink-0" />
