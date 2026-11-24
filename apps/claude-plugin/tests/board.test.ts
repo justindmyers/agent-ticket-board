@@ -1,4 +1,23 @@
+import type { On } from 'claude-code';
 import { expect, test } from 'claude-code/testing';
+
+const BOARD = {
+  command: 'board',
+  args: '',
+  origin: { kind: 'composer' },
+  presentation: { isFullscreen: false, columns: 80 }
+} as const;
+
+/** What the stubbed `atb` prints: one JSON value, exit code 0. */
+const printed = (value: unknown) => ({
+  value: {
+    exitCode: 0,
+    stdout: JSON.stringify(value),
+    stderr: '',
+    isStdoutTruncated: false,
+    isStderrTruncated: false
+  }
+});
 
 const PANE = {
   plugin: 'agent-ticket-board',
@@ -93,15 +112,17 @@ const TICKET = {
   comments: []
 };
 
-function stubAtb(on, calls: string[][]) {
+function stubAtb(on: On, calls: string[][]) {
   on('process.run', ($, e) => {
     const args = e.argv.slice(2);
     calls.push(args);
     const out = args[0] === 'sprint' ? SPRINT : args[0] === 'ticket' ? TICKET : { id: 'x' };
-    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+    return printed(out);
   });
 }
-const tick = () => new Promise((r) => setTimeout(r, 20));
+// The test environment has timers, but its types do not declare them.
+declare const setTimeout: (fn: () => void, ms: number) => unknown;
+const tick = () => new Promise<void>((r) => setTimeout(r, 20));
 
 test('git push is refused and never reaches the tool', async ($, on) => {
   let ran = 0;
@@ -154,7 +175,7 @@ test('the pane never opens in VS Code', async ($, on) => {
     opened.push(e.id);
     return { value: { isPlaced: true } };
   });
-  const r = await $.command.run({ command: 'board', args: '' });
+  const r = await $.command.run(BOARD);
   expect(r.text).toMatch(/activity bar/);
   expect(opened.length).toBe(0);
 });
@@ -165,7 +186,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     stubAtb(on, calls);
     on('session.surfaces', () => ({ value: [surface] }));
     on('ui.open', () => ({ value: { isPlaced: true } }));
-    await $.command.run({ command: 'board', args: '' });
+    await $.command.run(BOARD);
     await tick();
     expect(calls[0]).toEqual(['sprint', '--cached']);
     let ui = await $.ui.mount({ ...PANE, surface });
@@ -228,11 +249,11 @@ test('desktop: Jira move needs the confirm press; permission toggle', async ($, 
     const a = e.argv.slice(2);
     calls.push(a);
     const out = a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? synced : {};
-    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+    return printed(out);
   });
   on('session.surfaces', () => ({ value: ['desktop'] }));
   on('ui.open', () => ({ value: { isPlaced: true } }));
-  await $.command.run({ command: 'board', args: '' });
+  await $.command.run(BOARD);
   await tick();
   let ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
   await ui.press({ key: 'open-PROJ-102' });
@@ -333,11 +354,11 @@ for (const surface of ['desktop', 'terminal'] as const) {
               : a[0] === 'settings'
                 ? SETTINGS
                 : {};
-      return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+      return printed(out);
     });
     on('session.surfaces', () => ({ value: [surface] }));
     on('ui.open', () => ({ value: { isPlaced: true } }));
-    await $.command.run({ command: 'board', args: '' });
+    await $.command.run(BOARD);
     await tick();
     const remount = async (ui?: { unmount: () => Promise<void> }) => {
       await tick();
@@ -391,11 +412,11 @@ test('desktop: a ticket with no agent record shows what Jira says', async ($, on
   on('process.run', ($, e) => {
     const a = e.argv.slice(2);
     const out = a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? noRecord : {};
-    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+    return printed(out);
   });
   on('session.surfaces', () => ({ value: ['desktop'] }));
   on('ui.open', () => ({ value: { isPlaced: true } }));
-  await $.command.run({ command: 'board', args: '' });
+  await $.command.run(BOARD);
   await tick();
   let ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
   await ui.press({ key: 'open-PROJ-102' });
@@ -427,11 +448,11 @@ test('desktop: a row shows the local work for a ticket with no agent record', as
   on('process.run', ($, e) => {
     const a = e.argv.slice(2);
     const out = a[0] === 'sprint' ? withLocal : a[0] === 'ticket' ? TICKET : {};
-    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+    return printed(out);
   });
   on('session.surfaces', () => ({ value: ['desktop'] }));
   on('ui.open', () => ({ value: { isPlaced: true } }));
-  await $.command.run({ command: 'board', args: '' });
+  await $.command.run(BOARD);
   await tick();
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
   expect(
@@ -457,11 +478,11 @@ test('desktop: Adopt runs atb adopt with the proposed stage', async ($, on) => {
     const a = e.argv.slice(2);
     calls.push(a);
     const out = a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? offer : {};
-    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+    return printed(out);
   });
   on('session.surfaces', () => ({ value: ['desktop'] }));
   on('ui.open', () => ({ value: { isPlaced: true } }));
-  await $.command.run({ command: 'board', args: '' });
+  await $.command.run(BOARD);
   await tick();
   let ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
   await ui.press({ key: 'open-PROJ-102' });

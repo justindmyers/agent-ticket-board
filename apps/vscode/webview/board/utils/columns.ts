@@ -1,4 +1,4 @@
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 import type { BoardTicket } from '../types/board';
 
 const COLUMNS = ['To Do', 'In Progress', 'Code Review', 'Verifying', 'Blocked', 'Done'];

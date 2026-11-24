@@ -2,7 +2,7 @@
 // and Tailwind cannot build classes at runtime.
 import type { CSSProperties } from 'react';
 import type { Accent, Theme } from '../types/theme';
-import { PALETTE } from './palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 
 const hx = (a: Accent) => PALETTE[a].hex;
 

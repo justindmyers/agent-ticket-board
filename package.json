@@ -14,13 +14,14 @@
     "lint:fix": "eslint . --fix --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run && pnpm --filter @agent-ticket-board/claude-plugin test",
+    "test": "vitest run && pnpm --filter @agent-ticket-board/claude-plugin test && pnpm check:plugin",
     "test:ui": "pnpm --filter agent-ticket-board-vscode test:ui",
     "leak-check": "tsx scripts/leak-check.ts",
     "docs:lint": "tsx scripts/docs-lint.ts",
     "precommit": "pnpm typecheck && lint-staged && tsx scripts/leak-check.ts --staged && pnpm docs:lint",
     "install-local": "tsx scripts/install-local.ts",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "check:plugin": "pnpm --filter @agent-ticket-board/claude-plugin pretest && tsx scripts/plugin-check.ts"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",

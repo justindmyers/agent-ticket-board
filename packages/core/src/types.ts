@@ -1,11 +1,6 @@
-export type Stage = 'planning' | 'development' | 'testing' | 'code-review';
+import type { AgentKind, Stage } from './look';
 
-export const STAGES: { id: Stage; label: string }[] = [
-  { id: 'planning', label: 'Planning' },
-  { id: 'development', label: 'Development' },
-  { id: 'testing', label: 'Testing' },
-  { id: 'code-review', label: 'Code review' }
-];
+export { STAGES, type AgentKind, type Stage } from './look';
 
 export type Action = { id: string; label: string };
 
@@ -85,8 +80,6 @@ export type Ticket = {
   comments?: { author: string; created: string; body: unknown }[];
   detailAt?: string;
 };
-
-export type AgentKind = 'problem' | 'decision' | 'running' | 'waiting' | 'finished';
 
 /** The one-line agent summary that a queue row shows. */
 export type Agent = {

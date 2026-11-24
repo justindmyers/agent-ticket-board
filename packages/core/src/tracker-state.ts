@@ -1,7 +1,9 @@
 import { CONFIG } from './config';
 import { localLabel, type LocalWork } from './local-work';
 
-export type TrackerState = 'todo' | 'active' | 'blocked' | 'done';
+import type { TrackerState } from './look';
+
+export type { TrackerState };
 
 export type TrackerInfo = { state: TrackerState; label: string; notice: string | null };
 

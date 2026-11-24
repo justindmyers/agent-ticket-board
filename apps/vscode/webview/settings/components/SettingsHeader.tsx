@@ -6,7 +6,7 @@ import {
 } from '@mdi/js';
 import { Button } from '../../shared/components/Button';
 import { Icon } from '../../shared/components/Icon';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 import { send } from '../../shared/utils/vscodeApi';
 import type { Detecting } from '../../shared/types/settings';
 

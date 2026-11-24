@@ -1,5 +1,4 @@
-import type { TrackerState } from '../../shared/types/host';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE, STATE_ACCENT, type TrackerState } from '@agent-ticket-board/core/look';
 import type { Collapsed } from '../types/queue';
 
 export const COLLAPSED_BY_DEFAULT = new Set(['Done']);
@@ -11,15 +10,11 @@ const GROUP_DOT: Record<string, string> = {
   Running: PALETTE.blue.hex
 };
 
-const STATE_DOT: Record<TrackerState, string> = {
-  todo: 'color-mix(in srgb, var(--atb-ink) 30%, transparent)',
-  active: PALETTE.blue.hex,
-  blocked: PALETTE.red.hex,
-  done: PALETTE.green.hex
-};
+// Not started stays a quiet ink dot, not the neutral accent: it is the most common state.
+const QUIET_DOT = 'color-mix(in srgb, var(--atb-ink) 30%, transparent)';
 
-export const groupDot = (group: string, state?: TrackerState) =>
-  GROUP_DOT[group] ?? STATE_DOT[state ?? 'todo'];
+export const groupDot = (group: string, state: TrackerState = 'todo') =>
+  GROUP_DOT[group] ?? (state === 'todo' ? QUIET_DOT : PALETTE[STATE_ACCENT[state]].hex);
 
 export const isGroupOpen = (collapsed: Collapsed, group: string) =>
   !(collapsed[group] ?? COLLAPSED_BY_DEFAULT.has(group));

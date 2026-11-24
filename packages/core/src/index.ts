@@ -21,6 +21,7 @@ export * from './field-text';
 export * from './tracker-state';
 export * from './local-work';
 export * from './adopt';
+export { accentOf, PALETTE, STATE_ACCENT, type Accent } from './look';
 export * from './settings-view';
 
 import { loadConfig } from './config';

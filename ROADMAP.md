@@ -32,12 +32,12 @@ To do:
 - [ ] Find the dev command in a monorepo, where each app has its own `dev` script.
 - [x] Settings page in VS Code and in the Claude Code pane. It shows each value, its source and the detected value with its confidence. It has "Detect again" for each section, and nothing changes until the developer saves.
 - [ ] Measure the cold start. The target is less than 1 second after the first sync.
-- [ ] Look at the Claude Code pane in the Claude app and in the terminal. The tests pass, but nobody looked at the colors in the real app.
+- [x] Look at the Claude Code pane in the Claude app. The colors match the VS Code view.
 - [x] Adopt existing work: find worktrees and branches for a ticket. Show "Adopt" or "Ignore". Propose a stage and wait for the developer. Adopt writes the agent record only.
 - [ ] Adopt at a stage that the developer selects, and find Claude sessions for a ticket.
 - [x] Bring the webview code to the coding standards: one component in each file, folders for each kind of file, fewer comments.
 - [x] Make the lint rules enforce more of the standards. ESLint now runs all the React hook rules, one component in each file, jsx-a11y and Prettier, with no warnings. The hook runs `lint:fix` on staged files only.
-- [ ] Bring the Claude Code pane (`apps/claude-plugin/hooks/register.ts`) to the coding standards. It is one large file, and it copies the stage colors and the stage list from the webview. Move the shared values into `packages/core`.
+- [x] Bring the Claude Code pane to the coding standards. It has one file for each view, and it has the types of Claude Code. The stage list, the colors and the accent rule come from `packages/core/src/look.ts`. The plugin gets a generated copy, because it cannot import core. `pnpm test` fails on a type error in the plugin.
 - [x] Shorten the header comments that have more than 2 lines.
 - [x] Animate the enter and the exit of the popovers and the menus. Reduced motion stops the animations.
 - [ ] Add vitest component tests (jsdom) with an accessibility check. Now only the Playwright harness checks the UI.

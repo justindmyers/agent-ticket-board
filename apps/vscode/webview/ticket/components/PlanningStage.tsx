@@ -9,7 +9,7 @@ import { Dot } from '../../shared/components/Dot';
 import { Section } from '../../shared/components/Section';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 import { ink } from '../../shared/utils/surfaces';
 import type { Act } from '../types/ticket';
 import { canStartPlanning } from '../utils/ticket';

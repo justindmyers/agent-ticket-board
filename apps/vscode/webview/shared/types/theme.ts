@@ -1,5 +1,3 @@
-import type { PALETTE } from '../utils/palette';
-
 export type Theme = 'dark' | 'light' | 'hc';
 
-export type Accent = keyof typeof PALETTE;
+export type { Accent } from '@agent-ticket-board/core/look';

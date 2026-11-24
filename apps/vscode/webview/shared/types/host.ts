@@ -12,7 +12,9 @@ export type Agent = {
   progress?: string;
 };
 
-export type TrackerState = 'todo' | 'active' | 'blocked' | 'done';
+import type { TrackerState } from '@agent-ticket-board/core/look';
+
+export type { TrackerState };
 
 export type LocalWork = { branch: string; worktree: string | null; changed: number; label: string };
 

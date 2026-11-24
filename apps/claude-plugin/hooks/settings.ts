@@ -1,3 +1,5 @@
+import type { RenderElement } from 'claude-code';
+import type { Els } from './kit';
 type Confidence = 'high' | 'medium' | 'low';
 type Field = {
   key: string;
@@ -16,8 +18,6 @@ type View = {
 };
 type SaveResult = { saved: string[]; errors: Record<string, string> };
 type Run = <T>(args: string[]) => Promise<T>;
-type Make = (props: Record<string, unknown>) => unknown;
-type Ui = { Box: Make; Text: Make; Button: Make; Input: Make };
 
 const DETECTABLE = ['tracker', 'repo'];
 const GREEN = '#1EC46E';
@@ -94,21 +94,20 @@ async function save(run: Run, redraw: () => void) {
   await loadSettings(run, redraw);
 }
 
-function fieldRows(ui: Ui, f: Field, view: View, redraw: () => void, run: Run) {
+function fieldRows(ui: Els, f: Field, view: View, redraw: () => void, run: Run) {
   const { Box, Text, Button, Input } = ui;
   const value = settings.drafts[f.key] ?? f.text;
   const dirty = value !== f.text;
   const p = f.proposal;
   const gap = view.gaps.find((g) => g.key === f.key);
-  const rows: unknown[] = [
+  const rows: RenderElement[] = [
     Box({
       key: `head-${f.key}`,
       flexDirection: 'row',
       columnGap: 1,
       children: [
-        Text({ key: 'l', weight: 'semibold', children: [f.label] }),
+        Text({ weight: 'semibold', children: [f.label] }),
         Text({
-          key: 's',
           dimColor: true,
           children: [dirty ? 'Not saved' : f.source === 'config' ? 'Your config' : 'Default']
         })
@@ -129,17 +128,13 @@ function fieldRows(ui: Ui, f: Field, view: View, redraw: () => void, run: Run) {
         void save(run, redraw);
       }
     }),
-    Text({ key: `help-${f.key}`, dimColor: true, wrap: 'wrap', children: [f.help] })
+    Text({ dimColor: true, wrap: 'wrap', children: [f.help] })
   ];
   if (settings.errors[f.key]) {
-    rows.push(
-      Text({ key: `err-${f.key}`, color: RED, wrap: 'wrap', children: [settings.errors[f.key]] })
-    );
+    rows.push(Text({ color: RED, wrap: 'wrap', children: [settings.errors[f.key]] }));
   }
   if (p && (p.same || p.text === value)) {
-    rows.push(
-      Text({ key: `same-${f.key}`, dimColor: true, children: ['✓ Same as the detected value'] })
-    );
+    rows.push(Text({ dimColor: true, children: ['✓ Same as the detected value'] }));
   } else if (p) {
     rows.push(
       Box({
@@ -149,18 +144,16 @@ function fieldRows(ui: Ui, f: Field, view: View, redraw: () => void, run: Run) {
         flexWrap: 'wrap',
         children: [
           Text({
-            key: 't',
             dimColor: true,
             wrap: 'wrap',
             children: [`Detected: ${p.text || '(empty)'}`]
           }),
           Text({
-            key: 'c',
             color: p.confidence === 'high' ? GREEN : p.confidence === 'medium' ? AMBER : undefined,
             dimColor: p.confidence === 'low',
             children: [`${p.confidence} confidence`]
           }),
-          Text({ key: 's', dimColor: true, children: [`from ${p.source}`] }),
+          Text({ dimColor: true, children: [`from ${p.source}`] }),
           Button({
             key: `use-${f.key}`,
             label: 'Use',
@@ -176,7 +169,6 @@ function fieldRows(ui: Ui, f: Field, view: View, redraw: () => void, run: Run) {
   if (gap) {
     rows.push(
       Text({
-        key: `gap-${f.key}`,
         dimColor: true,
         wrap: 'wrap',
         children: [`Type /atb-setup and Claude fills this from ${gap.files.join(', ')}.`]
@@ -187,7 +179,7 @@ function fieldRows(ui: Ui, f: Field, view: View, redraw: () => void, run: Run) {
 }
 
 export function renderSettings(
-  ui: Ui,
+  ui: Els,
   run: Run,
   redraw: () => void,
   back: () => void,
@@ -199,9 +191,8 @@ export function renderSettings(
   const n = Object.keys(changed()).length;
   const top = [
     Button({ key: 'settings-back', label: '← My sprint', plain: true, onPress: back }),
-    Text({ key: 'title', weight: 'semibold', children: ['Settings'] }),
+    Text({ weight: 'semibold', children: ['Settings'] }),
     Text({
-      key: 'file',
       dimColor: true,
       wrap: 'wrap',
       children: [view ? `Saved in ${view.file}. Nothing changes until you save.` : 'Loading…']
@@ -219,7 +210,6 @@ export function renderSettings(
           onPress: () => void loadSettings(run, redraw, 'all')
         }),
         Text({
-          key: 'claude',
           dimColor: true,
           children: ['Or type /atb-setup to set up with Claude.']
         }),
@@ -231,12 +221,9 @@ export function renderSettings(
         })
       ]
     }),
-    ...(settings.error
-      ? [Text({ key: 'error', color: RED, wrap: 'wrap', children: [settings.error] })]
-      : []),
+    ...(settings.error ? [Text({ color: RED, wrap: 'wrap', children: [settings.error] })] : []),
     ...(view?.checks ?? []).map((c) =>
       Text({
-        key: `check-${c.name}`,
         color: c.ok ? GREEN : RED,
         wrap: 'wrap',
         children: [`${c.ok ? '✓' : '✗'} ${c.name}: ${c.detail}`]
@@ -244,13 +231,13 @@ export function renderSettings(
     )
   ];
   const sections = (view?.sections ?? []).flatMap((s) => [
-    Text({ key: `rule-${s.id}`, dimColor: true, wrap: 'clip', children: ['─'.repeat(40)] }),
+    Text({ dimColor: true, wrap: 'clip', children: ['─'.repeat(40)] }),
     Box({
       key: `sec-${s.id}`,
       flexDirection: 'row',
       justifyContent: 'space-between',
       children: [
-        Text({ key: 't', weight: 'semibold', children: [s.title] }),
+        Text({ weight: 'semibold', children: [s.title] }),
         ...(DETECTABLE.includes(s.id)
           ? [
               Button({
@@ -272,7 +259,7 @@ export function renderSettings(
           flexDirection: 'row',
           columnGap: 1,
           children: [
-            Text({ key: 'n', children: [n === 1 ? '1 unsaved change' : `${n} unsaved changes`] }),
+            Text({ children: [n === 1 ? '1 unsaved change' : `${n} unsaved changes`] }),
             Button({
               key: 'settings-discard',
               label: 'Discard',

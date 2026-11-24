@@ -6,6 +6,6 @@ apps/vscode/media/webview/
 apps/vscode/test-harness/out/
 .DS_Store
 *.tmp
-apps/claude-plugin/hooks/paths.gen.ts
+apps/claude-plugin/hooks/*.gen.ts
 .claude/settings.local.json
 .impeccable/

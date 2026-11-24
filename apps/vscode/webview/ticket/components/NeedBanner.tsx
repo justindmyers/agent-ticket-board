@@ -3,7 +3,7 @@ import { Kbd } from '../../shared/components/Kbd';
 import type { Need } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import { focusDraft } from '../../shared/utils/focus';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 import { ink } from '../../shared/utils/surfaces';
 import type { Act } from '../types/ticket';
 

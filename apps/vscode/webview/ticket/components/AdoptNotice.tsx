@@ -3,7 +3,7 @@ import { Button } from '../../shared/components/Button';
 import { Icon } from '../../shared/components/Icon';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 import { pill } from '../../shared/utils/surfaces';
 import { send } from '../../shared/utils/vscodeApi';
 

@@ -3,7 +3,7 @@ import { Section } from '../../shared/components/Section';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import { ago } from '../../shared/utils/ago';
-import { accentOf } from '../../shared/utils/stages';
+import { accentOf } from '@agent-ticket-board/core/look';
 import { pointsText } from '../utils/ticket';
 import { JiraStatusSection } from './JiraStatusSection';
 import { RailItem } from './RailItem';

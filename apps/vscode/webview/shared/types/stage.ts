@@ -1,3 +1,1 @@
-import type { STAGES } from '../utils/stages';
-
-export type StageId = (typeof STAGES)[number]['id'];
+export type { Stage as StageId } from '@agent-ticket-board/core/look';

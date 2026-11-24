@@ -16,7 +16,7 @@ export default tseslint.config(
       '**/node_modules/**',
       'apps/vscode/test-harness/**',
       '.scratch/**',
-      'apps/claude-plugin/hooks/paths.gen.ts'
+      'apps/claude-plugin/hooks/*.gen.ts'
     ]
   },
   { linterOptions: { reportUnusedDisableDirectives: 'error' } },

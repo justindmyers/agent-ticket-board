@@ -1,7 +1,7 @@
 import { mdiCheckCircleOutline } from '@mdi/js';
 import { Icon } from '../../shared/components/Icon';
 import type { Theme } from '../../shared/types/theme';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 import type { STAGES } from '../../shared/utils/stages';
 import { ink } from '../../shared/utils/surfaces';
 

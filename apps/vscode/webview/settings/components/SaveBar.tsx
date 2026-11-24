@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Button } from '../../shared/components/Button';
 import { COLLAPSE_SECONDS, EASE } from '../../shared/utils/motion';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 
 type Props = { count: number; onSave: () => void; onDiscard: () => void };
 

@@ -6,7 +6,7 @@ import type { QueueTicket } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import { needsYou, progressText } from '../../shared/utils/agent';
 import { cx } from '../../shared/utils/cx';
-import { accentOf } from '../../shared/utils/stages';
+import { accentOf } from '@agent-ticket-board/core/look';
 import { wash } from '../../shared/utils/surfaces';
 
 type Props = { t: QueueTicket; current: boolean; theme: Theme };

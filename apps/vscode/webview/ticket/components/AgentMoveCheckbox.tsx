@@ -2,7 +2,7 @@ import { mdiCheck } from '@mdi/js';
 import { Checkbox } from 'react-aria-components';
 import { Icon } from '../../shared/components/Icon';
 import { cx } from '../../shared/utils/cx';
-import { PALETTE } from '../../shared/utils/palette';
+import { PALETTE } from '@agent-ticket-board/core/look';
 import { send } from '../../shared/utils/vscodeApi';
 
 type Props = { ticketKey: string; allowed: boolean };
