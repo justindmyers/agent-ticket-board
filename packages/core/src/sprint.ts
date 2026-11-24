@@ -1,3 +1,4 @@
+import { isEqual } from 'lodash-es';
 import { CACHE_FILE } from './paths';
 import { readJson, writeJson } from './files';
 import { details, listSprint } from './jira';
@@ -46,4 +47,19 @@ export async function refreshSprint(
   await writeJson(CACHE_FILE, snap);
   emit({ ...snap, pending: 0 });
   return snap;
+}
+
+/**
+ * Writes one freshly fetched ticket into the sprint cache, so the list agrees with the detail view.
+ * Returns true when the cache changed. A ticket that is not in the sprint is left out.
+ */
+export async function rememberTicket(fresh: Ticket): Promise<boolean> {
+  const snap = await readCache();
+  const old = snap.tickets.find((t) => t.key === fresh.key);
+  if (!old || isEqual(old, fresh)) {
+    return false;
+  }
+  const tickets = snap.tickets.map((t) => (t.key === fresh.key ? fresh : t));
+  await writeJson(CACHE_FILE, { ...snap, tickets });
+  return true;
 }

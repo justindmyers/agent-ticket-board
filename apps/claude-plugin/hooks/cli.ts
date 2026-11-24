@@ -48,6 +48,11 @@ export async function loadTicket($: EngineInterface, key: string) {
   $.ui.invalidate('ui.render');
   try {
     store.detail = await atb<Detail>($, ['ticket', key]);
+    // The fresh ticket went into the sprint cache too: read it, so the list shows the same status.
+    const cached = await atb<Sprint>($, ['sprint', '--cached']);
+    if (cached.groups.length) {
+      store.sprint = cached;
+    }
   } catch (e) {
     store.error = errorText(e);
   }

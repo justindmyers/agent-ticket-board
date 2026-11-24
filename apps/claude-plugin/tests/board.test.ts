@@ -453,6 +453,42 @@ for (const surface of ['desktop', 'terminal'] as const) {
   });
 }
 
+test('desktop: opening a ticket reads the sprint list again, so a new status shows there', async ($, on) => {
+  const calls: string[][] = [];
+  const moved = {
+    ...SPRINT,
+    groups: [
+      {
+        group: 'In Progress',
+        tickets: [{ ...SPRINT.groups[0]!.tickets[0]!, status: 'In Progress' }]
+      }
+    ]
+  };
+  let opened = false;
+  on('process.run', ($, e) => {
+    const a = e.argv.slice(2);
+    calls.push(a);
+    if (a[0] === 'ticket' && !a.includes('--cached')) {
+      opened = true;
+    }
+    return printed(a[0] === 'sprint' ? (opened ? moved : SPRINT) : a[0] === 'ticket' ? TICKET : {});
+  });
+  on('session.surfaces', () => ({ value: ['desktop'] }));
+  on('ui.open', () => ({ value: { isPlaced: true } }));
+  await $.command.run(BOARD);
+  await tick();
+  let ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  await ui.press({ key: 'open-PROJ-102' });
+  await tick();
+  const fresh = calls.findIndex((c) => c[0] === 'ticket' && !c.includes('--cached'));
+  expect(calls.slice(fresh + 1)).toContainEqual(['sprint', '--cached']);
+  await ui.press({ key: 'back' });
+  await ui.unmount();
+  ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  expect(await ui.find({ key: 'grp-In Progress' })).toBeDefined();
+  await ui.unmount();
+});
+
 test('desktop: a ticket with no agent record shows what Jira says', async ($, on) => {
   const noRecord = {
     ...TICKET,

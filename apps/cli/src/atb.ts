@@ -18,6 +18,7 @@ import {
   PRS,
   setAfterMerge,
   readCache,
+  rememberTicket,
   saveSettings,
   settingsView,
   refreshPrs,
@@ -65,6 +66,9 @@ async function ticket(key: string) {
     throw new Error(`Unknown ticket ${key}`);
   }
   STATUS[key] = t.status;
+  if (t !== cached) {
+    await rememberTicket(t);
+  }
   await refreshLocalWork([key]);
   if (!flags.has('--cached')) {
     await refreshPrs(findPr, [key]);

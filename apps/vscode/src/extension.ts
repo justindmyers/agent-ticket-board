@@ -1,3 +1,4 @@
+import { isEqual } from 'lodash-es';
 import * as vscode from 'vscode';
 import { existsSync } from 'node:fs';
 import {
@@ -21,6 +22,7 @@ import {
   moveTicket,
   PRS,
   readCache,
+  rememberTicket,
   refreshPrs,
   refreshSprint,
   setAgentMayMove,
@@ -269,6 +271,11 @@ async function sendTicket(key: string, cachedOnly = false) {
   }
   try {
     const d = await detail(key);
+    if (cache?.tickets.some((t) => t.key === key && !isEqual(t, d))) {
+      cache = { ...cache, tickets: cache.tickets.map((t) => (t.key === key ? d : t)) };
+      broadcast();
+      void rememberTicket(d);
+    }
     if (inboxKey === key) {
       await msg(d, true);
     }
