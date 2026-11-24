@@ -1,4 +1,5 @@
 import { SHOT_FILE, shotSet } from './look';
+import { REUSE_RULES } from './reuse';
 import { z } from 'zod';
 import { loadFlow, saveFlow } from './agents';
 import { audit } from './audit';
@@ -117,6 +118,8 @@ export function testPrompt(t: Ticket, f: Flow, boardComments: string[], env: Tes
     '  variables inside the function, and read URL paths with a regex. Every route handler must call',
     '  fulfill or continue, also after an error: a handler that throws leaves the page loading.',
     '- Use Storybook only for a new shared component or a large new component. Features use the live app.',
+    '- When you fix code or tests:',
+    ...REUSE_RULES,
     '- View every screenshot with Read. Write in `seen` what it shows. If it does not show the requirement working,',
     '  or it looks wrong (overlap, cut-off text, a blank or loading page), fix the code and take the shots again.',
     '  Try at most 3 times for each requirement. Then set ok to false and say why in `note`.',

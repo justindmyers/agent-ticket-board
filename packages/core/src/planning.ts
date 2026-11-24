@@ -1,3 +1,4 @@
+import { REUSE_RULES } from './reuse';
 import { omit } from 'lodash-es';
 import { z } from 'zod';
 import { mdSections } from './adf-md';
@@ -137,6 +138,9 @@ export function planPrompt(
     '- small steps in order, each with the requirement ids that it covers. Steps are for the build: code',
     '  changes and commands such as tests, type checks and lint. Do not make browser, device or manual checks',
     '  into steps: the Testing stage does them, from the check of each requirement.',
+    '  When a step adds a helper, hook, component or test mock, name the existing code that the step reuses,',
+    '  or say why nothing in the repository fits. Rules for the build:',
+    ...REUSE_RULES,
     '',
     '# Description',
     '',

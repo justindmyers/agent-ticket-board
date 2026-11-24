@@ -1,3 +1,4 @@
+import { REUSE_RULES } from './reuse';
 import { z } from 'zod';
 import { mdSections } from './adf-md';
 import { loadFlow, saveFlow } from './agents';
@@ -74,9 +75,12 @@ export function buildPrompt(t: Ticket, f: Flow, boardComments: string[], command
     '- Work only in this folder. It is the worktree of the ticket, on its own branch.',
     '- Do not commit, push or open a pull request. The developer tests first and approves.',
     '- Follow the code style of the repository: its CLAUDE.md, its skills, and the code next to your change.',
+    ...REUSE_RULES,
     '- Do the steps in order. Before a step, call mcp__board__step with the step number and state "current".',
     '  After its check passes, call it again with state "done".',
     "- After each step, run the targeted check for that step: a test, or the repository's lint for the changed files.",
+    '- Before the final gate, read your diff (git diff and the new files). Replace each new helper or mock',
+    '  that duplicates code of the repository with the existing one.',
     '- At the end, run the final gate: the type check, then lint and tests for the changed files.',
     '  Use the commands of the repository (package.json scripts, nx targets).',
     '- If you cannot finish a step, stop at a safe point and say why in its note.',
