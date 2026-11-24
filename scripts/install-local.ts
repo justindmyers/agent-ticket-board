@@ -5,6 +5,7 @@ import { copyFileSync, cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { writePluginFiles } from './gen-plugin';
+import { userNode } from './user-node';
 
 const home = process.env.ATB_HOME ?? join(homedir(), '.agent-ticket-board');
 const run = (cmd: string, args: string[], cwd = '.') =>
@@ -16,11 +17,13 @@ mkdirSync(join(home, 'bin'), { recursive: true });
 const cli = join(home, 'bin', 'atb.cjs');
 copyFileSync('apps/cli/dist/atb.cjs', cli);
 console.log(`CLI: ${cli}`);
-// VS Code runs on Electron, not node: the extension starts the service with this node.
-writeFileSync(join(home, 'bin', 'env.json'), JSON.stringify({ node: process.execPath, atb: cli }));
+// VS Code runs on Electron, not node: the extension starts the service with the developer's own node.
+const node = userNode();
+console.log(`node: ${node}`);
+writeFileSync(join(home, 'bin', 'env.json'), JSON.stringify({ node, atb: cli }));
 
 // The Claude app's PATH may not include the folder that has node, so the pane uses absolute paths.
-writePluginFiles('.', { node: process.execPath, atb: cli });
+writePluginFiles('.', { node, atb: cli });
 
 // Agent sessions that the service starts load this copy of the plugin (the guards).
 const plugin = join(home, 'plugin');
