@@ -296,6 +296,43 @@ function page(theme, mode) {
   await k.screenshot({ path: path.join(OUT, 'inbox-dark-solo.png') });
   await k.close();
 
+  const rh = await open('dark', 'split', 1400, 900);
+  await rh.click('[role=option][data-key="PROJ-102"]');
+  await rh.waitForTimeout(300);
+  kb.rowHeights = await rh.evaluate(() =>
+    [...document.querySelectorAll('[data-queue] [role=option]')].map((o) => ({
+      key: o.dataset.key,
+      open: /, open/.test(o.textContent),
+      h: Math.round(o.getBoundingClientRect().height)
+    }))
+  );
+  const heightOf = (k) =>
+    rh.evaluate(
+      (key) =>
+        Math.round(
+          document.querySelector(`[role=option][data-key="${key}"]`).getBoundingClientRect().height
+        ),
+      k
+    );
+  const before = await heightOf('PROJ-105');
+  await rh.click('[role=option][data-key="PROJ-105"]');
+  await rh.waitForTimeout(300);
+  kb.rowHeightOnSelect = { before, after: await heightOf('PROJ-105') };
+  await rh.close();
+  const sb = await open('dark', 'sidebar', 320, 800);
+  await sb.evaluate(() => window.postMessage({ type: 'current', key: 'PROJ-102' }, '*'));
+  await sb.waitForTimeout(100);
+  const marked = () =>
+    sb.evaluate(
+      () =>
+        [...document.querySelectorAll('[role=option]')].filter((o) => /, open/.test(o.textContent))
+          .length
+    );
+  kb.sidebarCurrentWithTab = await marked();
+  await sb.evaluate(() => window.postMessage({ type: 'current', key: null }, '*'));
+  await sb.waitForTimeout(100);
+  kb.sidebarCurrentNoTab = await marked();
+  await sb.close();
   // Settings page: invented values from the fixture home, plus invented detected values.
   const settings = atb('settings');
   const propose = (key, text, confidence, same = false) => {

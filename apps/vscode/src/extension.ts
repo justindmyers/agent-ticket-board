@@ -297,9 +297,7 @@ async function handle(m: Msg, ctx: vscode.ExtensionContext) {
   switch (m.type) {
     case 'ready':
       postLayout();
-      if (inboxKey) {
-        post({ type: 'current', key: inboxKey });
-      }
+      post({ type: 'current', key: inbox ? (inboxKey ?? null) : null });
       return refresh();
     case 'refresh':
       return refresh(true);
