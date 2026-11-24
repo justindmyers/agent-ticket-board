@@ -30,10 +30,12 @@ import {
   type AgentRun,
   type Flow,
   type Ticket,
+  HOME,
   memorySection,
   projectMemory
 } from '@agent-ticket-board/core';
 import { sessionOf, TestBrowser } from './browser';
+import { planBase } from './plan-base';
 import type { Processes } from './processes';
 import { STAGE_SPECS, testAllowed, type StageId, type StageSpec } from './stages';
 
@@ -70,6 +72,8 @@ export type RunDeps = {
   notify?: (message: string) => void;
   /** The ticket's test browser. Default: the board's own playwright-cli browser. */
   browser?: (key: string, cwd: string) => BrowserLike;
+  /** The read-only copy of the remote's main branch for planning. Default: planBase. */
+  planBase?: (repo: string, dir: string) => Promise<string>;
   /** Claude Code's home, for the project memory of the repository. Default: ~/.claude. */
   claudeHome?: string;
   /** The command that takes a screenshot set. Default: this CLI's `shots`. */
@@ -111,11 +115,12 @@ export type AppEnv = {
   session: string;
   shots: string;
   mocked: boolean;
+  appLog: string;
 };
 
 export type BrowserLike = Pick<
   TestBrowser,
-  'isOpen' | 'open' | 'goto' | 'waitLogin' | 'close' | 'runCode' | 'routes'
+  'isOpen' | 'open' | 'goto' | 'waitLogin' | 'close' | 'runCode' | 'routes' | 'saveLogin'
 >;
 
 /** True when something accepts a TCP connection at host:port within 2 seconds. */
@@ -297,6 +302,12 @@ export class Runs {
 
   private async execute(key: string, spec: StageSpec, ac: AbortController) {
     const log = this.logs.get(key)!;
+    // One test run at a time: each starts a dev server and a browser, and the laptop stays usable.
+    const release = spec.stage === 'testing' ? await this.appTurn(key, ac) : () => undefined;
+    if (ac.signal.aborted) {
+      release();
+      return;
+    }
     await this.patchRun(key, { state: 'running', started: this.now() });
     await audit(key, 'service', 'run.started', { run: FLOWS[key]?.run?.id, stage: spec.stage });
     try {
@@ -306,7 +317,7 @@ export class Runs {
       const cwd =
         spec.stage === 'development'
           ? await this.worktree(key, t, log)
-          : (app?.cwd ?? (await worktreeOf(FLOWS[key]!)) ?? this.d.repo()!);
+          : (app?.cwd ?? (await worktreeOf(FLOWS[key]!)) ?? (await this.mainCopy(key)));
       // The developer's Claude Code memory of the main checkout: a worktree has none of its own.
       const memory = projectMemory(this.d.repo()!, this.d.claudeHome);
       const prompt =
@@ -341,7 +352,25 @@ export class Runs {
         // Stop closes the browser too; a finished or failed run keeps it for the next test run.
         await this.stopApp(key, ac.signal.aborted);
       }
+      release();
     }
+  }
+
+  private appQueue: Promise<void> = Promise.resolve();
+
+  /** Waits until no other test run has the app. Returns the release. */
+  private async appTurn(key: string, ac: AbortController) {
+    let release!: () => void;
+    const before = this.appQueue;
+    this.appQueue = new Promise<void>((r) => (release = r));
+    const waiting = setTimeout(
+      () => void this.patchRun(key, { activity: "Waiting for another ticket's test run" }),
+      200
+    );
+    await Promise.race([before, new Promise((r) => ac.signal.addEventListener('abort', r))]);
+    clearTimeout(waiting);
+    // A stopped run must not release before the runs ahead of it: it passes its turn on.
+    return ac.signal.aborted ? () => void before.then(release) : release;
   }
 
   /**
@@ -391,13 +420,15 @@ export class Runs {
     await this.write(key, { ...FLOWS[key]!, testPort: port });
     const browser = this.browser(key, f.worktree!, env);
     const keep = [ownerPort, Number(loginCheck?.split(':')[1])].filter((p) => p > 0);
+    // Moving the ticket to Testing approved the writes of its plan: the browser lets only those through.
+    const writes = f.writes ?? [];
     if (await browser.isOpen()) {
-      await browser.routes(keep);
+      await browser.routes(url, keep, writes);
       await browser.goto(url);
-      await audit(key, 'service', 'browser.reused', {});
+      await audit(key, 'service', 'browser.reused', { writes: writes.length });
     } else {
-      await browser.open(url, keep);
-      await audit(key, 'service', 'browser.opened', {});
+      await browser.open(url, keep, writes);
+      await audit(key, 'service', 'browser.opened', { writes: writes.length });
     }
     if (!(await browser.waitLogin(url, ownerPort, 5))) {
       await this.patchRun(key, { waiting: 'login', app: url });
@@ -412,6 +443,8 @@ export class Runs {
     }
     await this.patchRun(key, { waiting: undefined, app: url });
     await audit(key, 'service', 'browser.login.done', {});
+    // The next ticket's browser loads this login, so the developer does not log in again.
+    await browser.saveLogin();
     // The fake API that an earlier test run wrote: load it, so this run does not build it again.
     const mock = join(f.worktree!, '.playwright-cli', 'mock.js');
     const mocked = existsSync(mock);
@@ -424,8 +457,30 @@ export class Runs {
       url,
       session: sessionOf(key),
       shots: `${this.shotsCommand()} ${key}`,
-      mocked
+      mocked,
+      appLog: join(log.dir, 'app.log')
     };
+  }
+
+  /**
+   * A read-only copy of the remote's main branch, for a plan with no worktree yet: the developer's
+   * checkout can be on another branch, or behind. Falls back to the checkout, and says so.
+   */
+  private async mainCopy(key: string) {
+    const repo = this.d.repo()!;
+    try {
+      const dir = await (this.d.planBase ?? planBase)(
+        repo,
+        join(HOME, 'plan-base', repo.replace(/[^\w]/g, '-'))
+      );
+      await audit(key, 'service', 'plan.base', { dir });
+      return dir;
+    } catch (e) {
+      await audit(key, 'service', 'plan.base.failed', {
+        error: e instanceof Error ? e.message : String(e)
+      });
+      return repo;
+    }
   }
 
   /** The ticket's test browser. Tests replace it. */

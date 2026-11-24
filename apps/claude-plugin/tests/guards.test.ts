@@ -44,3 +44,25 @@ test('guards: GitHub and Jira reads pass', async () => {
     expect({ cmd, refused: refused(cmd) }).toEqual({ cmd, refused: false });
   }
 });
+
+test('guards: agents do not start servers; the board runs the app', async () => {
+  for (const cmd of [
+    'pnpm --filter nq dev --port 3005',
+    'BROWSER=none pnpm --filter nq dev',
+    'pnpm --filter shared storybook',
+    'pnpm --filter nq serve',
+    'pnpm start',
+    'npx vite --port 4000'
+  ]) {
+    expect(refused(cmd)).toBe(true);
+  }
+  for (const cmd of [
+    'pnpm add --save-dev x',
+    'pnpm --filter nq test:once src/a.test.tsx',
+    'npx vitest run src/a.test.ts',
+    'pnpm --filter shared storybook:build',
+    'pnpm exec playwright-cli -s=atb-X goto http://localhost:3002/'
+  ]) {
+    expect(refused(cmd)).toBe(false);
+  }
+});

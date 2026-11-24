@@ -44,6 +44,8 @@ export type Need = {
   actions: { id: string; label: string }[];
 };
 
+export type Write = { method: string; path: string; why: string };
+
 export type Flow = {
   stage: 'planning' | 'development' | 'testing' | 'code-review';
   need?: Need;
@@ -55,6 +57,7 @@ export type Flow = {
   questions?: Question[];
   answered?: Answered[];
   assumptions?: string[];
+  writes?: Write[];
   steps?: {
     n: number;
     text: string;

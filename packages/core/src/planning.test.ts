@@ -56,7 +56,8 @@ const result: PlanResult = {
   steps: [
     { text: 'Add the sort key', covers: ['R1', 'R2'] },
     { text: 'Add the option to the menu', covers: ['R1'] }
-  ]
+  ],
+  writes: []
 };
 
 describe('planPrompt', () => {
@@ -75,8 +76,14 @@ describe('planPrompt', () => {
 });
 
 describe('PLAN_SCHEMA', () => {
-  it('requires the three lists', () => {
-    expect(PLAN_SCHEMA.required).toEqual(['requirements', 'questions', 'assumptions', 'steps']);
+  it('requires the four lists', () => {
+    expect(PLAN_SCHEMA.required).toEqual([
+      'requirements',
+      'questions',
+      'assumptions',
+      'steps',
+      'writes'
+    ]);
   });
 
   it('is draft-07, the version that Claude Code validates', () => {

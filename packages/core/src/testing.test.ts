@@ -4,6 +4,7 @@ import { shotGroups, shotSet } from './look';
 import {
   applyTest,
   expandShots,
+  markStaleShots,
   approveTestingFlow,
   canTest,
   parseTest,
@@ -227,5 +228,40 @@ describe('screenshot sets', () => {
       { files, sizes }
     );
     expect(f.evidence?.R2?.shots).toHaveLength(6);
+  });
+});
+
+describe('markStaleShots', () => {
+  const f = {
+    stage: 'testing' as const,
+    requirements: [
+      { id: 'R1', text: 'x', check: 'y' },
+      { id: 'R2', text: 'x', check: 'y' }
+    ],
+    evidence: {
+      R1: { ok: true, shots: ['/s/R1-a-light-1400x900.png'], seen: 'ok' },
+      R2: { ok: true, shots: ['/s/R2-b-light-1400x900.png'], seen: 'ok' }
+    }
+  };
+  it('fails a requirement whose shots are older than the last code change', () => {
+    const out = markStaleShots(
+      f,
+      { '/s/R1-a-light-1400x900.png': 100, '/s/R2-b-light-1400x900.png': 300 },
+      200
+    );
+    expect(out.evidence?.R1).toMatchObject({
+      ok: false,
+      note: expect.stringMatching(/taken before the last code change/)
+    });
+    expect(out.evidence?.R2?.ok).toBe(true);
+    expect(out.need?.ask).toMatch(/R1 does not pass/);
+  });
+  it('changes nothing when every shot is newer', () => {
+    const out = markStaleShots(
+      f,
+      { '/s/R1-a-light-1400x900.png': 300, '/s/R2-b-light-1400x900.png': 300 },
+      200
+    );
+    expect(out).toBe(f);
   });
 });

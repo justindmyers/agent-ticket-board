@@ -46,7 +46,8 @@ const plan = {
   assumptions: [],
   requirements: [{ id: 'R1', text: 'Works', check: 'A test' }],
   questions: [],
-  steps: [{ text: 'Do it', covers: ['R1'] }]
+  steps: [{ text: 'Do it', covers: ['R1'] }],
+  writes: []
 };
 
 const init = { type: 'system', subtype: 'init', session_id: 'sess-1' } as SDKMessage;
@@ -88,6 +89,7 @@ function runs(query: QueryFn, extra: Partial<ConstructorParameters<typeof Runs>[
     changed: (k) => changed.push(k),
     now: () => '2026-01-01T00:00:00Z',
     notify: () => undefined,
+    planBase: async () => '/copies/main',
     ...extra
   });
   return { r, changed };
@@ -105,7 +107,7 @@ describe('Runs.plan', () => {
 
     const o = calls[0]!.options!;
     expect(o).toMatchObject({
-      cwd: '/code/example-app',
+      cwd: '/copies/main',
       model: 'sonnet',
       tools: PLAN_TOOLS,
       allowedTools: PLAN_ALLOWED,
@@ -259,7 +261,8 @@ describe('Runs and the project memory', () => {
       requirements: [{ id: 'R1', text: 'x', check: 'y' }],
       questions: [],
       assumptions: [],
-      steps: [{ text: 'a', covers: ['R1'] }]
+      steps: [{ text: 'a', covers: ['R1'] }],
+      writes: []
     };
     const { query, calls: q } = fakeQuery([init, success(plan)]);
     const { r } = runs(query, { claudeHome: home });
@@ -267,6 +270,34 @@ describe('Runs and the project memory', () => {
     await idle(r);
     expect(q[0]!.prompt).toContain('- [Mocks](feedback_mocks.md) — reuse mock.js');
     expect(q[0]!.options!.additionalDirectories).toEqual([dir]);
+  });
+});
+
+describe('Runs.plan without a worktree', () => {
+  it("reads a fresh copy of the remote's main branch, not the developer's checkout", async () => {
+    await saveFlow('PROJ-62', { stage: 'planning' });
+    const { query, calls: q } = fakeQuery([init, success(plan)]);
+    const { r } = runs(query);
+    await r.plan('PROJ-62');
+    await idle(r);
+    expect(q[0]!.options!.cwd).toBe('/copies/main');
+  });
+  it('falls back to the checkout when the copy fails, and logs why', async () => {
+    await saveFlow('PROJ-63', { stage: 'planning' });
+    const { query, calls: q } = fakeQuery([init, success(plan)]);
+    const { r } = runs(query, {
+      planBase: async () => {
+        throw new Error('git fetch: offline');
+      }
+    });
+    await r.plan('PROJ-63');
+    await idle(r);
+    expect(q[0]!.options!.cwd).toBe('/code/example-app');
+    expect(
+      (await readTimeline('PROJ-63')).find((e) => e.type === 'plan.base.failed')
+    ).toMatchObject({
+      error: 'git fetch: offline'
+    });
   });
 });
 
@@ -283,7 +314,8 @@ describe('Runs.plan in a worktree', () => {
     const plan = {
       requirements: [{ id: 'R1', text: 'x', check: 'y' }],
       assumptions: [],
-      steps: [{ text: 'New', covers: ['R1'] }]
+      steps: [{ text: 'New', covers: ['R1'] }],
+      writes: []
     };
     const { query, calls: q } = fakeQuery([init, success(plan)]);
     const { r } = runs(query);
@@ -429,13 +461,23 @@ describe('Runs.test', () => {
     const logins = [...(o.loggedIn ?? [true])];
     const browser = (key: string) => ({
       isOpen: async () => open,
-      open: async (url: string, keep: number[]) => {
-        calls.push(`open ${key} ${url} keep=${keep.join(',')}`);
+      open: async (
+        url: string,
+        keep: number[],
+        writes: { method: string; path: string }[] = []
+      ) => {
+        calls.push(
+          `open ${key} ${url} keep=${keep.join(',')}${writes.length ? ` writes=${writes.map((w) => `${w.method} ${w.path}`).join(',')}` : ''}`
+        );
         open = true;
       },
       goto: async (url: string) => void calls.push(`goto ${key} ${url}`),
       runCode: async (file: string) => void calls.push(`run-code ${key} ${file}`),
-      routes: async (keep: number[]) => void calls.push(`routes ${key} keep=${keep.join(',')}`),
+      routes: async (url: string, _keep: number[], writes: { method: string; path: string }[]) =>
+        void calls.push(
+          `routes ${key} ${url} writes=${writes.map((w) => `${w.method} ${w.path}`).join(',')}`
+        ),
+      saveLogin: async () => void calls.push(`save-login ${key}`),
       waitLogin: async (url: string, _owner: number, seconds: number) => {
         calls.push(`wait-login ${key} ${url} ${seconds}`);
         return logins.length > 1 ? logins.shift()! : logins[0]!;
@@ -500,9 +542,11 @@ describe('Runs.test', () => {
     expect(q[0]!.prompt).toContain('http://localhost:43102/');
     expect(q[0]!.prompt).toContain('pnpm exec playwright-cli -s=atb-PROJ-30');
     expect(q[0]!.prompt).toContain('/bin/node /bin/atb.cjs shots PROJ-30 <name>');
+    expect(q[0]!.prompt).toMatch(/Also search \S+app\.log for SyntaxError/);
     expect(b.calls).toEqual([
       'open PROJ-30 http://localhost:43102/ keep=43101',
-      'wait-login PROJ-30 http://localhost:43102/ 5'
+      'wait-login PROJ-30 http://localhost:43102/ 5',
+      'save-login PROJ-30'
     ]);
     const f = await loadFlow('PROJ-30');
     expect(f?.evidence?.R1?.ok).toBe(true);
@@ -538,6 +582,56 @@ describe('Runs.test', () => {
     await idle(r, 15_000);
     expect(b.calls).toContain(`run-code PROJ-38 ${join(dir, '.playwright-cli', 'mock.js')}`);
     expect(q[0]!.prompt).toMatch(/fake API from earlier test runs is loaded/);
+  });
+
+  it('gives the browser the writes that moving to Testing approved', async () => {
+    const { dir } = setup();
+    await saveFlow('PROJ-39', {
+      stage: 'testing',
+      worktree: dir,
+      requirements: req,
+      writes: [{ method: 'PUT', path: '/api/edges/:id/update-settings', why: 'R1' }]
+    });
+    const b = fakeBrowser();
+    const { r } = runs(fakeQuery([init, success(tested)]).query, { browser: b.browser });
+    await r.test('PROJ-39');
+    await idle(r, 15_000);
+    expect(b.calls[0]).toBe(
+      'open PROJ-39 http://localhost:43102/ keep=43101 writes=PUT /api/edges/:id/update-settings'
+    );
+  });
+
+  it('runs one test run at a time: the next waits for the app and browser of the first', async () => {
+    const { dir } = setup();
+    const dir2 = mkdtempSync(join(tmpdir(), 'atb-test-'));
+    await saveFlow('PROJ-40', { stage: 'testing', worktree: dir, requirements: req });
+    await saveFlow('PROJ-41', { stage: 'testing', worktree: dir2, requirements: req });
+    let release!: () => void;
+    const gate = new Promise<void>((res) => (release = res));
+    const b = fakeBrowser();
+    let first = true;
+    const query = ((args: Parameters<QueryFn>[0]) => {
+      const gated = first;
+      first = false;
+      return fakeQuery([init, success(tested)], gated ? gate : undefined).query(args);
+    }) as QueryFn;
+    const { r } = runs(query, { browser: b.browser });
+    await r.test('PROJ-40');
+    await r.test('PROJ-41');
+    await vi.waitFor(
+      () => expect(b.calls.some((c) => c.startsWith('save-login PROJ-40'))).toBe(true),
+      {
+        timeout: 15_000
+      }
+    );
+    await new Promise((res) => setTimeout(res, 500));
+    expect(b.calls.some((c) => c.includes('PROJ-41'))).toBe(false);
+    release();
+    await idle(r, 20_000);
+    const firstDone = b.calls.indexOf('save-login PROJ-40');
+    const secondStart = b.calls.findIndex((c) => c.includes('PROJ-41'));
+    expect(secondStart).toBeGreaterThan(firstDone);
+    expect(b.calls).toContain('save-login PROJ-41');
   });
 
   it('notifies and waits when the browser is not logged in', async () => {
@@ -608,9 +702,11 @@ describe('Runs.test', () => {
     expect(b.calls).toEqual([
       'open PROJ-34 http://localhost:43102/ keep=43101',
       'wait-login PROJ-34 http://localhost:43102/ 5',
-      'routes PROJ-34 keep=43101',
+      'save-login PROJ-34',
+      'routes PROJ-34 http://localhost:43102/ writes=',
       'goto PROJ-34 http://localhost:43102/',
-      'wait-login PROJ-34 http://localhost:43102/ 5'
+      'wait-login PROJ-34 http://localhost:43102/ 5',
+      'save-login PROJ-34'
     ]);
     expect((await loadFlow('PROJ-34'))?.testPort).toBe(43102);
   });

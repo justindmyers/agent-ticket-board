@@ -77,7 +77,8 @@ describe('a change re-plan', () => {
       ],
       questions: [],
       assumptions: ['Strict means semantic versions only'],
-      steps: [{ text: 'Validate the version format', covers: ['R1'] }]
+      steps: [{ text: 'Validate the version format', covers: ['R1'] }],
+      writes: []
     });
     expect(out.steps?.map((s) => [s.n, s.text, s.state])).toEqual([
       [1, 'Add the field', 'done'],

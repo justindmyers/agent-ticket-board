@@ -9,7 +9,8 @@ import {
   shotLabel,
   spentText,
   STAGES,
-  STATE_ACCENT
+  STATE_ACCENT,
+  writesText
 } from './look';
 
 describe('accentOf', () => {
@@ -132,5 +133,14 @@ describe('activityText', () => {
     );
     expect(activityText('Grep', { pattern: 'x' })).toBe('Searching the code');
     expect(activityText('mcp__board__step', {})).toBeNull();
+  });
+});
+
+describe('writesText', () => {
+  it('says that moving to Testing approves the list, and what happens to other writes', () => {
+    expect(writesText('planning', 2)).toMatch(/Moving the ticket to Testing approves them/);
+    expect(writesText('planning', 0)).toMatch(/^None/);
+    expect(writesText('testing', 1)).toMatch(/refuses every other write/);
+    expect(writesText('testing', 0)).toMatch(/^No writes approved/);
   });
 });

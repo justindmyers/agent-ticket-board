@@ -1,3 +1,4 @@
+import { writeRows } from './writes';
 import type { EngineInterface, RenderElement } from 'claude-code';
 import { agentRun } from './cli';
 import { hex, kit, type Ctx } from './kit';
@@ -42,7 +43,12 @@ export function stagePlanning($: EngineInterface, ctx: Ctx, d: Detail) {
       })
     );
   }
-  body.push(...planQuestions($, ctx, d), ...assumptionRows(ctx, d), ...earlierAnswers($, ctx, d));
+  body.push(
+    ...planQuestions($, ctx, d),
+    ...assumptionRows(ctx, d),
+    ...writeRows(ctx, d.flow, 'planning'),
+    ...earlierAnswers($, ctx, d)
+  );
   const draft = !!f?.questions?.some((q) => !q.a);
   if (f?.requirements) {
     body.push(

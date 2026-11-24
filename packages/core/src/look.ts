@@ -188,3 +188,22 @@ export function shotGroups(shots: string[]) {
   }
   return groups;
 }
+
+/** What the Writes section of a ticket says, in Planning and in Testing. */
+export function writesText(stage: string, count: number) {
+  if (stage === 'planning') {
+    return count
+      ? 'Testing may make only these writes to the backend. Moving the ticket to Testing approves them. To change the list, comment and re-plan first.'
+      : 'None: the tests fake every write. The test browser refuses real writes to the backend.';
+  }
+  return count
+    ? 'Moving the ticket to Testing approved these. The test browser refuses every other write to the backend.'
+    : 'No writes approved: the test browser refuses every write to the backend.';
+}
+
+/** A command that loads the computer: a type check, lint, tests or a build. They run one at a time. */
+export function isHeavy(cmd: string) {
+  return /(check:types|typecheck|\btsc\b|test:once|\bvitest\b|\bjest\b|\beslint\b|\blint\b|\bbuild\b)/.test(
+    cmd.replace(/\bcat\s+\S+/g, '')
+  );
+}

@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process';
-import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { execFile, execFileSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { HOME } from '@agent-ticket-board/core';
+import { HOME, writePattern, type Write } from '@agent-ticket-board/core';
 
 // The ticket's test browser: one headed playwright-cli session for each ticket, run from the
 // worktree with the target repository's own `pnpm exec playwright-cli`. It waits for the developer's
@@ -9,6 +9,9 @@ import { HOME } from '@agent-ticket-board/core';
 // ticket, so the developer logs in once; Approve closes the window and deletes the profile.
 
 export const sessionOf = (key: string) => `atb-${key}`;
+
+/** The developer's login, saved from a test browser and loaded into the next ticket's browser. */
+const LOGIN_STATE = join(HOME, 'browser-login.json');
 
 const profileDir = (key: string) => join(HOME, 'browser-profiles', key);
 export const shotsDir = (key: string) => join(HOME, 'tickets', key, 'shots');
@@ -31,14 +34,36 @@ export function loginState(
 }
 
 /**
- * The routes of the test browser, as one playwright-cli run-code snippet. It replaces earlier routes.
- * Documents on any localhost port except `keep` get `Referrer-Policy: no-referrer`: dev logins often
- * refuse a Referer from a port other than the developer's own.
+ * Whether the test browser lets a request through: reads always; writes only when the developer
+ * approved them in the plan. It runs inside the browser sandbox as well, so it uses no imports.
+ */
+export function writeDecision(
+  method: string,
+  url: string,
+  rules: { method: string; re: string }[]
+) {
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+    return 'read';
+  }
+  const path = url.replace(/^[a-z]+:\/\/[^/]+/i, '');
+  return rules.some((r) => r.method === method && new RegExp(r.re).test(path)) ? 'allow' : 'block';
+}
+
+/**
+ * The routes of the test browser, as one playwright-cli run-code snippet. It replaces earlier routes,
+ * so a later test run gets the writes approved now.
+ * - Documents on any localhost port except `keep` get `Referrer-Policy: no-referrer`: dev logins often
+ *   refuse a Referer from a port other than the developer's own.
+ * - Writes from the app: only the approved ones reach the backend. Others get 403.
  * A route handler always resolves: an uncaught error leaves the request open and hangs the session.
  */
-export function routesCode(keep: number[]) {
+export function routesCode(appOrigin: string, keep: number[], writes: Write[]) {
   const ports = keep.map((p) => `${p}\\/`).join('|');
+  const origin = appOrigin.replace(/\/$/, '').replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const rules = JSON.stringify(writes.map((w) => ({ method: w.method, re: writePattern(w.path) })));
   return `async (page) => {
+  const writeDecision = ${writeDecision.toString()};
+  const rules = ${rules};
   const ctx = page.context();
   await ctx.unrouteAll({ behavior: 'ignoreErrors' });
   await ctx.route(/^http:\\/\\/localhost:(?!${ports})\\d+\\//, async (route) => {
@@ -51,6 +76,24 @@ export function routesCode(keep: number[]) {
       await route.fulfill({ response: resp, headers: { ...resp.headers(), 'referrer-policy': 'no-referrer' } });
     } catch (e) {
       try { await route.continue(); } catch (e2) {}
+    }
+  });
+  await ctx.route(/^${origin}\\//, async (route) => {
+    try {
+      const d = writeDecision(route.request().method(), route.request().url(), rules);
+      if (d === 'read') {
+        await route.fallback();
+      } else if (d === 'allow') {
+        await route.continue();
+      } else {
+        await route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'not approved: this write is not in the plan of the ticket' })
+        });
+      }
+    } catch (e) {
+      try { await route.fallback(); } catch (e2) {}
     }
   });
   return 'routes installed';
@@ -118,6 +161,33 @@ export function evalResult(out: string) {
   }
 }
 
+/** The resize that restores the window from `[outerWidth, outerHeight]`, or null. */
+export function restoreSize(evalOut: string) {
+  const m = /^(\d+),(\d+)$/.exec(evalResult(evalOut));
+  return m ? ['resize', m[1]!, String(Number(m[2]) - 87)] : null;
+}
+
+/** Apple silicon: the hardware, also when this process runs translated. */
+const APPLE_SILICON = (() => {
+  if (process.platform !== 'darwin') {
+    return false;
+  }
+  try {
+    return execFileSync('sysctl', ['-n', 'hw.optional.arm64'], { encoding: 'utf8' }).trim() === '1';
+  } catch {
+    return false;
+  }
+})();
+
+/** A command that runs natively on Apple silicon: a Chrome under Rosetta loads the CPU. */
+export function nativeCommand(
+  cmd: string,
+  args: string[],
+  arm64 = APPLE_SILICON
+): [string, string[]] {
+  return arm64 ? ['arch', ['-arm64', cmd, ...args]] : [cmd, args];
+}
+
 export function parseSizes(list: string[]): [number, number][] {
   return list
     .map((s) => /^(\d+)\s*x\s*(\d+)$/i.exec(s.trim()))
@@ -160,8 +230,7 @@ export class TestBrowser {
   pw(args: string[], timeoutMs = 60_000) {
     return new Promise<{ code: number; out: string }>((resolve) =>
       execFile(
-        'pnpm',
-        ['exec', 'playwright-cli', `-s=${this.session}`, ...args],
+        ...nativeCommand('pnpm', ['exec', 'playwright-cli', `-s=${this.session}`, ...args]),
         { cwd: this.o.cwd, env: this.o.env, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 },
         (e, out, err) =>
           resolve({
@@ -187,10 +256,10 @@ export class TestBrowser {
   }
 
   /**
-   * Opens the ticket's browser, installs its routes, and goes to the app. The profile of an earlier
-   * browser stays: the login survives a closed window.
+   * Opens the ticket's browser, installs its routes, loads the login of an earlier ticket, and goes to
+   * the app. The profile of an earlier browser stays: the login survives a closed window.
    */
-  async open(url: string, keepPorts: number[]) {
+  async open(url: string, keepPorts: number[], writes: Write[] = []) {
     const dir = profileDir(this.key);
     mkdirSync(dir, { recursive: true });
     const init = join(dir, '..', `${this.key}.init.js`);
@@ -213,15 +282,27 @@ export class TestBrowser {
         `The test browser did not open: ${opened.out.trim().split('\n').at(-1) ?? ''}`
       );
     }
-    await this.routes(keepPorts);
+    await this.routes(url, keepPorts, writes);
+    if (existsSync(LOGIN_STATE)) {
+      // Cookies on localhost are shared by every port: the login of another ticket's browser works here.
+      await this.pw(['state-load', LOGIN_STATE]);
+    }
     await this.pw(['goto', url]);
   }
 
-  /** Installs the routes of the test browser: the Referer fix. */
-  async routes(keepPorts: number[]) {
+  /** Installs the routes of the test browser: the Referer fix and the guard for approved writes. */
+  async routes(url: string, keepPorts: number[], writes: Write[]) {
     const file = join(profileDir(this.key), '..', `${this.key}.routes.js`);
-    writeFileSync(file, routesCode(keepPorts));
+    writeFileSync(file, routesCode(new URL(url).origin, keepPorts, writes));
     await this.pw(['run-code', '--filename', file]);
+  }
+
+  /** Saves the login of this browser for the next ticket's browser. Only the developer can read it. */
+  async saveLogin() {
+    await this.pw(['state-save', LOGIN_STATE]);
+    if (existsSync(LOGIN_STATE)) {
+      chmodSync(LOGIN_STATE, 0o600);
+    }
   }
 
   /** Runs a playwright-cli script file in the page, like the fake API of the ticket. */
@@ -267,6 +348,7 @@ export class TestBrowser {
     focus: string | null = null
   ) {
     const misses: string[] = [];
+    const before = restoreSize((await this.pw(['eval', '[outerWidth, outerHeight].join()'])).out);
     const out = shotsDir(this.key);
     mkdirSync(out, { recursive: true });
     const files: string[] = [];
@@ -306,6 +388,10 @@ export class TestBrowser {
       }
     }
     await this.pw(['set-color-scheme', 'no-preference']);
+    // Back to the window's own size: a fixed size crops the page when the window is smaller.
+    if (before) {
+      await this.pw(before);
+    }
     return { files, misses };
   }
 

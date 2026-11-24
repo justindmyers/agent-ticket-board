@@ -96,5 +96,12 @@
       "test": "pnpm vitest run src/map/useViewHistory.test.ts -t debounce"
     }
   },
-  "spent": 6.67
+  "spent": 6.67,
+  "writes": [
+    {
+      "method": "PUT",
+      "path": "/api/maps/:id/view",
+      "why": "R2 saves the map zoom so Back restores it"
+    }
+  ]
 }

@@ -4,11 +4,19 @@ export const JIRA_WRITE =
 /** GitHub writes: pull requests, issues, reviews, releases, repos, and `gh api` with a write method. */
 export const GH_WRITE =
   /\bgh\s+(?:(?:pr\s+(?:create|merge|comment|edit|close|reopen|review|ready|lock|unlock))|(?:issue\s+(?:create|comment|edit|close|reopen|delete|transfer|lock|unlock|pin|unpin))|(?:release\s+(?:create|edit|delete|upload))|(?:repo\s+(?:create|delete|edit|rename|archive|fork|sync))|(?:api\b[^;&|]*(?:-X|--method)\s*(?:POST|PUT|PATCH|DELETE)))/i;
+/** A dev server, Storybook or app server started by hand: the board starts the app of a ticket itself. */
+export const SERVER_START =
+  /(?:\bpnpm\b[^;&|]*(?<![\w-])(?:dev|serve|start|storybook)(?![\w:-]))|(?:\b(?:npx|pnpm\s+exec)\s+vite\b(?![\w-]))/;
 // Only a client may pass --approved (the developer's approval); the agent uses `atb move` without it.
 export const SELF_APPROVE = /\batb(\.cjs)?\b[^;&|]*\bmove\b[^;&|]*--approved\b/;
 
 /** The refusal for a Bash command that breaks a board rule, or null when the command may run. */
 export function refusal(cmd: string): { deny: string; toast?: string } | null {
+  if (SERVER_START.test(cmd)) {
+    return {
+      deny: 'BLOCKED by agent-ticket-board: the board runs the app of the ticket. Do not start a dev server, Storybook or a watcher. Testing gets the running app.'
+    };
+  }
   if (GIT_PUSH.test(cmd)) {
     return {
       toast: 'Blocked git push (needs your "approved" first)',

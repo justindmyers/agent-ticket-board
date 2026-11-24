@@ -42,3 +42,5 @@ export async function loadState() {
 }
 export * from './changes';
 export * from './memory';
+export * from './writes';
+export * from './heavy-lock';

@@ -1,7 +1,9 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   applyTest,
+  markStaleShots,
   canTest,
   CONFIG,
   parseTest,
@@ -168,6 +170,7 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
         session: app!.session,
         shots: app!.shots,
         mocked: app!.mocked,
+        appLog: app!.appLog,
         commands: commandsOf(testAllowed())
       }),
     tools: BUILD_TOOLS,
@@ -176,7 +179,10 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
     },
     schema: () => TEST_SCHEMA,
     // The agent names its screenshot sets; the evidence gets every file of each set.
-    apply: (f, output, key) => applyTest(f, parseTest(output), shotFilesOf(key)),
+    apply: (f, output, key) => {
+      const out = applyTest(f, parseTest(output), shotFilesOf(key));
+      return f.worktree ? markStaleShots(out, shotTimes(out), lastChange(f.worktree)) : out;
+    },
     counts: (f) => ({
       passing: Object.values(f.evidence ?? {}).filter((e) => e.ok).length,
       requirements: f.requirements?.length,
@@ -195,4 +201,41 @@ function shotFilesOf(key: string) {
   const dir = join(TICKETS_DIR, key, 'shots');
   const files = existsSync(dir) ? readdirSync(dir).map((n) => join(dir, n)) : [];
   return { files, sizes: CONFIG.app.shotSizes };
+}
+
+/** The time of each screenshot in the evidence. */
+function shotTimes(f: Flow) {
+  const times: Record<string, number> = {};
+  for (const p of Object.values(f.evidence ?? {}).flatMap((e) => e.shots ?? [])) {
+    try {
+      times[p] = statSync(p).mtimeMs;
+    } catch {
+      // A shot that is gone has no time: it does not count as stale.
+    }
+  }
+  return times;
+}
+
+/** The time of the newest changed file in a worktree that can change the page: not tests or docs. */
+export function lastChange(worktree: string) {
+  const git = (args: string[]) => {
+    try {
+      return execFileSync('git', args, { cwd: worktree, encoding: 'utf8' }).split('\n');
+    } catch {
+      return [];
+    }
+  };
+  const files = [
+    ...git(['diff', '--name-only', 'HEAD']),
+    ...git(['ls-files', '--others', '--exclude-standard'])
+  ].filter((p) => p && !/\.(test|spec|stories)\.|\.md$|(^|\/)__tests__\//.test(p));
+  let newest = 0;
+  for (const p of files) {
+    try {
+      newest = Math.max(newest, statSync(join(worktree, p)).mtimeMs);
+    } catch {
+      // A deleted file has no time.
+    }
+  }
+  return newest;
 }

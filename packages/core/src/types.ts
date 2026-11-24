@@ -1,3 +1,4 @@
+import type { Write } from './writes';
 import type { AgentKind, Stage } from './look';
 
 export { STAGES, type AgentKind, type Stage } from './look';
@@ -106,6 +107,8 @@ export type Flow = {
   /** What the agent decided where the ticket is not clear. */
   assumptions?: string[];
   steps?: Step[];
+  /** The writes to the backend that testing may make. Moving the ticket to Testing approves them. */
+  writes?: Write[];
   /** What the developer asked to change after the build. A re-plan plans the pending ones. */
   changes?: Change[];
   checks?: { name: string; ok: boolean | null; note?: string }[];

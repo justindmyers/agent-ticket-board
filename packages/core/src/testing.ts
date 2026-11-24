@@ -68,6 +68,8 @@ export type TestEnv = {
   session: string;
   shots: string;
   commands: string[];
+  /** The dev-server output of this run. */
+  appLog?: string;
   /** True when the fake API of earlier test runs is loaded already. */
   mocked?: boolean;
 };
@@ -80,6 +82,25 @@ export function testPrompt(t: Ticket, f: Flow, boardComments: string[], env: Tes
     '',
     '# Requirements',
     ...(f.requirements ?? []).map((r) => `- ${r.id}: ${r.text}. Check: ${r.check}`),
+    '',
+    '# Writes to the backend',
+    ...(f.writes?.length
+      ? [
+          'The developer approved these writes by moving the ticket to Testing. Make only these, and only for their requirement.',
+          ...f.writes.map((w) => `- ${w.method} ${w.path}: ${w.why}`)
+        ]
+      : ['No writes to the backend are approved. Fake every write in .playwright-cli/mock.js.']),
+    'Any other write gets 403 "not approved" from the test browser. Do not work around it: set ok to false for the',
+    'requirement, and name the method and path in `note`, so the developer can add it with a comment.',
+    ...(f.assumptions?.length
+      ? [
+          '',
+          '# Assumptions to check',
+          'The plan relied on these. Check each with real data, or show that the code makes it impossible. When one',
+          'does not hold, set ok to false for the requirements that it affects, and say why in `note`.',
+          ...f.assumptions.map((a) => `- ${a}`)
+        ]
+      : []),
     ...(left.length
       ? [
           '',
@@ -124,6 +145,19 @@ export function testPrompt(t: Ticket, f: Flow, boardComments: string[], env: Tes
     '  or it looks wrong (overlap, cut-off text, a blank or loading page), fix the code and take the shots again.',
     '  Try at most 3 times for each requirement. Then set ok to false and say why in `note`.',
     `- Shell commands that you may run, one for each call: ${env.commands.join('; ')}. Anything else is refused.`,
+    '- Check every data state that a check lists: with real data where it exists, else in .playwright-cli/mock.js.',
+    '  Name the state in the shot name (R2-empty, R2-many).',
+    '- For each new or changed control (link, button, tooltip, hover state, menu), use it with real input: click,',
+    '  hover, press Tab, Enter and Escape. element.focus() does not show :focus-visible. Text that tells the user to',
+    '  do something must be the control that does it. Write in `seen` what each one did.',
+    '- At phone size, also eval document.documentElement.scrollWidth <= innerWidth, and check that dialog footers',
+    '  and bottom content are visible and that tap targets are at least 24 px.',
+    '- If you resize the browser yourself, read outerWidth and outerHeight first, and restore it to',
+    '  outerWidth × (outerHeight − 87) when you are done.',
+    '- Wrap the body of every page.on listener in try/catch: a throw closes the browser.',
+    '- After any fix, take again every set whose page the fix can change, not only the set of the fixed requirement.',
+    `- After your last code change, hard-reload each page that the change touches, then run \`pnpm exec playwright-cli -s=${env.session} console\`.`,
+    `  Any error is a failure: fix it or set ok to false.${env.appLog ? ` Also search ${env.appLog} for SyntaxError and "Failed to reload".` : ''}`,
     '- Do not commit or push. Do not close the browser or stop the app: the board does that.',
     '- Keep scratch files in .playwright-cli/. Never print tokens or secrets.'
   ].join('\n');
@@ -169,6 +203,31 @@ function testNeed(f: Flow, evidence: Record<string, Evidence>): Need {
         ask: `Tested: ${ids.length} of ${ids.length} requirements pass, with evidence.`,
         actions: [{ id: 'approveTesting', label: 'Approve for code review' }, open]
       };
+}
+
+/**
+ * Evidence from screenshots that are older than the last code change does not pass: the fix can
+ * change what they show. `shotTimes` has the time of each shot; `lastChange` of the newest changed file.
+ */
+export function markStaleShots(
+  f: Flow,
+  shotTimes: Record<string, number>,
+  lastChange: number
+): Flow {
+  let stale = false;
+  const evidence: Record<string, Evidence> = {};
+  for (const [id, e] of Object.entries(f.evidence ?? {})) {
+    const old = e.ok && (e.shots ?? []).some((p) => (shotTimes[p] ?? Infinity) < lastChange);
+    stale ||= old;
+    evidence[id] = old
+      ? {
+          ...e,
+          ok: false,
+          note: 'The screenshots were taken before the last code change. Test again.'
+        }
+      : e;
+  }
+  return stale ? { ...f, evidence, need: testNeed(f, evidence) } : f;
 }
 
 const listIds = (ids: string[]) =>

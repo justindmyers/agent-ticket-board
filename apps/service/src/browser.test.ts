@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { writePattern } from '@agent-ticket-board/core';
 
 vi.hoisted(() => {
   // A temporary home, set before core computes its paths: the test never touches real profiles.
@@ -12,10 +13,13 @@ import {
   evalResult,
   focusScript,
   loginState,
+  nativeCommand,
   parseSizes,
   profileConfig,
+  restoreSize,
   routesCode,
-  tooBlank
+  tooBlank,
+  writeDecision
 } from './browser';
 
 describe('loginState', () => {
@@ -33,7 +37,7 @@ describe('loginState', () => {
 
 describe('the Referer fix', () => {
   it('drops the Referer on documents of every localhost port except the owner and the login service', () => {
-    const code = routesCode([3000, 8080]);
+    const code = routesCode('http://localhost:3002', [3000, 8080], []);
     expect(code).toContain('localhost:(?!3000\\/|8080\\/)\\d+\\/');
     expect(code).toContain("'referrer-policy': 'no-referrer'");
     expect(code.trim().startsWith('async (page) =>')).toBe(true);
@@ -122,5 +126,53 @@ describe('evalResult', () => {
     expect(evalResult(out)).toBe('focused: Updates');
     expect(evalResult('### Result\n"not found: X"\n')).toBe('not found: X');
     expect(evalResult('something else')).toBe('');
+  });
+});
+
+describe('the write guard of the test browser', () => {
+  const rules = [{ method: 'PUT', re: writePattern('/api/edges/:id/update-settings') }];
+  it('lets reads through, and only the approved writes', () => {
+    expect(writeDecision('GET', 'http://localhost:3002/api/edges', rules)).toBe('read');
+    expect(
+      writeDecision('PUT', 'http://localhost:3002/proxy/api/edges/e1/update-settings', rules)
+    ).toBe('allow');
+    expect(writeDecision('POST', 'http://localhost:3002/api/edges/e1/update-settings', rules)).toBe(
+      'block'
+    );
+    expect(writeDecision('DELETE', 'http://localhost:3002/api/edges/e1', rules)).toBe('block');
+  });
+  it('is installed for the app origin only, after the Referer fix, with the same decision code', () => {
+    const code = routesCode(
+      'http://localhost:3002',
+      [3000, 8080],
+      [{ method: 'PUT', path: '/api/edges/:id/update-settings', why: 'R1' }]
+    );
+    expect(code).toContain('unrouteAll');
+    expect(code).toContain('^http:\\/\\/localhost:3002\\/');
+    expect(() => new Function(`return ${code}`)).not.toThrow();
+    expect(code).toContain(writeDecision.toString());
+    expect(code).toContain('status: 403');
+    expect(code.indexOf('referrer-policy')).toBeLessThan(code.indexOf('status: 403'));
+  });
+});
+
+describe('restoreSize', () => {
+  it("restores the window's own size, not a fixed size: the viewport is the outer height minus the browser bar", () => {
+    expect(restoreSize('### Result\n"1512,945"\n### Ran Playwright code')).toEqual([
+      'resize',
+      '1512',
+      '858'
+    ]);
+    expect(restoreSize('no result')).toBeNull();
+  });
+});
+
+describe('nativeCommand', () => {
+  it('runs the browser natively on Apple silicon: a translated Chrome loads the CPU', () => {
+    expect(nativeCommand('pnpm', ['exec', 'x'], true)).toEqual([
+      'arch',
+      ['-arm64', 'pnpm', 'exec', 'x']
+    ]);
+    expect(nativeCommand('pnpm', ['exec', 'x'], false)).toEqual(['pnpm', ['exec', 'x']]);
   });
 });

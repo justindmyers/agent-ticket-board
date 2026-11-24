@@ -11,6 +11,7 @@ import { AssumptionsSection } from './AssumptionsSection';
 import { EarlierAnswers } from './EarlierAnswers';
 import { QuestionsSection } from './QuestionsSection';
 import { RunSection } from './RunSection';
+import { WritesSection } from './WritesSection';
 import { TicketRow } from './TicketRow';
 import { TicketRows } from './TicketRows';
 import { TicketText } from './TicketText';
@@ -48,6 +49,8 @@ export function PlanningStage({ d, act, theme }: Props) {
       )}
 
       {!!f?.assumptions?.length && <AssumptionsSection assumptions={f.assumptions} theme={theme} />}
+
+      {f?.requirements && <WritesSection writes={f.writes ?? []} stage="planning" theme={theme} />}
 
       {!!f?.answered?.length && (
         <EarlierAnswers ticketKey={d.ticket.key} answered={f.answered} theme={theme} />

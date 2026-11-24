@@ -3,6 +3,7 @@
 import type { EngineInterface, Register } from 'claude-code';
 import { atb, loadSprint } from './cli';
 import { refusal } from './guards';
+import { isHeavy } from './look.gen';
 import type { Ctx } from './kit';
 import { queueView } from './queue-view';
 import { renderSettings, settings } from './settings';
@@ -55,7 +56,23 @@ export const register: Register = (on) => {
   });
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    const r = refusal(String(e.command ?? ''));
+    const cmd = String(e.command ?? '');
+    const r = refusal(cmd);
+    if (!r && isHeavy(cmd)) {
+      // One heavy command at a time on this computer, across every agent session.
+      const owner = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const got = await atb<{ ok: boolean }>($, ['heavy', 'acquire', owner], 31 * 60_000);
+      if (!got.ok) {
+        return {
+          deny: 'The computer ran other type checks, lint or tests for 30 minutes. Try this command again later.'
+        };
+      }
+      try {
+        return await next(e);
+      } finally {
+        await atb($, ['heavy', 'release', owner]).catch(() => undefined);
+      }
+    }
     if (!r) {
       return next(e);
     }

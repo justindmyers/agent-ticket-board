@@ -52,6 +52,7 @@ export type Flow = {
   questions?: { q: string; a?: string; why?: string; options?: string[]; recommended?: number }[];
   answered?: { q: string; a: string }[];
   assumptions?: string[];
+  writes?: { method: string; path: string; why: string }[];
   steps?: { n: number; text: string; covers: string[]; state: string; note?: string }[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;

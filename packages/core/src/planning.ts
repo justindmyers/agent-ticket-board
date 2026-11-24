@@ -41,6 +41,20 @@ const Assumptions = z
     'What you decided where the ticket is not clear, one sentence each, so the developer can check it'
   );
 
+const Writes = z
+  .array(
+    z.object({
+      method: z.enum(['POST', 'PUT', 'PATCH', 'DELETE']),
+      path: z
+        .string()
+        .describe('The API path, with :name for ids, like /api/edges/:id/upgrade-request'),
+      why: z.string().describe('The requirement that needs it, and what the write does')
+    })
+  )
+  .describe(
+    'Every write to the backend that testing must make in the live app. Empty when the tests fake them.'
+  );
+
 const Steps = z.array(
   z.object({
     text: z.string().describe('One small step'),
@@ -52,14 +66,16 @@ const PlanSchema = z.object({
   requirements: Requirements,
   questions: Questions,
   assumptions: Assumptions,
-  steps: Steps
+  steps: Steps,
+  writes: Writes
 });
 
 /** A re-plan after the developer answered: no questions field, so the agent must give a whole plan. */
 const FinalPlanSchema = z.object({
   requirements: Requirements,
   assumptions: Assumptions,
-  steps: Steps
+  steps: Steps,
+  writes: Writes
 });
 
 export type PlanResult = z.infer<typeof PlanSchema>;
@@ -127,6 +143,18 @@ export function planPrompt(
       : []),
     'Then answer with:',
     '- numbered requirements (R1, R2, ...), each with a check: a test or a click path;',
+    "  Requirements cover only what the ticket, its comments and the developer's notes ask. Do not add test",
+    '  types, measurements or rules. Put an item that is outside the scope in one assumption line, and do not plan it.',
+    '  For a requirement that shows data, list in its check the data states to see: zero, one, many, missing fields,',
+    '  unknown references, overlaps, out of order, zero length, outside the parent span. Only the states it can meet.',
+    ...(/bug|defect|incident/i.test(t.type)
+      ? [
+          "  R1 states the reported symptom in the reporter's words. Its check reproduces it under their conditions",
+          '  (size, org, data) and must fail without the fix. Where size or aspect ratio can matter, check more than one.'
+        ]
+      : []),
+    `  Run gh pr list --search ${t.key} --state all. If a pull request (also a draft or a closed one) built UI for this`,
+    '  ticket, its layout and interactions are the spec: name it in the requirements. Replace only how it reads data.',
     ...(answered.length
       ? [
           '- no questions. Do not ask questions: the developer answered them already. Where something is still',
@@ -137,6 +165,9 @@ export function planPrompt(
           '  each with why it matters, 2 to 4 options and the option you recommend. Decide everything else yourself;',
           '- assumptions: what you decided where the ticket is not clear, one sentence each;'
         ]),
+    '- writes: every write to the backend (POST, PUT, PATCH, DELETE) that testing must make in the live app,',
+    '  with its API path and the requirement that needs it. Moving the ticket to Testing approves this list, and',
+    '  the test browser refuses every other write. Leave it empty when the tests can fake the writes;',
     '- small steps in order, each with the requirement ids that it covers. Steps are for the build: code',
     '  changes and commands such as tests, type checks and lint. Do not make browser, device or manual checks',
     '  into steps: the Testing stage does them, from the check of each requirement.',
@@ -180,6 +211,7 @@ export function applyPlan(f: Flow, r: PlanResult): Flow {
     stage: 'planning',
     requirements: r.requirements,
     assumptions: r.assumptions,
+    writes: r.writes,
     questions: r.questions.map((q) => ({
       q: q.q,
       why: q.why,

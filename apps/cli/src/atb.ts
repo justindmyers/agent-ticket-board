@@ -1,7 +1,11 @@
 // atb: the shared command line for every client; the Claude Code pane reaches core only through it.
 // Run it with no command for the usage. JSON goes to stdout.
 import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import {
+  acquireHeavy,
+  HOME,
+  releaseHeavy,
   addComment,
   agentFor,
   CONFIG,
@@ -53,6 +57,7 @@ const USAGE = `usage:
   atb sprint [--cached]                  sprint snapshot (cached: from ~/.agent-ticket-board/cache)
   atb ticket <KEY> [--cached]            ticket detail, agent record, comments and group
   atb comment <KEY> <text> [--run]       a comment for the agent (never sent to Jira)
+  atb heavy acquire|release <OWNER>      the lock that runs heavy commands one at a time (used by the guard hook)
   atb change <KEY> <TEXT>                comment and re-plan: built work goes back to Planning for the change
   atb move <KEY> <STATUS> [--approved]   a Jira move by the agent, or one that the developer approved
   atb agent-may-move <KEY> on|off        the developer's permission for one ticket
@@ -232,6 +237,15 @@ async function main() {
   }
   if (cmd === 'ticket' && key) {
     return out(await ticket(key));
+  }
+  if (cmd === 'heavy' && (args[0] === 'acquire' || args[0] === 'release') && args[1]) {
+    // The guard hook runs heavy commands one at a time: it holds this lock around each one.
+    const lock = join(HOME, 'heavy.lock');
+    if (args[0] === 'release') {
+      releaseHeavy(lock, args[1]);
+      return out({ ok: true });
+    }
+    return out({ ok: await acquireHeavy(lock, args[1]) });
   }
   if (cmd === 'change' && key && args[1]) {
     const info = await ensureService(process.argv[1]!);

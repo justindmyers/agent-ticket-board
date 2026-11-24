@@ -1,3 +1,4 @@
+import { writeRows } from './writes';
 import type { EngineInterface, RenderElement } from 'claude-code';
 import { openShot } from './cli';
 import { hex, kit, type Ctx } from './kit';
@@ -12,7 +13,10 @@ export function stageTesting($: EngineInterface, ctx: Ctx, f: Flow) {
   const { sectionTitle, dim } = kit(ctx);
   const reqs = f.requirements ?? [];
   const passing = reqs.filter((r) => f.evidence?.[r.id]?.ok).length;
-  const body: RenderElement[] = [...runBox($, ctx, store.open ?? '', f, 'testing')];
+  const body: RenderElement[] = [
+    ...runBox($, ctx, store.open ?? '', f, 'testing'),
+    ...writeRows(ctx, f, 'testing')
+  ];
 
   body.push(
     sectionTitle('ev', 'Evidence', hex('amber'), passing + ' of ' + reqs.length),

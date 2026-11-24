@@ -7,6 +7,7 @@ import type { Act } from '../types/ticket';
 import { EvidenceRow } from './EvidenceRow';
 import { RunSection } from './RunSection';
 import { TicketRows } from './TicketRows';
+import { WritesSection } from './WritesSection';
 
 type Props = { f: Flow; act: Act; theme: Theme };
 
@@ -19,6 +20,8 @@ export function TestingStage({ f, act, theme }: Props) {
       {f.run?.stage === 'testing' && runActive(f) && (
         <RunSection run={f.run} act={act} theme={theme} />
       )}
+
+      <WritesSection writes={f.writes ?? []} stage="testing" theme={theme} />
 
       <Section
         icon={mdiFormatListChecks}
