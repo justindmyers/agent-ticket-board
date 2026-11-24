@@ -44,7 +44,7 @@ export function QueueGroup({
           className="h-8 w-full justify-start gap-2 rounded-lg px-2 text-[11px] font-medium tracking-[0.08em] uppercase"
         >
           <Icon path={open ? mdiChevronDown : mdiChevronRight} size={14} className="text-muted" />
-          <Dot color={groupDot(group.group)} />
+          <Dot color={groupDot(group.group, group.state)} />
           <span
             className={cx(
               'min-w-0 flex-1 text-left',

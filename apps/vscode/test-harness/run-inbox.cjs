@@ -62,7 +62,24 @@ function page(theme, mode) {
 
 (async () => {
   const sprint = atb('sprint', '--cached');
-  const groups = sprint.groups;
+  // The fixture home has no repo, so add invented local work to one not-started ticket.
+  const groups = sprint.groups.map((g) => ({
+    ...g,
+    tickets: g.tickets.map((t) =>
+      t.key === 'PROJ-107'
+        ? {
+            ...t,
+            state: 'active',
+            local: {
+              branch: 'feat/PROJ-107-example',
+              worktree: '/code/example-app-wt/proj-107-example',
+              changed: 6,
+              label: 'Worktree proj-107-example, 6 changed files'
+            }
+          }
+        : t
+    )
+  }));
   const tickets = Object.fromEntries(groups.flatMap((g) => g.tickets).map((t) => [t.key, t]));
   const detail = (k) => {
     const d = atb('ticket', k, '--cached');
@@ -71,6 +88,16 @@ function page(theme, mode) {
       fresh: true,
       ticket: d.ticket,
       flow: d.flow,
+      tracker:
+        k === 'PROJ-107' ? { ...d.tracker, state: 'active', label: 'Started locally' } : d.tracker,
+      adopt:
+        k === 'PROJ-107'
+          ? {
+              stage: 'development',
+              stageLabel: 'Development',
+              text: 'Worktree proj-107-example, 6 changed files, on branch feat/PROJ-107-example.'
+            }
+          : d.adopt,
       comments: d.comments,
       jira: d.jira
     };
@@ -318,7 +345,37 @@ function page(theme, mode) {
   await rh.click('[role=option][data-key="PROJ-105"]');
   await rh.waitForTimeout(300);
   kb.rowHeightOnSelect = { before, after: await heightOf('PROJ-105') };
+  await rh.click('[role=option][data-key="PROJ-107"]');
+  await rh
+    .waitForFunction(() => document.getElementById('ttl-key')?.textContent === 'PROJ-107', null, {
+      timeout: 3000
+    })
+    .catch(() => {});
+  kb.adoptNotice = await rh.evaluate(
+    () => document.querySelector('[aria-label="Work found on this machine"]')?.textContent ?? null
+  );
+  await rh.getByRole('button', { name: 'Adopt as Development' }).click();
+  kb.adoptSent = await rh.evaluate(
+    () => window.__sent.filter((m) => m.type === 'adopt').at(-1) ?? null
+  );
   await rh.close();
+  kb.trackerLabels = {};
+  for (const key of ['PROJ-105', 'PROJ-106', 'PROJ-107']) {
+    const rh2 = await open('dark', 'split', 1400, 900);
+    await rh2.click(`[role=option][data-key="${key}"]`).catch(() => {});
+    await rh2
+      .waitForFunction((k) => document.getElementById('ttl-key')?.textContent === k, key, {
+        timeout: 3000
+      })
+      .catch(() => {});
+    kb.trackerLabels[key] = await rh2.evaluate(() =>
+      document
+        .querySelector('nav[aria-label="Where it is"]')
+        ?.textContent?.replace(/Jira|Chat/g, '')
+        .trim()
+    );
+    await rh2.close();
+  }
   const sb = await open('dark', 'sidebar', 320, 800);
   await sb.evaluate(() => window.postMessage({ type: 'current', key: 'PROJ-102' }, '*'));
   await sb.waitForTimeout(100);

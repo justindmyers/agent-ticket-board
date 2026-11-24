@@ -1,5 +1,7 @@
 import { CONFIG } from './config';
 import { flowFor, STATUS } from './agents';
+import { LOCAL, localView } from './local-work';
+import { trackerState, workState } from './tracker-state';
 import { STAGES, type Agent, type Ticket } from './types';
 
 // One queue model for every client: VS Code sidebar, inbox, board, Claude Code pane and CLI.
@@ -62,7 +64,11 @@ export function grouped<T extends Ticket>(tickets: T[]) {
   );
   return ['Needs you', 'Running', ...order, ...rest]
     .filter((g) => map.has(g))
-    .map((g) => ({ group: g, tickets: map.get(g)! }));
+    .map((g) => ({
+      group: g,
+      state: g === 'Needs you' || g === 'Running' ? undefined : trackerState(g),
+      tickets: map.get(g)!
+    }));
 }
 
 /** The JSON shape that the CLI prints and the Claude Code pane reads. */
@@ -71,6 +77,7 @@ export function shapeSprint(s: { at: string | null; tickets: Ticket[] }) {
     at: s.at,
     groups: grouped(s.tickets).map((g) => ({
       group: g.group,
+      state: g.state,
       tickets: g.tickets.map((t) => ({
         key: t.key,
         summary: t.summary,
@@ -78,6 +85,8 @@ export function shapeSprint(s: { at: string | null; tickets: Ticket[] }) {
         type: t.type,
         points: t.points,
         updated: t.updated,
+        state: workState(t.status, LOCAL[t.key]),
+        local: localView(t.key),
         agent: agentFor(t.key)
       }))
     }))

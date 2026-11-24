@@ -1,5 +1,6 @@
 import { ListBoxItem } from 'react-aria-components';
 import { AgentAsk } from '../../shared/components/AgentAsk';
+import { LocalWorkLine } from '../../shared/components/LocalWorkLine';
 import { Orb } from '../../shared/components/Orb';
 import type { QueueTicket } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
@@ -19,7 +20,7 @@ const metaOf = (t: QueueTicket) =>
 
 export function QueueRow({ t, current, theme }: Props) {
   const a = t.agent;
-  const accent = accentOf(a, t.status);
+  const accent = accentOf(a, t.state);
   const needs = needsYou(a);
 
   return (
@@ -55,6 +56,7 @@ export function QueueRow({ t, current, theme }: Props) {
           className="col-start-2 col-end-4 flex items-start gap-1.5"
         />
       )}
+      {!a && t.local && <LocalWorkLine local={t.local} className="col-start-2 col-end-4" />}
       {current && <span className="sr-only">, open</span>}
       {!needs && a && (
         <span className="sr-only">

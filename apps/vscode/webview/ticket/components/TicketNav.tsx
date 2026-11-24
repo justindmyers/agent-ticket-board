@@ -3,7 +3,7 @@ import { Button } from '../../shared/components/Button';
 import { Icon } from '../../shared/components/Icon';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
-import type { stageOf } from '../../shared/utils/stages';
+import { accentOf, type stageOf } from '../../shared/utils/stages';
 import { ink } from '../../shared/utils/surfaces';
 import type { Act } from '../types/ticket';
 import { TicketMoreMenu } from './TicketMoreMenu';
@@ -18,7 +18,15 @@ type Props = {
 
 export function TicketNav({ d, stage, act, onBack, theme }: Props) {
   const f = d.flow;
-  const stageColor = stage ? ink(stage.accent, theme) : f?.closed ? ink('green', theme) : undefined;
+  const plain = f ? 'neutral' : accentOf(null, d.tracker?.state);
+  const stageColor = stage
+    ? ink(stage.accent, theme)
+    : f?.closed
+      ? ink('green', theme)
+      : plain === 'neutral'
+        ? undefined
+        : ink(plain, theme);
+  const label = stage ? stage.label : f?.closed ? 'Finished' : (d.tracker?.label ?? 'Not started');
 
   return (
     <nav aria-label="Where it is" className="flex min-w-0 items-center gap-1 text-xs text-muted">
@@ -36,9 +44,7 @@ export function TicketNav({ d, stage, act, onBack, theme }: Props) {
         {d.ticket.key}
       </span>
       <Icon path={mdiChevronRight} size={14} className="text-muted" />
-      <span style={{ color: stageColor }}>
-        {stage ? stage.label : f?.closed ? 'Finished' : 'Not started'}
-      </span>
+      <span style={{ color: stageColor }}>{label}</span>
       {!d.fresh && <span className="ml-2 text-muted">Updating…</span>}
       <div className="ml-auto flex items-center gap-0.5">
         <Button variant="ghost" className="h-7 px-2" onPress={() => act('openJira')}>

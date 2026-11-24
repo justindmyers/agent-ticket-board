@@ -44,6 +44,18 @@ export const CONFIG_SECTIONS: ConfigSection[] = [
         kind: 'list'
       },
       {
+        key: 'tracker.notStarted',
+        label: 'Not started statuses',
+        help: 'A ticket in one of these statuses has no work yet.',
+        kind: 'list'
+      },
+      {
+        key: 'tracker.blocked',
+        label: 'Blocked statuses',
+        help: 'A ticket in one of these statuses cannot move until something changes.',
+        kind: 'list'
+      },
+      {
         key: 'tracker.finished',
         label: 'Finished statuses',
         help: 'A ticket in one of these statuses is finished.',

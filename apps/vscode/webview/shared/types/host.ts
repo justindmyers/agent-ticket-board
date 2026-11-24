@@ -12,8 +12,14 @@ export type Agent = {
   progress?: string;
 };
 
+export type TrackerState = 'todo' | 'active' | 'blocked' | 'done';
+
+export type LocalWork = { branch: string; worktree: string | null; changed: number; label: string };
+
 export type QueueTicket = {
   key: string;
+  state?: TrackerState;
+  local?: LocalWork | null;
   summary: string;
   status: string;
   type?: string;
@@ -22,7 +28,7 @@ export type QueueTicket = {
   agent: Agent | null;
 };
 
-export type Group = { group: string; tickets: QueueTicket[] };
+export type Group = { group: string; state?: TrackerState; tickets: QueueTicket[] };
 
 export type Snapshot = { at: string | null; groups: Group[]; updating: boolean; pending: number };
 
@@ -85,6 +91,8 @@ export type Detail = {
     description?: unknown;
   };
   flow: Flow | null;
+  tracker?: { state: TrackerState; label: string; notice: string | null };
+  adopt?: { stage: Flow['stage']; stageLabel: string; text: string } | null;
   comments: { id: string; text: string; at: string; ran?: boolean }[];
   jira?: JiraInfo;
   fresh: boolean;

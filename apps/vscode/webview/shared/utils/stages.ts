@@ -1,5 +1,5 @@
 import { mdiClipboardTextOutline, mdiCodeBraces, mdiFlaskOutline, mdiSourcePull } from '@mdi/js';
-import type { Agent, Flow } from '../types/host';
+import type { Agent, Flow, TrackerState } from '../types/host';
 import type { Accent } from '../types/theme';
 
 export const STAGES = [
@@ -15,7 +15,7 @@ export const stageIndex = (f: Flow | null) => (f ? STAGES.findIndex((s) => s.id 
 
 export function accentOf(
   a: Pick<Agent, 'kind' | 'stage'> | null | undefined,
-  status?: string
+  state?: TrackerState
 ): Accent {
   if (a?.kind === 'problem') {
     return 'red';
@@ -26,5 +26,11 @@ export function accentOf(
   if (a) {
     return stageOf(a.stage)?.accent ?? 'neutral';
   }
-  return /done|verifying/i.test(status ?? '') ? 'green' : 'neutral';
+  const byState: Record<TrackerState, Accent> = {
+    todo: 'neutral',
+    active: 'blue',
+    blocked: 'red',
+    done: 'green'
+  };
+  return byState[state ?? 'todo'];
 }

@@ -28,6 +28,15 @@ import {
   jiraPanel,
   STATUS,
   ticketUrl,
+  trackerInfo,
+  workState,
+  LOCAL,
+  localView,
+  refreshLocalWork,
+  adoptOffer,
+  adoptWork,
+  ignoreWork,
+  type Stage,
   type Snapshot,
   type Ticket
 } from '@agent-ticket-board/core';
@@ -41,6 +50,8 @@ type Msg =
   | { type: 'move'; key: string; from?: string; to: string }
   | { type: 'setAgentMove'; key: string; allow: boolean }
   | { type: 'setAfterMerge'; key: string; to: string | null }
+  | { type: 'adopt'; key: string; stage: Stage }
+  | { type: 'ignoreLocal'; key: string }
   | { type: 'comment'; key: string; text: string; run?: boolean }
   | { type: 'action'; key: string; id: string }
   | { type: 'openJira'; key: string }
@@ -87,7 +98,14 @@ function nonce() {
 function shaped() {
   return cache!.tickets.map((t) => {
     STATUS[t.key] = t.status;
-    return { ...t, agent: agentFor(t.key), comments: undefined, description: undefined };
+    return {
+      ...t,
+      state: workState(t.status, LOCAL[t.key]),
+      local: localView(t.key),
+      agent: agentFor(t.key),
+      comments: undefined,
+      description: undefined
+    };
   });
 }
 
@@ -150,6 +168,22 @@ async function autoSync() {
   }
 }
 
+// git only, so it runs on every refresh: local work changes far more often than Jira.
+async function loadLocalWork() {
+  if (!cache) {
+    return;
+  }
+  await refreshLocalWork(cache.tickets.map((t) => t.key));
+  broadcast();
+  const adoptable = cache.tickets.map((t) => t.key).filter((k) => adoptOffer(k));
+  if (adoptable.length) {
+    await refreshPrs(findPr, adoptable);
+  }
+  if (inboxKey) {
+    void sendTicket(inboxKey, true);
+  }
+}
+
 // Show the disk cache at once, then refresh in the background and fill in as data arrives.
 async function refresh(force = false) {
   if (!cache) {
@@ -159,6 +193,7 @@ async function refresh(force = false) {
     }
   }
   broadcast();
+  void loadLocalWork();
   if (loading) {
     return loading;
   }
@@ -181,6 +216,7 @@ async function refresh(force = false) {
         void sendTicket(inboxKey, true);
       }
       void loadPrs();
+      void loadLocalWork();
     } catch (e) {
       post({ type: cache ? 'warn' : 'error', message: errorText(e) });
     } finally {
@@ -205,6 +241,8 @@ async function sendTicket(key: string, cachedOnly = false) {
       fresh,
       ticket: t,
       flow: flowFor(key, t.status),
+      tracker: trackerInfo(t.status, LOCAL[key]),
+      adopt: adoptOffer(key),
       comments: await listComments(key),
       jira: await jiraPanel(key, PRS[key])
     });
@@ -276,6 +314,13 @@ async function runAction(key: string, id: string) {
       ? open(`vscode://anthropic.claude-code/open?session=${f.session}`)
       : undefined;
   }
+  if (id === 'openWorktree') {
+    return f?.worktree
+      ? vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(f.worktree), {
+          forceNewWindow: true
+        })
+      : vscode.window.showInformationMessage(`${key}: no worktree for this ticket.`);
+  }
   if (id === 'openApp' && f?.app) {
     return open(f.app);
   }
@@ -318,6 +363,26 @@ async function handle(m: Msg, ctx: vscode.ExtensionContext) {
       await setAgentMayMove(m.key, !!m.allow);
       void sendTicket(m.key, true);
       return autoSync();
+    case 'adopt':
+      try {
+        await adoptWork(m.key, m.stage);
+        vscode.window.setStatusBarMessage(
+          `${m.key}: adopted. Nothing runs until you start it.`,
+          6000
+        );
+      } catch (e) {
+        void vscode.window.showErrorMessage(errorText(e));
+      }
+      broadcast();
+      return sendTicket(m.key, true);
+    case 'ignoreLocal':
+      try {
+        await ignoreWork(m.key);
+      } catch (e) {
+        void vscode.window.showErrorMessage(errorText(e));
+      }
+      broadcast();
+      return sendTicket(m.key, true);
     case 'setAfterMerge':
       await setAfterMerge(m.key, m.to);
       broadcast();

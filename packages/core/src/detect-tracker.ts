@@ -61,6 +61,7 @@ async function fromSprint(run: Run, items: Item[]): Promise<Proposal[]> {
   );
   const ordered = sortBy(statuses, (s) => CATEGORY_ORDER.indexOf(s.statusCategory?.key ?? 'new'));
   const finished = ordered.filter((s) => s.statusCategory?.key === 'done').map((s) => s.name!);
+  const notStarted = ordered.filter((s) => s.statusCategory?.key === 'new').map((s) => s.name!);
   const proposals: Proposal[] = [
     {
       key: 'tracker.project',
@@ -71,6 +72,14 @@ async function fromSprint(run: Run, items: Item[]): Promise<Proposal[]> {
     { key: 'tracker.jql', value: jqlFor(project), source: src, confidence: 'high' },
     { key: 'tracker.columns', value: ordered.map((s) => s.name), source: src, confidence: 'medium' }
   ];
+  if (notStarted.length) {
+    proposals.push({
+      key: 'tracker.notStarted',
+      value: notStarted,
+      source: src,
+      confidence: 'medium'
+    });
+  }
   if (finished.length) {
     proposals.push(
       { key: 'tracker.finished', value: finished, source: src, confidence: 'medium' },

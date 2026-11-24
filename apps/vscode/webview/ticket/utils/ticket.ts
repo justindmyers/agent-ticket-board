@@ -2,7 +2,8 @@ import type { Detail } from '../../shared/types/host';
 
 const STARTABLE = /^(to do|in progress|open|backlog|selected for development)$/i;
 
-export const canStartPlanning = (d: Detail) => !d.flow && STARTABLE.test(d.ticket.status);
+export const canStartPlanning = (d: Detail) =>
+  !d.flow && !d.adopt && (d.tracker ? d.tracker.state !== 'done' : STARTABLE.test(d.ticket.status));
 
 export const pointsText = (points: number | null, unit = ' pts') =>
   points == null ? 'Not pointed' : `${points}${unit}`;

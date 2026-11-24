@@ -1,3 +1,4 @@
+import type { TrackerState } from '../../shared/types/host';
 import { PALETTE } from '../../shared/utils/palette';
 import type { Collapsed } from '../types/queue';
 
@@ -10,8 +11,15 @@ const GROUP_DOT: Record<string, string> = {
   Running: PALETTE.blue.hex
 };
 
-export const groupDot = (group: string) =>
-  GROUP_DOT[group] ?? 'color-mix(in srgb, var(--atb-ink) 30%, transparent)';
+const STATE_DOT: Record<TrackerState, string> = {
+  todo: 'color-mix(in srgb, var(--atb-ink) 30%, transparent)',
+  active: PALETTE.blue.hex,
+  blocked: PALETTE.red.hex,
+  done: PALETTE.green.hex
+};
+
+export const groupDot = (group: string, state?: TrackerState) =>
+  GROUP_DOT[group] ?? STATE_DOT[state ?? 'todo'];
 
 export const isGroupOpen = (collapsed: Collapsed, group: string) =>
   !(collapsed[group] ?? COLLAPSED_BY_DEFAULT.has(group));

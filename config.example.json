@@ -6,6 +6,8 @@
     "jql": "project = PROJ AND assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC",
     "pointsField": "customfield_00000",
     "columns": ["To Do", "In Progress", "Code Review", "Done"],
+    "notStarted": ["To Do"],
+    "blocked": ["Blocked"],
     "finished": ["Done"],
     "afterMerge": "Done",
     "afterMergeRules": [

@@ -2,7 +2,7 @@ import { TabPanel, Tabs } from 'react-aria-components';
 import type { Detail } from '../../shared/types/host';
 import type { StageId } from '../../shared/types/stage';
 import type { Accent, Theme } from '../../shared/types/theme';
-import { stageIndex, STAGES } from '../../shared/utils/stages';
+import { accentOf, stageIndex, STAGES } from '../../shared/utils/stages';
 import { panel } from '../../shared/utils/surfaces';
 import { send } from '../../shared/utils/vscodeApi';
 import { CommentsSection } from './CommentsSection';
@@ -14,6 +14,8 @@ import { TicketNav } from './TicketNav';
 import { TicketRail } from './TicketRail';
 import { TicketSkeleton } from './TicketSkeleton';
 import { TicketTitle } from './TicketTitle';
+import { AdoptNotice } from './AdoptNotice';
+import { TrackerNotice } from './TrackerNotice';
 
 type Props = {
   d: Detail | null;
@@ -36,7 +38,11 @@ export function TicketPane({ d, tab, setTab, draft, setDraft, onBack, theme }: P
   const stage = f?.closed ? null : si >= 0 ? STAGES[si] : null;
   const current: StageId = tab ?? stage?.id ?? (f?.closed ? 'code-review' : 'planning');
   const accent: Accent =
-    need?.kind === 'problem' ? 'red' : f?.closed ? 'green' : (stage?.accent ?? 'neutral');
+    need?.kind === 'problem'
+      ? 'red'
+      : f?.closed
+        ? 'green'
+        : (stage?.accent ?? (f ? 'neutral' : accentOf(null, d.tracker?.state)));
   const act = (id: string) => send({ type: 'action', key: d.ticket.key, id });
 
   return (
@@ -51,6 +57,8 @@ export function TicketPane({ d, tab, setTab, draft, setDraft, onBack, theme }: P
           <TicketTitle d={d} accent={accent} stageIcon={stage?.icon} theme={theme} />
 
           {f?.closed && <FinishedNotice text={f.closed.text} theme={theme} />}
+          {!f && d.tracker && !d.adopt && <TrackerNotice tracker={d.tracker} theme={theme} />}
+          {!f && d.adopt && <AdoptNotice ticketKey={d.ticket.key} offer={d.adopt} theme={theme} />}
           {need && <NeedBanner need={need} act={act} theme={theme} />}
 
           <StageTabList current={si} theme={theme} />

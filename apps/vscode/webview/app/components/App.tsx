@@ -105,7 +105,7 @@ export function App() {
 
   const needsN = data?.groups.find((g) => g.group === NEEDS_YOU_GROUP)?.tickets.length ?? 0;
   const selT = data?.groups.flatMap((g) => g.tickets).find((t) => t.key === selected);
-  const glowHex = PALETTE[accentOf(selT?.agent, selT?.status)].hex;
+  const glowHex = PALETTE[accentOf(selT?.agent, selT?.state)].hex;
   const header = <SprintHeader data={data} offline={offline} needsN={needsN} theme={theme} />;
 
   if (SIDEBAR) {

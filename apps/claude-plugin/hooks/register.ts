@@ -35,12 +35,15 @@ type Agent = {
   action?: { id: string; label: string };
   progress?: string;
 } | null;
+type TrackerState = 'todo' | 'active' | 'blocked' | 'done';
 type Row = {
   key: string;
+  state?: TrackerState;
   summary: string;
   status: string;
   type?: string;
   points: number | null;
+  local?: { label: string } | null;
   agent: Agent;
 };
 type Sprint = { at: string | null; groups: { group: string; tickets: Row[] }[] };
@@ -83,6 +86,8 @@ type Flow = {
 type Detail = {
   ticket: Row & { priority?: string };
   flow: Flow | null;
+  tracker?: { state: TrackerState; label: string; notice: string | null };
+  adopt?: { stage: string; stageLabel: string; text: string } | null;
   comments: { id: string; text: string; ran?: boolean }[];
   sections: { title: string | null; kind: string; md: string }[] | null;
   jira?: {
@@ -106,16 +111,20 @@ export const JIRA_WRITE =
 // Only a client may pass --approved (the developer's approval); the agent uses `atb move` without it.
 export const SELF_APPROVE = /\batb(\.cjs)?\b[^;&|]*\bmove\b[^;&|]*--approved\b/;
 
-const accentOf = (a: Agent, status?: string) =>
+const accentOf = (a: Agent, state?: TrackerState) =>
   a?.kind === 'problem'
     ? C.red
     : a?.kind === 'finished'
       ? C.green
       : a
         ? (STAGES.find((s) => s.id === a.stage)?.color ?? C.neutral)
-        : /done|verifying/i.test(status ?? '')
+        : state === 'done'
           ? C.green
-          : C.neutral;
+          : state === 'blocked'
+            ? C.red
+            : state === 'active'
+              ? C.blue
+              : C.neutral;
 const needsYou = (a: Agent) => !!a && (a.kind === 'problem' || a.kind === 'decision');
 const isOpen = (g: string) => !(collapsed[g] ?? COLLAPSED_BY_DEFAULT.has(g));
 
@@ -165,6 +174,16 @@ async function loadTicket($, key: string) {
     error = String(e?.message ?? e);
   }
   $.ui.invalidate('ui.render');
+}
+
+async function localWork($, key: string, args: string[]) {
+  try {
+    await atb($, args);
+  } catch (e) {
+    error = String(e?.message ?? e);
+  }
+  await loadTicket($, key);
+  await loadSprint($);
 }
 
 async function openIfApp($) {
@@ -338,8 +357,10 @@ export function register(on) {
         need = f?.need;
       const si = f?.closed ? STAGES.length : f ? STAGES.findIndex((s) => s.id === f.stage) : -1;
       const stage = f?.closed ? null : si >= 0 ? STAGES[si] : null;
+      const doneInJira = !f && d.tracker?.state === 'done';
+      const plain = f ? C.neutral : accentOf(null, d.tracker?.state);
       const accent =
-        need?.kind === 'problem' ? C.red : f?.closed ? C.green : (stage?.color ?? C.neutral);
+        need?.kind === 'problem' ? C.red : f?.closed ? C.green : (stage?.color ?? plain);
       const tab = tabs[t.key] ?? stage?.id ?? (f?.closed ? 'code-review' : 'planning');
       const ti = STAGES.findIndex((s) => s.id === tab);
 
@@ -359,8 +380,10 @@ export function register(on) {
               Text({ key: 'k', dimColor: true, children: [t.key + '  ›'] }),
               Text({
                 key: 's',
-                color: stage?.color ?? (f?.closed ? C.green : C.neutral),
-                children: [stage ? stage.label : f?.closed ? 'Finished' : 'Not started']
+                color: stage?.color ?? (f?.closed ? C.green : plain),
+                children: [
+                  stage ? stage.label : f?.closed ? 'Finished' : (d.tracker?.label ?? 'Not started')
+                ]
               })
             ]
           }),
@@ -376,6 +399,56 @@ export function register(on) {
               .filter(Boolean)
               .join('  •  ')
           ),
+          ...(!f && d.adopt
+            ? [
+                Box({
+                  key: 'adopt',
+                  flexDirection: 'column',
+                  borderStyle: 'round',
+                  borderColor: C.blue,
+                  paddingX: 1,
+                  children: [
+                    Text({
+                      key: 'adopt-t',
+                      wrap: 'wrap',
+                      children: [
+                        `Work found on this machine. ${d.adopt.text} Proposed stage: ${d.adopt.stageLabel}.`
+                      ]
+                    }),
+                    Box({
+                      key: 'adopt-b',
+                      flexDirection: 'row',
+                      columnGap: 1,
+                      children: [
+                        Button({
+                          key: 'adopt-yes',
+                          label: 'Adopt as ' + d.adopt.stageLabel,
+                          variant: 'primary',
+                          onPress: () =>
+                            void localWork($, t.key, ['adopt', t.key, '--stage=' + d.adopt!.stage])
+                        }),
+                        Button({
+                          key: 'adopt-ignore',
+                          label: 'Ignore',
+                          onPress: () => void localWork($, t.key, ['ignore', t.key])
+                        })
+                      ]
+                    })
+                  ]
+                })
+              ]
+            : []),
+          ...(!f && !d.adopt && d.tracker?.notice
+            ? [
+                Text({
+                  key: 'tracker',
+                  color: doneInJira ? C.green : undefined,
+                  dimColor: !doneInJira,
+                  wrap: 'wrap',
+                  children: [d.tracker.notice]
+                })
+              ]
+            : []),
           ...(f?.closed
             ? [
                 Text({
@@ -459,7 +532,11 @@ export function register(on) {
 
       const body: unknown[] = [];
       if (tab === 'planning') {
-        if (!f && /^(to do|in progress)$/i.test(t.status)) {
+        if (
+          !f &&
+          !d.adopt &&
+          (d.tracker ? d.tracker.state !== 'done' : /^(to do|in progress)$/i.test(t.status))
+        ) {
           body.push(
             sectionTitle('ns', 'Not started', C.blue),
             dim(
@@ -907,7 +984,7 @@ export function register(on) {
       }
       for (const t of g.tickets) {
         const a = t.agent,
-          accent = accentOf(a, t.status),
+          accent = accentOf(a, t.state),
           loud = needsYou(a);
         const meta =
           a?.kind === 'running' && a.progress
@@ -943,6 +1020,16 @@ export function register(on) {
                 plain: true,
                 onPress: () => void loadTicket($, t.key)
               }),
+              ...(!a && t.local
+                ? [
+                    Text({
+                      key: 'local',
+                      dimColor: true,
+                      wrap: 'truncate',
+                      children: ['⎇ ' + t.local.label]
+                    })
+                  ]
+                : []),
               ...(loud
                 ? [
                     Text({

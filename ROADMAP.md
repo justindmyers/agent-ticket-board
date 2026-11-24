@@ -33,14 +33,17 @@ To do:
 - [x] Settings page in VS Code and in the Claude Code pane. It shows each value, its source and the detected value with its confidence. It has "Detect again" for each section, and nothing changes until the developer saves.
 - [ ] Measure the cold start. The target is less than 1 second after the first sync.
 - [ ] Look at the Claude Code pane in the Claude app and in the terminal. The tests pass, but nobody looked at the colors in the real app.
-- [ ] Adopt existing work: find worktrees, branches, pull requests and sessions for a ticket. Show "Adopt" or "Ignore". Propose a stage and wait for the developer.
+- [x] Adopt existing work: find worktrees and branches for a ticket. Show "Adopt" or "Ignore". Propose a stage and wait for the developer. Adopt writes the agent record only.
+- [ ] Adopt at a stage that the developer selects, and find Claude sessions for a ticket.
 - [x] Bring the webview code to the coding standards: one component in each file, folders for each kind of file, fewer comments.
 - [x] Make the lint rules enforce more of the standards. ESLint now runs all the React hook rules, one component in each file, jsx-a11y and Prettier, with no warnings. The hook runs `lint:fix` on staged files only.
 - [ ] Bring the Claude Code pane (`apps/claude-plugin/hooks/register.ts`) to the coding standards. It is one large file, and it copies the stage colors and the stage list from the webview. Move the shared values into `packages/core`.
 - [ ] Shorten the header comments that have more than 2 lines (`register.ts`, `atb.ts`, `moves.ts`, `reconcile.ts`, `install-local.ts`, `leak-check.ts`).
 - [ ] Animate the enter and the exit of the popovers and the menus, with `motion-reduce:animate-none`.
 - [ ] Add vitest component tests (jsdom) with an accessibility check. Now only the Playwright harness checks the UI.
-- [ ] Remove the sample agent records when the service writes real records.
+- [x] Ticket pages and colors follow the Jira state when the board has no agent work for a ticket. A "Not started statuses" setting sets which statuses mean that no work started.
+- [x] The board reads local git work for each ticket: a branch with the ticket key, and the changed files in its worktree. A not-started ticket with local work shows as started.
+- [ ] Remove the sample agent records when the service writes real records. Sample records now stay in the test fixtures only.
 
 ## M2: Service, menu bar and build
 

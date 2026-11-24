@@ -18,6 +18,9 @@ export * from './detect-repo';
 export * from './detect-tracker';
 export * from './config-fields';
 export * from './field-text';
+export * from './tracker-state';
+export * from './local-work';
+export * from './adopt';
 export * from './settings-view';
 
 import { loadConfig } from './config';

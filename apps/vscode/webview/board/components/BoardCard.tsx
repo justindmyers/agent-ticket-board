@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AgentAsk } from '../../shared/components/AgentAsk';
+import { LocalWorkLine } from '../../shared/components/LocalWorkLine';
 import { Icon } from '../../shared/components/Icon';
 import { LinkButton } from '../../shared/components/LinkButton';
 import { Orb } from '../../shared/components/Orb';
@@ -17,7 +18,7 @@ type Props = { t: BoardTicket; theme: Theme; statuses: string[] };
 
 export function BoardCard({ t, theme, statuses }: Props) {
   const a = t.agent;
-  const accent = accentOf(a, t.status);
+  const accent = accentOf(a, t.state);
   const needs = needsYou(a);
   const [hover, setHover] = useState(false);
   const stage = a?.kind === 'finished' ? undefined : stageOf(a?.stage);
@@ -55,6 +56,7 @@ export function BoardCard({ t, theme, statuses }: Props) {
         {t.summary}
       </LinkButton>
       {needs && a && <AgentAsk agent={a} theme={theme} />}
+      {!a && t.local && <LocalWorkLine local={t.local} />}
       {(stage || t.pendingMove) && (
         <div className="flex flex-wrap gap-1.5 pt-0.5">
           {stage && (

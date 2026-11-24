@@ -14,6 +14,8 @@ export type Config = {
     jql: string;
     pointsField: string | null;
     columns: string[];
+    notStarted: string[];
+    blocked: string[];
     finished: string[];
     afterMerge: string;
     /** Rules on the pull request branch, for example infra or hotfix work. `to: null` means: ask the developer. */
@@ -37,6 +39,8 @@ export const DEFAULTS: Config = {
     jql: 'assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC',
     pointsField: null,
     columns: ['To Do', 'In Progress', 'Code Review', 'Done'],
+    notStarted: ['To Do', 'Open', 'Backlog'],
+    blocked: ['Blocked', 'On Hold'],
     finished: ['Done'],
     afterMerge: 'Done',
     afterMergeRules: []

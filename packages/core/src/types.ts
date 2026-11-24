@@ -65,6 +65,8 @@ export type Flow = {
   app?: string;
   pr?: Pr;
   branch?: string;
+  worktree?: string;
+  adopted?: string;
   session?: string;
   closed?: { reason: 'tracker' | 'merged'; text: string };
 };

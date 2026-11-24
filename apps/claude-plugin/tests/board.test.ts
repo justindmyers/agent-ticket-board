@@ -375,3 +375,103 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await ui.unmount();
   });
 }
+
+test('desktop: a ticket with no agent record shows what Jira says', async ($, on) => {
+  const noRecord = {
+    ...TICKET,
+    ticket: { ...TICKET.ticket, status: 'Verifying' },
+    agent: null,
+    flow: null,
+    tracker: {
+      state: 'done',
+      label: 'Finished in Jira',
+      notice: 'Jira says Verifying. The board has no agent work for this ticket.'
+    }
+  };
+  on('process.run', ($, e) => {
+    const a = e.argv.slice(2);
+    const out = a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? noRecord : {};
+    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+  });
+  on('session.surfaces', () => ({ value: ['desktop'] }));
+  on('ui.open', () => ({ value: { isPlaced: true } }));
+  await $.command.run({ command: 'board', args: '' });
+  await tick();
+  let ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  await ui.press({ key: 'open-PROJ-102' });
+  await tick();
+  await ui.unmount();
+  ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  expect(await ui.find({ type: 'Text', text: /^Finished in Jira$/ })).toBeDefined();
+  expect(await ui.find({ type: 'Text', text: /no agent work for this ticket/ })).toBeDefined();
+  expect(await ui.find({ type: 'Text', text: /^Not started$/ })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('desktop: a row shows the local work for a ticket with no agent record', async ($, on) => {
+  const local = {
+    branch: 'feat/PROJ-102-x',
+    worktree: true,
+    changed: 6,
+    label: '6 changed files on feat/PROJ-102-x'
+  };
+  const withLocal = {
+    ...SPRINT,
+    groups: SPRINT.groups.map((g) => ({
+      ...g,
+      tickets: g.tickets.map((t) =>
+        t.key === 'PROJ-102' ? { ...t, agent: null, state: 'active', local } : t
+      )
+    }))
+  };
+  on('process.run', ($, e) => {
+    const a = e.argv.slice(2);
+    const out = a[0] === 'sprint' ? withLocal : a[0] === 'ticket' ? TICKET : {};
+    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+  });
+  on('session.surfaces', () => ({ value: ['desktop'] }));
+  on('ui.open', () => ({ value: { isPlaced: true } }));
+  await $.command.run({ command: 'board', args: '' });
+  await tick();
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  expect(
+    await ui.find({ type: 'Text', text: /6 changed files on feat\/PROJ-102-x/ })
+  ).toBeDefined();
+  await ui.unmount();
+});
+
+test('desktop: Adopt runs atb adopt with the proposed stage', async ($, on) => {
+  const calls: string[][] = [];
+  const offer = {
+    ...TICKET,
+    agent: null,
+    flow: null,
+    tracker: { state: 'active', label: 'Started locally', notice: 'Jira says To Do.' },
+    adopt: {
+      stage: 'development',
+      stageLabel: 'Development',
+      text: 'Worktree proj-102-x, 6 changed files.'
+    }
+  };
+  on('process.run', ($, e) => {
+    const a = e.argv.slice(2);
+    calls.push(a);
+    const out = a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? offer : {};
+    return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+  });
+  on('session.surfaces', () => ({ value: ['desktop'] }));
+  on('ui.open', () => ({ value: { isPlaced: true } }));
+  await $.command.run({ command: 'board', args: '' });
+  await tick();
+  let ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  await ui.press({ key: 'open-PROJ-102' });
+  await tick();
+  await ui.unmount();
+  ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  expect(await ui.find({ type: 'Text', text: /Work found on this machine/ })).toBeDefined();
+  expect(await ui.find({ type: 'Text', text: /^Not started$/ })).toBeUndefined();
+  await ui.press({ key: 'adopt-yes' });
+  await tick();
+  expect(calls).toContainEqual(['adopt', 'PROJ-102', '--stage=development']);
+  await ui.unmount();
+});

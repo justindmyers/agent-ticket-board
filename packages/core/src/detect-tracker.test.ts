@@ -87,6 +87,7 @@ describe('detectTracker', () => {
       'Closed'
     ]);
     expect(ps['tracker.finished'].value).toEqual(['Done', 'Closed']);
+    expect(ps['tracker.notStarted']).toMatchObject({ value: ['To Do'], confidence: 'medium' });
     expect(ps['tracker.afterMerge']).toMatchObject({ value: 'Done', confidence: 'low' });
   });
 

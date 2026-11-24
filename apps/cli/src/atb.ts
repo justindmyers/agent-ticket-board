@@ -6,6 +6,8 @@
 //   atb move <KEY> <STATUS> --approved    a move that the developer approved in a client
 //   atb agent-may-move <KEY> on|off       the developer's permission for one ticket
 //   atb after-merge <KEY> <STATUS>|default   the status for this ticket after its merge
+//   atb adopt <KEY> [--stage=<stage>]     take over the local work for a ticket (writes the agent record)
+//   atb ignore <KEY>                      hide the local branch for a ticket
 //   atb detect [--repo=<path>] [--only=tracker|repo]   proposed config values; writes nothing
 //   atb config [set <key> <json>]          the config, or one value that the developer accepted
 //   atb settings [--detect] [--only=…] [--repo=…] | atb settings save <json>   the settings view
@@ -35,12 +37,20 @@ import {
   setConfigValue,
   shapeSprint,
   STATUS,
-  ticketUrl
+  ticketUrl,
+  trackerInfo,
+  LOCAL,
+  refreshLocalWork,
+  adoptOffer,
+  adoptWork,
+  ignoreWork,
+  isStage
 } from '@agent-ticket-board/core';
 
 const USAGE =
   'usage: atb sprint [--cached] | atb ticket <KEY> [--cached] | atb comment <KEY> <text> [--run] | ' +
   'atb move <KEY> <STATUS> [--approved] | atb agent-may-move <KEY> on|off | atb after-merge <KEY> <STATUS>|default | ' +
+  'atb adopt <KEY> [--stage=<stage>] | atb ignore <KEY> | ' +
   'atb detect [--repo=<path>] [--only=tracker|repo] | atb config [set <key> <json>] | ' +
   'atb settings [--detect] [--only=tracker|repo] | atb settings save <json>\n';
 
@@ -59,6 +69,7 @@ async function ticket(key: string) {
     throw new Error(`Unknown ticket ${key}`);
   }
   STATUS[key] = t.status;
+  await refreshLocalWork([key]);
   if (!flags.has('--cached')) {
     await refreshPrs(findPr, [key]);
   }
@@ -68,6 +79,8 @@ async function ticket(key: string) {
     group: groupOf(t, agentFor(key)),
     agent: agentFor(key),
     flow: flowFor(key),
+    tracker: trackerInfo(t.status, LOCAL[key]),
+    adopt: adoptOffer(key),
     comments: await listComments(key),
     jira: await jiraPanel(key, PRS[key]),
     sections,
@@ -104,9 +117,12 @@ async function main() {
   }
   if (cmd === 'sprint') {
     if (flags.has('--cached')) {
-      return out(shapeSprint(await readCache()));
+      const cached = await readCache();
+      await refreshLocalWork(cached.tickets.map((t) => t.key));
+      return out(shapeSprint(cached));
     }
     const [snap] = await Promise.all([refreshSprint(() => undefined), refreshPrs(findPr)]);
+    await refreshLocalWork(snap.tickets.map((t) => t.key));
     return out(shapeSprint(snap));
   }
   if (cmd === 'ticket' && key) {
@@ -114,6 +130,22 @@ async function main() {
   }
   if (cmd === 'comment' && key && args[1]) {
     return out(await addComment(key, args.slice(1).join(' '), flags.has('--run')));
+  }
+  if ((cmd === 'adopt' || cmd === 'ignore') && key) {
+    const t = (await readCache()).tickets.find((x) => x.key === key);
+    if (t) {
+      STATUS[key] = t.status;
+    }
+    await refreshLocalWork([key]);
+    if (cmd === 'ignore') {
+      await ignoreWork(key);
+      return out({ ignored: key });
+    }
+    const stage = option('stage') ?? adoptOffer(key)?.stage;
+    if (!stage || !isStage(stage)) {
+      throw new Error(`${key}: nothing to adopt, or an unknown stage.`);
+    }
+    return out(await adoptWork(key, stage));
   }
   if (cmd === 'move' && key && args[1]) {
     const from = (await readCache()).tickets.find((t) => t.key === key)?.status;
