@@ -1,4 +1,6 @@
-import type { FieldKind } from './config-fields';
+// The text form of each config value. No imports: the Claude Code plugin gets a verbatim copy.
+
+export type FieldKind = 'text' | 'optionalText' | 'list' | 'port' | 'portRange' | 'rules';
 
 type Rule = { branch: string; to: string | null };
 
@@ -8,7 +10,7 @@ const ARROW = /\s*(?:=>|->|→)\s*/;
 const formatRule = (r: Rule) => `${r.branch} => ${r.to ?? ASK}`;
 
 function parseRule(text: string): Rule | null {
-  const [branch, to = ''] = text.split(ARROW);
+  const [branch = '', to = ''] = text.split(ARROW);
   if (!branch.trim()) {
     return null;
   }
@@ -44,6 +46,31 @@ const PARSE: Record<FieldKind, (t: string) => unknown> = {
       .map(parseRule)
       .filter((r): r is Rule => r !== null)
 };
+
+const isRegExp = (pattern: string) => {
+  try {
+    new RegExp(pattern);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Why one list item or branch pattern cannot go into the field text, or null when it can. */
+export function itemProblem(kind: 'list' | 'rules', item: string): string | null {
+  if (!item.trim()) {
+    return 'Type a value first.';
+  }
+  if (kind === 'list') {
+    return item.includes(',') ? 'An item cannot contain a comma.' : null;
+  }
+  if (item.includes(';') || ARROW.test(item)) {
+    return 'A branch pattern cannot contain ; or =>.';
+  }
+  return isRegExp(item) ? null : 'This is not a valid regular expression.';
+}
+
+export const isPattern = isRegExp;
 
 export const formatValue = (kind: FieldKind, value: unknown): string => FORMAT[kind](value);
 

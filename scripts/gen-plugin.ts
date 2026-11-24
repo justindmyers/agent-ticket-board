@@ -1,27 +1,29 @@
-// Writes the plugin's git-ignored generated files: hooks/look.gen.ts (a copy of core's look.ts, because
-// hooks cannot import core) and hooks/paths.gen.ts (node and CLI paths; plain names for tests).
+// Writes the plugin's git-ignored generated files: a copy of each shared core module (hooks cannot import
+// core) and hooks/paths.gen.ts (node and CLI paths; plain names for tests).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const HOOKS = 'apps/claude-plugin/hooks';
-const LOOK_SOURCE = 'packages/core/src/look.ts';
 
-export const GENERATED =
-  '// Generated from packages/core/src/look.ts by scripts/gen-plugin.ts. Do not edit. Not in git.\n';
+/** Core modules that the plugin uses. Each one must stay import-free. */
+export const SHARED = ['look', 'field-text'];
 
-/** The plugin copy of the shared look. The source must stay import-free, or the copy cannot load. */
-export function pluginLook(source: string) {
-  if (/^\s*import\s/m.test(source)) {
-    throw new Error(`${LOOK_SOURCE} must not import anything: the plugin gets a verbatim copy.`);
+export const generated = (name: string) =>
+  `// Generated from packages/core/src/${name}.ts by scripts/gen-plugin.ts. Do not edit. Not in git.\n`;
+
+/** The plugin copy of one shared module. The source must stay import-free, or the copy cannot load. */
+export function pluginCopy(name: string, source: string) {
+  if (/^\s*(import|export .* from)\s/m.test(source)) {
+    throw new Error(`${name}.ts must not import anything: the plugin gets a verbatim copy.`);
   }
-  return GENERATED + source;
+  return generated(name) + source;
 }
 
 export function writePluginFiles(root: string, paths?: { node: string; atb: string }) {
-  writeFileSync(
-    `${root}/${HOOKS}/look.gen.ts`,
-    pluginLook(readFileSync(`${root}/${LOOK_SOURCE}`, 'utf8'))
-  );
+  for (const name of SHARED) {
+    const source = readFileSync(`${root}/packages/core/src/${name}.ts`, 'utf8');
+    writeFileSync(`${root}/${HOOKS}/${name}.gen.ts`, pluginCopy(name, source));
+  }
   const pathsFile = `${root}/${HOOKS}/paths.gen.ts`;
   if (paths || !existsSync(pathsFile)) {
     const { node, atb } = paths ?? { node: 'node', atb: 'atb.cjs' };

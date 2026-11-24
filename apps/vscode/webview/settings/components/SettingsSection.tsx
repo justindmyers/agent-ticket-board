@@ -14,6 +14,7 @@ type Props = {
   drafts: Drafts;
   errors: Record<string, string>;
   detecting: Detecting;
+  statuses: string[];
   onChange: (key: string, text: string) => void;
   onDetect: () => void;
   theme: Theme;
@@ -25,6 +26,7 @@ export function SettingsSection({
   drafts,
   errors,
   detecting,
+  statuses,
   onChange,
   onDetect,
   theme
@@ -65,6 +67,7 @@ export function SettingsSection({
             changed={f.key in drafts && drafts[f.key] !== f.text}
             error={errors[f.key]}
             gapFiles={gaps.find((g) => g.key === f.key)?.files}
+            statuses={statuses}
             onChange={(text) => onChange(f.key, text)}
             theme={theme}
           />

@@ -3,7 +3,7 @@ import { useHostMessages } from '../../shared/hooks/useHostMessages';
 import { useTheme } from '../../shared/hooks/useTheme';
 import { send } from '../../shared/utils/vscodeApi';
 import type { Detecting, SectionId, SettingsView } from '../../shared/types/settings';
-import { changedDrafts, withoutKeys, type Drafts } from '../utils/drafts';
+import { changedDrafts, columnsOf, withoutKeys, type Drafts } from '../utils/drafts';
 import { SaveBar } from './SaveBar';
 import { SettingsHeader } from './SettingsHeader';
 import { SettingsSection } from './SettingsSection';
@@ -18,6 +18,7 @@ export function SettingsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const changed = changedDrafts(view, drafts);
   const count = Object.keys(changed).length;
+  const statuses = columnsOf(view, drafts);
 
   useHostMessages((m) => {
     if (m.type === 'settings') {
@@ -63,6 +64,7 @@ export function SettingsPage() {
             drafts={drafts}
             errors={errors}
             detecting={detecting}
+            statuses={statuses}
             onChange={onChange}
             onDetect={() => detect(s.id)}
             theme={theme}

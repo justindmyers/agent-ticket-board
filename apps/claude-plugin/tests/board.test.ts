@@ -309,7 +309,10 @@ const SETTINGS = {
       title: 'Tracker',
       fields: [
         field('tracker.project', 'Project key', 'PROJ', { source: 'config' }),
-        field('tracker.columns', 'Board columns', 'To Do, Done')
+        field('tracker.columns', 'Board columns', 'To Do, Done', { kind: 'list' }),
+        field('tracker.afterMergeRules', 'Branch rules after the merge', '^hotfix/ => ask me', {
+          kind: 'rules'
+        })
       ]
     },
     { id: 'repo', title: 'Repository', fields: [field('repo.branch', 'Branch name', '{key}')] }
@@ -393,6 +396,59 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await ui.press({ key: 'settings-back' });
     ui = await remount(ui);
     expect(await ui.find({ key: 'grp-Needs you' })).toBeDefined();
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: settings: edit a list and the branch rules`, async ($, on) => {
+    const calls: string[][] = [];
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      const out =
+        a[0] === 'sprint'
+          ? SPRINT
+          : a[0] === 'settings' && a[1] === 'save'
+            ? { saved: [], errors: {} }
+            : a[0] === 'settings'
+              ? SETTINGS
+              : {};
+      return printed(out);
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    const remount = async (ui?: { unmount: () => Promise<void> }) => {
+      await tick();
+      await ui?.unmount();
+      return $.ui.mount({ ...PANE, surface });
+    };
+    let ui = await remount();
+    await ui.press({ key: 'settings' });
+    ui = await remount(ui);
+    await ui.press({ key: 'down-tracker.columns-0' });
+    ui = await remount(ui);
+    await ui.input({ key: 'add-tracker.columns', text: 'Done' });
+    ui = await remount(ui);
+    expect(await ui.find({ type: 'Text', text: /in the list already/ })).toBeDefined();
+    await ui.input({ key: 'add-tracker.columns', text: 'Verifying' });
+    await ui.input({ key: 'add-tracker.afterMergeRules', text: '^(x' });
+    ui = await remount(ui);
+    expect(await ui.find({ type: 'Text', text: /not a valid regular expression/ })).toBeDefined();
+    await ui.input({ key: 'add-tracker.afterMergeRules', text: '^release/' });
+    ui = await remount(ui);
+    await ui.select({ key: 'to-tracker.afterMergeRules-1', value: 'Done' });
+    await ui.press({ key: 'remove-tracker.afterMergeRules-0' });
+    ui = await remount(ui);
+    await ui.press({ key: 'settings-save' });
+    await tick();
+    const save = calls.find((c) => c[1] === 'save');
+    expect(JSON.parse(save?.[2] ?? '{}')).toEqual({
+      'tracker.columns': 'Done, To Do, Verifying',
+      'tracker.afterMergeRules': '^release/ => Done'
+    });
     await ui.unmount();
   });
 }

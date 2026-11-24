@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldKind } from './config-fields';
-import { formatValue, parseValue } from './field-text';
+import { checkValue, CONFIG_FIELDS } from './config-fields';
+import { formatValue, itemProblem, parseValue } from './field-text';
 
 const RULES = [
   { branch: '^hotfix/', to: null },
@@ -30,5 +31,28 @@ describe('formatValue and parseValue', () => {
   it('keeps text that it cannot read, so that the type check reports it', () => {
     expect(parseValue('port', 'abc')).toBe('abc');
     expect(parseValue('portRange', '3001')).toBe('3001');
+  });
+});
+
+describe('itemProblem', () => {
+  it.each([
+    ['list', 'In Progress', null],
+    ['list', 'Done, really', 'An item cannot contain a comma.'],
+    ['list', '  ', 'Type a value first.'],
+    ['rules', '^release/', null],
+    ['rules', '^a;b', 'A branch pattern cannot contain ; or =>.'],
+    ['rules', '^a => b', 'A branch pattern cannot contain ; or =>.'],
+    ['rules', '^(release', 'This is not a valid regular expression.']
+  ] as const)('checks a %s item %j before it goes into the text', (kind, item, problem) => {
+    expect(itemProblem(kind, item)).toBe(problem);
+  });
+});
+
+describe('the rules check', () => {
+  const rules = CONFIG_FIELDS.find((f) => f.kind === 'rules')!;
+
+  it('refuses a branch pattern that is not a regular expression', () => {
+    expect(checkValue(rules, [{ branch: '^(release', to: null }])).toMatch(/regular expression/);
+    expect(checkValue(rules, [{ branch: '^release/', to: 'Done' }])).toBeNull();
   });
 });

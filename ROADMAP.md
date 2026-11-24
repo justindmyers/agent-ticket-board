@@ -28,7 +28,8 @@ To do:
 
 - [x] Setup detectors for the tracker (site, project, query, statuses, points field) and the repository (remote, worktree script, branch pattern, dev command, port). `atb detect` shows the values. `atb config set` saves one value.
 - [x] `/atb-setup` in the Claude Code plugin. Claude fills the gaps from the named files, and the developer accepts each value.
-- [ ] Edit the lists and the branch rules with their own controls. Now each value is one line of text.
+- [x] Edit the lists and the branch rules with their own controls, in VS Code and in the Claude Code pane. A list item cannot contain a comma, and a branch rule must be a valid regular expression.
+- [ ] Choose "Status after the merge" from the board columns. Now it is one line of text.
 - [ ] Find the dev command in a monorepo, where each app has its own `dev` script.
 - [x] Settings page in VS Code and in the Claude Code pane. It shows each value, its source and the detected value with its confidence. It has "Detect again" for each section, and nothing changes until the developer saves.
 - [ ] Measure the cold start. The target is less than 1 second after the first sync.

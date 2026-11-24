@@ -1,4 +1,7 @@
-export type FieldKind = 'text' | 'optionalText' | 'list' | 'port' | 'portRange' | 'rules';
+import { isPattern } from './field-text';
+import type { FieldKind } from './field-text';
+
+export type { FieldKind };
 
 export type ConfigField = { key: string; label: string; help: string; kind: FieldKind };
 
@@ -144,7 +147,11 @@ const isPort = (v: unknown): v is number =>
 
 const isRule = (v: unknown) => {
   const r = v as { branch?: unknown; to?: unknown } | null;
-  return typeof r?.branch === 'string' && (typeof r.to === 'string' || r.to === null);
+  return (
+    typeof r?.branch === 'string' &&
+    isPattern(r.branch) &&
+    (typeof r.to === 'string' || r.to === null)
+  );
 };
 
 const CHECKS: Record<FieldKind, [(v: unknown) => boolean, string]> = {
@@ -161,7 +168,7 @@ const CHECKS: Record<FieldKind, [(v: unknown) => boolean, string]> = {
   ],
   rules: [
     (v) => Array.isArray(v) && v.every(isRule),
-    'must be a list of rules with a branch and a status or null'
+    'must be a list of rules, each with a branch regular expression and a status or null'
   ]
 };
 

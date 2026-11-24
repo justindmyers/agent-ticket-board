@@ -1,10 +1,13 @@
 import type { RenderElement } from 'claude-code';
-import type { Els } from './kit';
+import { parseValue } from './field-text.gen';
+import { hex, type Els } from './kit';
+import { listRows, ruleRows } from './settings-lists';
 type Confidence = 'high' | 'medium' | 'low';
 type Field = {
   key: string;
   label: string;
   help: string;
+  kind: string;
   text: string;
   source: 'config' | 'default';
   proposal?: { text: string; source: string; confidence: Confidence; same: boolean };
@@ -20,9 +23,6 @@ type SaveResult = { saved: string[]; errors: Record<string, string> };
 type Run = <T>(args: string[]) => Promise<T>;
 
 const DETECTABLE = ['tracker', 'repo'];
-const GREEN = '#1EC46E';
-const RED = '#FA4045';
-const AMBER = '#FFBE0C';
 
 export const settings = {
   open: false,
@@ -94,8 +94,41 @@ async function save(run: Run, redraw: () => void) {
   await loadSettings(run, redraw);
 }
 
+const columnsOf = (view: View) => {
+  const f = fieldsOf(view).find((x) => x.key === 'tracker.columns');
+  return f ? (parseValue('list', settings.drafts[f.key] ?? f.text) as string[]) : [];
+};
+
+/** The editor of one field: items for a list, rule rows for branch rules, else one text input. */
+function control(ui: Els, f: Field, value: string, view: View, redraw: () => void, run: Run) {
+  const set = (text: string) => {
+    settings.drafts[f.key] = text;
+    redraw();
+  };
+  if (f.kind === 'list') {
+    return listRows(ui, f.key, f.label, value, set);
+  }
+  if (f.kind === 'rules') {
+    return ruleRows(ui, f.key, value, columnsOf(view), set);
+  }
+  return [
+    ui.Input({
+      key: `field-${f.key}`,
+      label: f.label,
+      placeholder: 'Empty',
+      value,
+      submitLabel: 'save',
+      onInput: (v: string) => set(v),
+      onSubmit: (v: string) => {
+        settings.drafts[f.key] = v;
+        void save(run, redraw);
+      }
+    })
+  ];
+}
+
 function fieldRows(ui: Els, f: Field, view: View, redraw: () => void, run: Run) {
-  const { Box, Text, Button, Input } = ui;
+  const { Box, Text, Button } = ui;
   const value = settings.drafts[f.key] ?? f.text;
   const dirty = value !== f.text;
   const p = f.proposal;
@@ -113,25 +146,11 @@ function fieldRows(ui: Els, f: Field, view: View, redraw: () => void, run: Run) 
         })
       ]
     }),
-    Input({
-      key: `field-${f.key}`,
-      label: f.label,
-      placeholder: 'Empty',
-      value,
-      submitLabel: 'save',
-      onInput: (v: string) => {
-        settings.drafts[f.key] = v;
-        redraw();
-      },
-      onSubmit: (v: string) => {
-        settings.drafts[f.key] = v;
-        void save(run, redraw);
-      }
-    }),
+    ...control(ui, f, value, view, redraw, run),
     Text({ dimColor: true, wrap: 'wrap', children: [f.help] })
   ];
   if (settings.errors[f.key]) {
-    rows.push(Text({ color: RED, wrap: 'wrap', children: [settings.errors[f.key]] }));
+    rows.push(Text({ color: hex('red'), wrap: 'wrap', children: [settings.errors[f.key]] }));
   }
   if (p && (p.same || p.text === value)) {
     rows.push(Text({ dimColor: true, children: ['✓ Same as the detected value'] }));
@@ -149,7 +168,12 @@ function fieldRows(ui: Els, f: Field, view: View, redraw: () => void, run: Run) 
             children: [`Detected: ${p.text || '(empty)'}`]
           }),
           Text({
-            color: p.confidence === 'high' ? GREEN : p.confidence === 'medium' ? AMBER : undefined,
+            color:
+              p.confidence === 'high'
+                ? hex('green')
+                : p.confidence === 'medium'
+                  ? hex('amber')
+                  : undefined,
             dimColor: p.confidence === 'low',
             children: [`${p.confidence} confidence`]
           }),
@@ -221,10 +245,12 @@ export function renderSettings(
         })
       ]
     }),
-    ...(settings.error ? [Text({ color: RED, wrap: 'wrap', children: [settings.error] })] : []),
+    ...(settings.error
+      ? [Text({ color: hex('red'), wrap: 'wrap', children: [settings.error] })]
+      : []),
     ...(view?.checks ?? []).map((c) =>
       Text({
-        color: c.ok ? GREEN : RED,
+        color: c.ok ? hex('green') : hex('red'),
         wrap: 'wrap',
         children: [`${c.ok ? '✓' : '✗'} ${c.name}: ${c.detail}`]
       })

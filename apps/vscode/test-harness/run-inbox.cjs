@@ -528,6 +528,30 @@ function page(theme, mode) {
   await axe(sk, 'dark/settings-edited');
   await sk.screenshot({ path: path.join(OUT, 'settings-dark-edited.png'), fullPage: true });
   await sk.close();
+  // List and rule editors: each edit becomes the field text that Save sends.
+  const se = await openSettings('dark', 1100);
+  const sentOn = (p, type) => p.evaluate((t) => window.__sent.filter((m) => m.type === t), type);
+  await se.getByRole('button', { name: 'Move Verifying up in Finished statuses' }).click();
+  const addTo = (name, text) =>
+    se
+      .getByRole('textbox', { name })
+      .fill(text)
+      .then(() => se.getByRole('textbox', { name }).press('Enter'));
+  await addTo('Add to Blocked statuses', 'Waiting');
+  await addTo('Add to Finished statuses', 'Done');
+  kb.listDuplicate = await se.getByText('It is in the list already.').count();
+  await addTo('Add a branch rule', '^(x');
+  kb.ruleInvalid = await se.getByText('This is not a valid regular expression.').count();
+  await se.getByRole('textbox', { name: 'Add a branch rule' }).fill('');
+  await addTo('Add a branch rule', '^release/');
+  await se.getByRole('button', { name: /Status after the merge for \^release\// }).click();
+  await se.getByRole('option', { name: 'Done' }).click();
+  await se.getByRole('button', { name: 'Remove the rule ^(hotfix|infra)/' }).click();
+  await axe(se, 'dark/settings-editors');
+  await se.screenshot({ path: path.join(OUT, 'settings-dark-editors.png'), fullPage: true });
+  await se.getByRole('button', { name: 'Save', exact: true }).click();
+  kb.editorSave = (await sentOn(se, 'saveSettings'))[0]?.texts ?? null;
+  await se.close();
   const sn = await openSettings('dark', 520);
   await axe(sn, 'dark/settings-narrow');
   await sn.screenshot({ path: path.join(OUT, 'settings-dark-narrow.png'), fullPage: true });

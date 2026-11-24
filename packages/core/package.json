@@ -18,6 +18,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./look": "./src/look.ts"
+    "./look": "./src/look.ts",
+    "./field-text": "./src/field-text.ts"
   }
 }
