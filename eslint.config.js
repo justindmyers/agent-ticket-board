@@ -11,6 +11,8 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
+      // Written by Claude Code when it loads the plugin: its API declarations for the installed version.
+      'apps/claude-plugin/.claude-plugin/types/**',
       '**/dist/**',
       '**/media/webview/**',
       '**/node_modules/**',

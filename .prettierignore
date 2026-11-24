@@ -3,3 +3,4 @@ pnpm-lock.yaml
 **/media/webview/**
 *.md
 .github/
+apps/claude-plugin/.claude-plugin/types/

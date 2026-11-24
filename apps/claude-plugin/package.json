@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "pretest": "tsx ../../scripts/gen-plugin.ts",
-    "test": "claude plugin test"
+    "test": "claude plugin test",
+    "typecheck": "tsx ../../scripts/typecheck-plugin.ts"
   }
 }
