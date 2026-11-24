@@ -55,7 +55,7 @@ export function queueRow($: EngineInterface, ctx: Ctx, t: Row) {
         ? [
             Text({
               color: hex(a.kind === 'problem' ? 'red' : 'violet'),
-              wrap: 'wrap',
+              wrap: 'truncate',
               children: [a.ask ?? '']
             })
           ]

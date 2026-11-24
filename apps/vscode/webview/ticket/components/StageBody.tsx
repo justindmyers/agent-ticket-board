@@ -25,7 +25,7 @@ export function StageBody({ id, d, act, theme }: Props) {
     );
   }
   if (id === 'development') {
-    return <DevelopmentStage f={f} theme={theme} />;
+    return <DevelopmentStage f={f} act={act} theme={theme} />;
   }
   if (id === 'testing') {
     return <TestingStage f={f} act={act} theme={theme} />;

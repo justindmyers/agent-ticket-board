@@ -636,6 +636,222 @@
       "reporter": "Sample Reporter",
       "comments": [],
       "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-110",
+      "summary": "Bulk archive projects",
+      "status": "In Progress",
+      "type": "Story",
+      "priority": "Medium",
+      "labels": [],
+      "points": 5,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Each project card and list row needs the number of items in the project."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The card and the list row show the item count."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Archived items show as \"3 (1 archived)\"."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The list sorts by item count in both directions."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Agent notes"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Count archived items, but label them."
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
+    },
+    {
+      "key": "PROJ-111",
+      "summary": "Project usage chart",
+      "status": "In Progress",
+      "type": "Story",
+      "priority": "Medium",
+      "labels": [],
+      "points": 3,
+      "updated": "2026-01-15T10:00:00.000+0000",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Each project card and list row needs the number of items in the project."
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Acceptance criteria"
+              }
+            ]
+          },
+          {
+            "type": "bulletList",
+            "content": [
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The card and the list row show the item count."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Archived items show as \"3 (1 archived)\"."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "listItem",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The list sorts by item count in both directions."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 3
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Agent notes"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Count archived items, but label them."
+              }
+            ]
+          }
+        ]
+      },
+      "reporter": "Sample Reporter",
+      "comments": [],
+      "detailAt": "2026-01-15T10:05:00.000Z"
     }
   ]
 }

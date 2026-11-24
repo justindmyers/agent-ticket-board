@@ -420,6 +420,30 @@ function page(theme, mode) {
       .filter((m) => m.type === 'action' && /^(auditLog|debugBundle)$/.test(m.id))
       .map((m) => m.id)
   );
+  // A problem with a long reason: the list shows the short line, and the reason as a tooltip.
+  kb.problemRow = await rh.evaluate(() => {
+    const row = document.querySelector('[role=option][data-key="PROJ-111"]');
+    const ask = row?.querySelector('[title]');
+    return ask
+      ? { title: ask.getAttribute('title'), height: Math.round(ask.getBoundingClientRect().height) }
+      : null;
+  });
+  await rh.click('[role=option][data-key="PROJ-111"]');
+  await rh.waitForTimeout(300);
+  await rh.screenshot({ path: path.join(OUT, 'ticket-problem.png') });
+  // A build run in progress: the Development tab shows it with Stop, and the running border.
+  await rh.click('[role=option][data-key="PROJ-110"]');
+  await rh
+    .waitForFunction(() => document.getElementById('ttl-key')?.textContent === 'PROJ-110', null, {
+      timeout: 3000
+    })
+    .catch(() => {});
+  kb.buildSection = await rh.evaluate(() => {
+    const s = document.querySelector('[aria-label="Building now"]');
+    return s ? { text: s.textContent, running: s.classList.contains('run-border') } : null;
+  });
+  await axe(rh, 'dark/ticket-building');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-building.png') });
   // A planning run in progress: the Planning tab says so and offers Stop, not Start.
   await rh.click('[role=option][data-key="PROJ-109"]');
   await rh

@@ -1,16 +1,23 @@
 import { createWriteStream } from 'node:fs';
 import {
+  createSdkMcpServer,
+  tool,
   type Options,
   type Query,
   type SDKMessage,
   type SpawnedProcess
 } from '@anthropic-ai/claude-agent-sdk';
 import PQueue from 'p-queue';
+import { z } from 'zod';
 import {
   audit,
+  branchName,
+  CONFIG,
+  ensureWorktree,
   errorData,
   FLOWS,
   loadFlow,
+  markStep,
   pruneRuns,
   RunLog,
   saveFlow,
@@ -23,9 +30,9 @@ import type { Processes } from './processes';
 import { STAGE_SPECS, type StageId, type StageSpec } from './stages';
 
 // Agent runs: a queue with a fixed number of slots, one run at a time for each ticket, and Stop.
-// Every step goes into the audit log.
+// Worktrees are made one at a time (their install is heavy). Every step goes into the audit log.
 
-export { PLAN_ALLOWED, PLAN_TOOLS, READ_ONLY_TOOLS } from './stages';
+export { BUILD_ALLOWED, PLAN_ALLOWED, PLAN_TOOLS, READ_ONLY_TOOLS } from './stages';
 
 export type QueryFn = (args: {
   prompt: string;
@@ -39,12 +46,14 @@ export type RunDeps = {
   claude: string;
   /** The board's guard plugin. */
   plugin: string;
-  /** The target repository: planning reads it. */
+  /** The target repository: planning reads it, and worktrees branch off it. */
   repo: () => string | null;
   ticket: (key: string) => Promise<Ticket>;
   comments: (key: string) => Promise<string[]>;
   /** Called after each change to a record, so the service can tell the clients. */
   changed: (key: string) => void;
+  /** Makes or finds the ticket's worktree. Tests replace it. */
+  worktree?: typeof ensureWorktree;
   slots?: number;
   now?: () => string;
 };
@@ -62,6 +71,8 @@ export function toolPath(path = '') {
 
 export class Runs {
   private queue: PQueue;
+  /** Worktree setup runs `pnpm install`: one at a time. */
+  private heavy = new PQueue({ concurrency: 1 });
   private active = new Map<string, AbortController>();
   private logs = new Map<string, RunLog>();
   private now: () => string;
@@ -80,6 +91,10 @@ export class Runs {
 
   plan(key: string) {
     return this.start(key, 'planning');
+  }
+
+  develop(key: string) {
+    return this.start(key, 'development');
   }
 
   /** Queues a run of one stage. Returns at once; the run updates the record as it goes. */
@@ -143,13 +158,19 @@ export class Runs {
     await Promise.all(this.list().map((k) => this.stop(k)));
   }
 
+  /** The board's `step` tool: the agent reports that a plan step is current or done. */
+  async reportStep(key: string, n: number, state: 'current' | 'done', note?: string) {
+    await audit(key, 'agent', 'step', { n, state, ...(note ? { note } : {}) });
+    await this.write(key, markStep(FLOWS[key]!, n, state));
+  }
+
   private async execute(key: string, spec: StageSpec, ac: AbortController) {
     const log = this.logs.get(key)!;
     await this.patchRun(key, { state: 'running', started: this.now() });
     await audit(key, 'service', 'run.started', { run: FLOWS[key]?.run?.id, stage: spec.stage });
     try {
       const t = await this.d.ticket(key);
-      const cwd = this.d.repo()!;
+      const cwd = spec.stage === 'development' ? await this.worktree(key, t, log) : this.d.repo()!;
       const prompt = spec.prompt(t, FLOWS[key]!, await this.d.comments(key));
       const options = this.options(key, spec, cwd, ac, log);
       await log.prompt(prompt, options as Record<string, unknown>);
@@ -172,6 +193,26 @@ export class Runs {
     }
   }
 
+  /** The ticket's worktree: found, or made by the configured script, one at a time. */
+  private async worktree(key: string, t: Ticket, log: RunLog) {
+    const f = FLOWS[key]!;
+    const branch = f.branch ?? branchName(t, CONFIG.repo.branch);
+    const make = this.d.worktree ?? ensureWorktree;
+    await audit(key, 'service', 'worktree.wait', { branch, waiting: this.heavy.size });
+    const wt = (await this.heavy.add(() =>
+      make({
+        repo: this.d.repo()!,
+        script: CONFIG.repo.worktreeScript,
+        branch,
+        log: (chunk) => void log.append('worktree.log', chunk),
+        spawn: (cmd, args, opts) => this.d.processes.spawn(cmd, args, opts, key, 'setup')
+      })
+    ))!;
+    await audit(key, 'service', 'worktree.ready', { ...wt });
+    await this.write(key, { ...FLOWS[key]!, branch: wt.branch, worktree: wt.path });
+    return wt.path;
+  }
+
   private options(
     key: string,
     spec: StageSpec,
@@ -179,6 +220,32 @@ export class Runs {
     ac: AbortController,
     log: RunLog
   ): Options {
+    const board =
+      spec.stage === 'development'
+        ? {
+            mcpServers: {
+              board: createSdkMcpServer({
+                name: 'board',
+                version: '1',
+                tools: [
+                  tool(
+                    'step',
+                    'Report a plan step: "current" before you start it, "done" after its check passes.',
+                    {
+                      n: z.number().int().describe('The step number in the plan'),
+                      state: z.enum(['current', 'done']),
+                      note: z.string().optional()
+                    },
+                    async (a) => {
+                      await this.reportStep(key, a.n, a.state, a.note);
+                      return { content: [{ type: 'text', text: `Step ${a.n} is ${a.state}.` }] };
+                    }
+                  )
+                ]
+              })
+            }
+          }
+        : {};
     return {
       cwd,
       model: spec.model,
@@ -194,6 +261,7 @@ export class Runs {
       pathToClaudeCodeExecutable: this.d.claude,
       // A service started from an editor can miss the shell PATH: add the usual tool folders for gh and acli.
       env: { ...process.env, PATH: toolPath(process.env.PATH) },
+      ...board,
       spawnClaudeCodeProcess: (o) => {
         const child = this.d.processes.spawn(
           o.command,

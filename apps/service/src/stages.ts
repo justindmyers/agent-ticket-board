@@ -1,5 +1,10 @@
 import {
+  applyBuild,
   applyPlan,
+  BUILD_SCHEMA,
+  buildPrompt,
+  canDevelop,
+  parseBuild,
   parsePlan,
   PLAN_SCHEMA,
   FINAL_PLAN_SCHEMA,
@@ -12,7 +17,7 @@ import {
 // What differs between the stages that an agent runs: the checks before a run, the model and the
 // cost cap, the tools, the prompt, the answer shape and how the answer goes into the record.
 
-export type StageId = 'planning';
+export type StageId = 'planning' | 'development';
 
 export const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
 
@@ -40,9 +45,32 @@ export const LOOKUPS = [
 export const PLAN_TOOLS = [...READ_ONLY_TOOLS, 'Bash'];
 export const PLAN_ALLOWED = [...READ_ONLY_TOOLS, ...LOOKUPS];
 
+/** Build mode: edits, and an allowlist of commands. `dontAsk` refuses everything else (logged). */
+export const BUILD_TOOLS = [...READ_ONLY_TOOLS, 'Edit', 'Write', 'TodoWrite', 'Bash'];
+export const BUILD_ALLOWED = [
+  ...READ_ONLY_TOOLS,
+  'Edit',
+  'Write',
+  'TodoWrite',
+  'Bash(pnpm:*)',
+  'Bash(nx:*)',
+  'Bash(npx:*)',
+  'Bash(node:*)',
+  'Bash(git status:*)',
+  'Bash(git diff:*)',
+  ...LOOKUPS,
+  'Bash(npm run:*)',
+  'Bash(npm test:*)',
+  'Bash(echo:*)',
+  'Bash(ls:*)',
+  'Bash(pwd)',
+  'mcp__board__step'
+];
+
 /** The allowed commands in words, for the prompt: from the allowlist, so the two cannot drift. */
 export const commandsOf = (allowed: string[]) =>
   allowed.filter((x) => x.startsWith('Bash(')).map((x) => x.slice(5, -1).replace(/:\*$/, ''));
+export const ALLOWED_COMMANDS = commandsOf(BUILD_ALLOWED);
 
 export type StageSpec = {
   stage: StageId;
@@ -85,6 +113,32 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
       questions: f.questions?.length,
       assumptions: f.assumptions?.length,
       steps: f.steps?.length
+    })
+  },
+  development: {
+    stage: 'development',
+    model: 'opus',
+    budgetUsd: 8,
+    retry: 'startDevelopment',
+    refuse: canDevelop,
+    begin: (f) => ({
+      ...withoutNeed(f!),
+      stage: 'development',
+      // From an approved plan every step starts again; a retry keeps the steps that are done.
+      steps:
+        f!.stage === 'planning'
+          ? f!.steps?.map((s) => ({ ...s, state: 'todo' as const }))
+          : f!.steps
+    }),
+    prompt: (t, f, comments) => buildPrompt(t, f, comments, ALLOWED_COMMANDS),
+    tools: BUILD_TOOLS,
+    allowed: BUILD_ALLOWED,
+    schema: () => BUILD_SCHEMA,
+    apply: (f, output) => applyBuild(f, parseBuild(output)),
+    counts: (f) => ({
+      stepsDone: f.steps?.filter((s) => s.state === 'done').length,
+      steps: f.steps?.length,
+      gate: f.checks?.map((c) => `${c.name}: ${c.ok ? 'ok' : 'failed'}`)
     })
   }
 };

@@ -93,3 +93,21 @@ describe('a record with no active run and no need', () => {
     expect(flowFor('PROJ-11')?.need).toBeUndefined();
   });
 });
+
+describe('the list row of a need', () => {
+  it('carries the detail of the need, for a tooltip', () => {
+    FLOWS['PROJ-12'] = {
+      stage: 'development',
+      need: {
+        kind: 'problem',
+        ask: 'Step 2 is not done.',
+        detail: 'Needs a dev server.',
+        actions: []
+      }
+    };
+    expect(agentFor('PROJ-12')).toMatchObject({
+      ask: 'Step 2 is not done.',
+      detail: 'Needs a dev server.'
+    });
+  });
+});

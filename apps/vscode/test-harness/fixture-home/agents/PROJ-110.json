@@ -1,0 +1,45 @@
+{
+  "stage": "development",
+  "branch": "feature/PROJ-110-bulk-archive-projects",
+  "worktree": "/code/example-app-feature-PROJ-110-bulk-archive-projects",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Select several projects",
+      "check": "Unit test"
+    },
+    {
+      "id": "R2",
+      "text": "Archive them in one action",
+      "check": "Click path"
+    }
+  ],
+  "questions": [],
+  "steps": [
+    {
+      "n": 1,
+      "text": "Add multi-select to the project list",
+      "covers": ["R1"],
+      "state": "done"
+    },
+    {
+      "n": 2,
+      "text": "Add the Archive action",
+      "covers": ["R2"],
+      "state": "current"
+    },
+    {
+      "n": 3,
+      "text": "Confirm before archiving",
+      "covers": ["R2"],
+      "state": "todo"
+    }
+  ],
+  "run": {
+    "id": "2026-01-05T09-00-00-000Z-development",
+    "state": "running",
+    "stage": "development",
+    "started": "2026-01-05T09:00:00Z",
+    "model": "opus"
+  }
+}

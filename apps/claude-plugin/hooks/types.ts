@@ -7,6 +7,7 @@ export type Agent = {
   kind: AgentKind;
   closed?: string;
   ask?: string;
+  detail?: string;
   action?: { id: string; label: string };
   progress?: string;
 } | null;
@@ -37,6 +38,7 @@ export type Flow = {
     kind: 'problem' | 'decision';
     from?: 'sync';
     ask: string;
+    detail?: string;
     actions: { id: string; label: string }[];
   };
   requirements?: {
@@ -49,7 +51,7 @@ export type Flow = {
   questions?: { q: string; a?: string; why?: string; options?: string[]; recommended?: number }[];
   answered?: { q: string; a: string }[];
   assumptions?: string[];
-  steps?: { n: number; text: string; covers: string[]; state: string }[];
+  steps?: { n: number; text: string; covers: string[]; state: string; note?: string }[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
   app?: string;

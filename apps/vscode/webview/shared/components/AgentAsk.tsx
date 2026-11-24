@@ -10,11 +10,13 @@ export function AgentAsk({ agent, theme, className }: Props) {
 
   return (
     <span
-      className={cx('text-[12px] leading-snug', className)}
+      className={cx('line-clamp-2 text-[12px] leading-snug', className)}
       style={{ color: ink(problem ? 'red' : 'violet', theme) }}
+      title={agent.detail ? `${agent.ask}\n\n${agent.detail}` : agent.ask}
     >
       <span className="sr-only">{problem ? 'Problem: ' : 'Agent needs you: '}</span>
       {agent.ask}
+      {agent.detail && <span className="sr-only"> {agent.detail}</span>}
     </span>
   );
 }

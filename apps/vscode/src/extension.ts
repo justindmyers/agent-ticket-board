@@ -46,7 +46,8 @@ import {
   ignoreWork,
   type Stage,
   type Snapshot,
-  type Ticket
+  type Ticket,
+  moveToTesting
 } from '@agent-ticket-board/core';
 
 // Jira writes: a status change only, after the developer confirms it here, or by the agent on a
@@ -346,6 +347,18 @@ async function runAction(key: string, id: string) {
     return pr
       ? open(pr.url)
       : vscode.window.showInformationMessage(`${key}: no pull request found on GitHub.`);
+  }
+  if (id === 'toTesting') {
+    try {
+      await moveToTesting(key);
+      broadcast();
+      return sendTicket(key, true);
+    } catch (err) {
+      return showError(key, err);
+    }
+  }
+  if (id === 'startDevelopment' || (id === 'approve' && f?.stage === 'planning')) {
+    return startRun(key, 'develop').catch((e: unknown) => showError(key, e));
   }
   if (id === 'startPlanning' || id === 'replan') {
     return startRun(key).catch((e: unknown) => showError(key, e));

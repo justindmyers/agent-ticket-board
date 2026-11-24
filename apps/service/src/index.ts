@@ -115,6 +115,7 @@ export async function serve() {
       processes: processes.list()
     }),
     'POST /tickets/:key/plan': async ({ key }) => runs.plan(key!),
+    'POST /tickets/:key/develop': async ({ key }) => runs.develop(key!),
     'POST /tickets/:key/stop': async ({ key }) => ({ stopped: await runs.stop(key!) }),
     'POST /shutdown': async () => {
       setTimeout(() => void shutdown('asked by a client'), 10);

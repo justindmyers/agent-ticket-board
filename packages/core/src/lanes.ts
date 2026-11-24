@@ -30,6 +30,7 @@ export function agentFor(key: string): Agent | null {
       stageLabel,
       kind: f.need.kind,
       ask: f.need.ask,
+      ...(f.need.detail ? { detail: f.need.detail } : {}),
       action: f.need.actions[0]
     };
   }

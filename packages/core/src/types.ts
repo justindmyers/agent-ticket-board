@@ -8,7 +8,10 @@ export type Action = { id: string; label: string };
 export type Need = {
   kind: 'problem' | 'decision';
   from?: 'sync';
+  /** One short line: the list shows it. */
   ask: string;
+  /** The longer reason: the ticket shows it, and the list shows it as a tooltip. */
+  detail?: string;
   actions: Action[];
   /** For a sync need: the one status that the agent may apply by itself, if the developer allowed it. */
   to?: string;
@@ -46,6 +49,8 @@ export type Step = {
   text: string;
   covers: string[];
   state: 'done' | 'current' | 'todo';
+  /** The agent's note, for example why a step is not done. */
+  note?: string;
 };
 
 export type Pr = {
@@ -119,6 +124,7 @@ export type Agent = {
   kind: AgentKind;
   closed?: string;
   ask?: string;
+  detail?: string;
   action?: Action;
   progress?: string;
 };

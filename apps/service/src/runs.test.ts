@@ -13,7 +13,7 @@ vi.hoisted(() => {
 
 import { FLOWS, loadFlow, readTimeline, saveFlow, type Ticket } from '@agent-ticket-board/core';
 import { Processes } from './processes';
-import { PLAN_ALLOWED, PLAN_TOOLS, Runs, toolPath, type QueryFn } from './runs';
+import { BUILD_ALLOWED, PLAN_ALLOWED, PLAN_TOOLS, Runs, toolPath, type QueryFn } from './runs';
 
 const ticket = (key: string): Ticket => ({
   key,
@@ -224,6 +224,110 @@ describe('Runs.plan', () => {
     await expect(runs(query, { repo: () => null }).r.plan('PROJ-6')).rejects.toThrow(
       /repository folder/
     );
+  });
+});
+
+describe('Runs.develop', () => {
+  const approved = {
+    stage: 'planning' as const,
+    requirements: [{ id: 'R1', text: 'Works', check: 'A test' }],
+    questions: [],
+    steps: [
+      { n: 1, text: 'Do it', covers: ['R1'], state: 'todo' as const },
+      { n: 2, text: 'Test it', covers: ['R1'], state: 'todo' as const }
+    ],
+    need: {
+      kind: 'decision' as const,
+      ask: 'Approve',
+      actions: [{ id: 'approve', label: 'Approve plan and start' }]
+    }
+  };
+  const ok = { ok: true, note: '' };
+  const built = {
+    steps: [
+      { n: 1, done: true, check: 'pnpm vitest a', ok: true, note: '' },
+      { n: 2, done: true, check: 'pnpm vitest b', ok: true, note: '' }
+    ],
+    gate: { typecheck: ok, lint: ok, tests: ok },
+    summary: 'Done.',
+    followups: []
+  };
+  const worktree = vi.fn(async (a: { branch: string; log: (c: string) => void }) => {
+    a.log('Worktree ready\n');
+    return { path: '/code/example-app-wt', branch: a.branch, made: true };
+  });
+
+  it('refuses a plan with open questions, and says why', async () => {
+    await saveFlow('PROJ-20', { ...approved, questions: [{ q: 'Open?' }] });
+    const { r } = runs(fakeQuery([]).query, { worktree });
+    await expect(r.develop('PROJ-20')).rejects.toThrow(/1 open question/);
+  });
+
+  it('builds in the worktree with the build tools, then moves a clean result to Testing', async () => {
+    await saveFlow('PROJ-21', approved);
+    const { query, calls } = fakeQuery([init, success(built)]);
+    const { r } = runs(query, { worktree });
+    await r.develop('PROJ-21');
+    await idle(r);
+
+    expect(worktree).toHaveBeenCalledWith(
+      expect.objectContaining({ repo: '/code/example-app', branch: 'feature/PROJ-21-example' })
+    );
+    const o = calls[0]!.options!;
+    expect(o).toMatchObject({
+      cwd: '/code/example-app-wt',
+      model: 'opus',
+      maxBudgetUsd: 8,
+      tools: expect.arrayContaining(['Edit', 'Write', 'Bash']),
+      allowedTools: BUILD_ALLOWED,
+      permissionMode: 'dontAsk',
+      settingSources: ['project', 'local'],
+      strictMcpConfig: true
+    });
+    expect(Object.keys(o.mcpServers ?? {})).toEqual(['board']);
+    expect(o.allowedTools).not.toContain('Bash');
+    expect(calls[0]!.prompt).toMatch(/Do not commit/);
+
+    const f = await loadFlow('PROJ-21');
+    expect(f).toMatchObject({
+      stage: 'testing',
+      branch: 'feature/PROJ-21-example',
+      worktree: '/code/example-app-wt'
+    });
+    expect(f?.need?.ask).toBe('Ready to test: 2 of 2 steps done, and the gate passed');
+    const types = (await readTimeline('PROJ-21')).map((e) => e.type);
+    expect(types).toEqual(
+      expect.arrayContaining(['run.queued', 'worktree.wait', 'worktree.ready', 'run.done'])
+    );
+    const runDir = join(process.env.ATB_HOME!, 'tickets', 'PROJ-21', 'runs', f!.run!.id!);
+    expect(readFileSync(join(runDir, 'worktree.log'), 'utf8')).toBe('Worktree ready\n');
+  });
+
+  it('records the step that the agent reports, live', async () => {
+    await saveFlow('PROJ-22', { ...approved, stage: 'development' });
+    FLOWS['PROJ-22'] = (await loadFlow('PROJ-22'))!;
+    const { r } = runs(fakeQuery([]).query);
+    await r.reportStep('PROJ-22', 2, 'current');
+    expect((await loadFlow('PROJ-22'))?.steps?.map((s) => s.state)).toEqual(['todo', 'current']);
+    expect((await readTimeline('PROJ-22')).find((e) => e.type === 'step')).toMatchObject({
+      source: 'agent',
+      n: 2
+    });
+  });
+
+  it('logs the commands that the allowlist refused', async () => {
+    await saveFlow('PROJ-23', approved);
+    const refused = {
+      ...(success(built) as unknown as object),
+      permission_denials: [
+        { tool_name: 'Bash', tool_use_id: 'x', tool_input: { command: 'rm -rf dist' } }
+      ]
+    } as unknown as SDKMessage;
+    const { r } = runs(fakeQuery([init, refused]).query, { worktree });
+    await r.develop('PROJ-23');
+    await idle(r);
+    const ev = (await readTimeline('PROJ-23')).find((e) => e.type === 'tools.refused');
+    expect(ev?.tools).toEqual([{ tool: 'Bash', input: { command: 'rm -rf dist' } }]);
   });
 });
 

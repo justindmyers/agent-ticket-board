@@ -14,8 +14,8 @@ import {
 
 type Env = { node: string; atb: string };
 
-/** Starts a planning run (or a re-plan) for one ticket. Starts the service if it does not run. */
-export async function startRun(key: string) {
+/** Starts a planning or a build run for one ticket. Starts the service if it does not run. */
+export async function startRun(key: string, verb: 'plan' | 'develop' = 'plan') {
   const env = await readJson<Env | null>(ENV_FILE, null);
   if (!env) {
     throw new Error(
@@ -23,7 +23,7 @@ export async function startRun(key: string) {
     );
   }
   const info = await ensureService(env.atb, env.node);
-  await callService(info, `/tickets/${key}/plan`, {});
+  await callService(info, `/tickets/${key}/${verb}`, {});
 }
 
 export async function stopRun(key: string) {

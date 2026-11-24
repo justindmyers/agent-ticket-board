@@ -640,6 +640,104 @@ for (const surface of ['desktop', 'terminal'] as const) {
   });
 }
 
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: Approve plan and start builds, and the Development tab shows the run`, async ($, on) => {
+    const calls: string[][] = [];
+    const steps = [
+      { n: 1, text: 'Do it', covers: ['R1'], state: 'current' },
+      { n: 2, text: 'Test it', covers: ['R1'], state: 'todo' }
+    ];
+    let flow: Record<string, unknown> = {
+      stage: 'planning',
+      requirements: [{ id: 'R1', text: 'Works', check: 'A test' }],
+      steps,
+      need: {
+        kind: 'decision',
+        ask: 'Approve the plan',
+        actions: [{ id: 'approve', label: 'Approve plan and start' }]
+      }
+    };
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      if (a[0] === 'develop') {
+        flow = {
+          stage: 'development',
+          steps,
+          run: { state: 'running', stage: 'development', model: 'opus' }
+        };
+      }
+      return printed(a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : {});
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'act-approve' });
+    await tick();
+    expect(calls).toContainEqual(['develop', 'PROJ-102']);
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(await ui.find({ type: 'Text', text: /^Building now$/ })).toBeDefined();
+    expect(await ui.find({ type: 'Text', text: /Do it\s+\(now\)/ })).toBeDefined();
+    await ui.unmount();
+  });
+}
+
+test('desktop: Move to Testing runs atb to-testing, and the step shows its note', async ($, on) => {
+  const calls: string[][] = [];
+  const flow = {
+    stage: 'development',
+    steps: [
+      { n: 1, text: 'Do it', covers: [], state: 'done' },
+      {
+        n: 2,
+        text: 'Check it in the browser',
+        covers: [],
+        state: 'todo',
+        note: 'Needs a dev server.'
+      }
+    ],
+    checks: [{ name: 'Tests', ok: true }],
+    need: {
+      kind: 'problem',
+      ask: 'Step 2 is not done.',
+      detail: 'Needs a dev server and mock edges.',
+      actions: [
+        { id: 'toTesting', label: 'Move to Testing' },
+        { id: 'startDevelopment', label: 'Try again' }
+      ]
+    }
+  };
+  on('process.run', ($, e) => {
+    const a = e.argv.slice(2);
+    calls.push(a);
+    return printed(a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : {});
+  });
+  on('session.surfaces', () => ({ value: ['desktop'] }));
+  on('ui.open', () => ({ value: { isPlaced: true } }));
+  await $.command.run(BOARD);
+  await tick();
+  let ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  await ui.press({ key: 'open-PROJ-102' });
+  await tick();
+  await ui.unmount();
+  ui = await $.ui.mount({ ...PANE, surface: 'desktop' });
+  expect(await ui.find({ type: 'Text', text: /Needs a dev server\.$/ })).toBeDefined();
+  expect(
+    await ui.find({ type: 'Text', text: /^Needs a dev server and mock edges\.$/ })
+  ).toBeDefined();
+  await ui.press({ key: 'act-toTesting' });
+  await tick();
+  expect(calls).toContainEqual(['to-testing', 'PROJ-102']);
+  await ui.unmount();
+});
+
 test('desktop: a ticket with no agent record shows what Jira says', async ($, on) => {
   const noRecord = {
     ...TICKET,

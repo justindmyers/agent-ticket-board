@@ -40,6 +40,7 @@ export function NeedBanner({ need, act, theme }: Props) {
           {label}
         </span>
         <span className="text-[13px] text-ink/90">{need.ask}</span>
+        {need.detail && <span className="text-xs leading-snug text-muted">{need.detail}</span>}
       </div>
 
       <div className="flex flex-wrap gap-2">

@@ -1,5 +1,5 @@
 import type { EngineInterface } from 'claude-code';
-import { agentRun } from './cli';
+import { agentRun, toTesting } from './cli';
 import { hex, notBuilt, type Ctx } from './kit';
 import { store } from './store';
 import type { Flow, Row } from './types';
@@ -25,6 +25,7 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
     children: [
       Text({ color, children: [who] }),
       Text({ wrap: 'wrap', children: [need.ask] }),
+      ...(need.detail ? [Text({ dimColor: true, wrap: 'wrap', children: [need.detail] })] : []),
       Box({
         key: 'acts',
         flexDirection: 'row',
@@ -39,8 +40,15 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
               if (x.id.startsWith('move:')) {
                 store.confirmMove = { key: t.key, to: x.id.slice(5), from: t.status };
                 ctx.redraw();
+              } else if (x.id === 'toTesting') {
+                void toTesting($, t.key);
               } else if (x.id === 'startPlanning' || x.id === 'replan') {
                 void agentRun($, t.key, 'plan');
+              } else if (
+                x.id === 'startDevelopment' ||
+                (x.id === 'approve' && store.detail?.flow?.stage === 'planning')
+              ) {
+                void agentRun($, t.key, 'develop');
               } else {
                 notBuilt($, t.key, x.label);
               }

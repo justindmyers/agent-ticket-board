@@ -6,14 +6,21 @@ import type { Theme } from '../../shared/types/theme';
 import { ChecksSection } from './ChecksSection';
 import { TicketRow } from './TicketRow';
 import { TicketRows } from './TicketRows';
+import { RunSection } from './RunSection';
+import type { Act } from '../types/ticket';
+import { runActive } from '@agent-ticket-board/core/look';
 
-type Props = { f: Flow; theme: Theme };
+type Props = { f: Flow; act: Act; theme: Theme };
 
-export function DevelopmentStage({ f, theme }: Props) {
+export function DevelopmentStage({ f, act, theme }: Props) {
   const done = f.steps?.filter((s) => s.state === 'done').length ?? 0;
 
   return (
     <>
+      {f.run?.stage === 'development' && runActive(f) && (
+        <RunSection run={f.run} act={act} theme={theme} />
+      )}
+
       {f.steps && (
         <Section
           icon={mdiChartBar}
@@ -38,6 +45,7 @@ export function DevelopmentStage({ f, theme }: Props) {
                 }
               >
                 {s.text}
+                {s.note && <span className="mt-0.5 block text-xs text-muted">{s.note}</span>}
               </TicketRow>
             ))}
           </TicketRows>

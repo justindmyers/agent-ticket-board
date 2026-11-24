@@ -5,7 +5,7 @@ import { readJson, writeJson } from '@agent-ticket-board/core';
 // Every child of the service runs in its own process group and is recorded with a fingerprint
 // (its start time). Stop kills the groups; a new service kills what a crashed one left behind.
 
-export type Kind = 'agent' | 'dev-server' | 'browser';
+export type Kind = 'agent' | 'setup' | 'dev-server' | 'browser';
 export type Entry = { pid: number; started: string; ticket: string; kind: Kind };
 
 const sh = promisify(execFile);

@@ -76,7 +76,7 @@ export function watchRun($: EngineInterface, key: string) {
 }
 
 /** Starts (`plan`) or stops an agent run through the service, then follows it. */
-export async function agentRun($: EngineInterface, key: string, verb: 'plan' | 'stop') {
+export async function agentRun($: EngineInterface, key: string, verb: 'plan' | 'develop' | 'stop') {
   try {
     await atb($, [verb, key], 30000);
   } catch (e) {
@@ -120,4 +120,15 @@ export async function runLocalWork($: EngineInterface, key: string, args: string
   }
   await loadTicket($, key);
   await loadSprint($);
+}
+
+/** Moves a finished build with a clean gate to Testing, then reloads the ticket. */
+export async function toTesting($: EngineInterface, key: string) {
+  try {
+    await atb($, ['to-testing', key]);
+  } catch (e) {
+    $.ui.toast(`${key}: ${errorText(e)}`);
+    return;
+  }
+  await reloadTicket($, key);
 }

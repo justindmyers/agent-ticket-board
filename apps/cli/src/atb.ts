@@ -42,7 +42,8 @@ import {
   serviceInfo,
   bundle,
   readTimeline,
-  timelineText
+  timelineText,
+  moveToTesting
 } from '@agent-ticket-board/core';
 import { serve } from '@agent-ticket-board/service';
 
@@ -61,6 +62,8 @@ const USAGE = `usage:
   atb answer <KEY> <N> <text> [--earlier]   answer plan question N, or change earlier answer N
   atb audit <KEY> [--json] [--tail=N]    the ticket's audit timeline
   atb audit <KEY> --bundle               one archive of the ticket's audit log, tokens removed
+  atb to-testing <KEY>                   move a finished build with a clean gate to Testing
+  atb develop <KEY>                      start building the approved plan in the ticket's worktree
   atb plan <KEY>                         start a planning run (starts the service if it does not run)
   atb stop <KEY>                         stop the agent run of a ticket
   atb serve                              run the board service (clients start it for you)
@@ -141,12 +144,15 @@ async function main() {
     );
     return;
   }
+  if (cmd === 'to-testing' && key) {
+    return out(await moveToTesting(key));
+  }
   if (cmd === 'answer' && key && /^\d+$/.test(args[1] ?? '')) {
     const save = flags.has('--earlier') ? saveEarlierAnswer : saveAnswer;
     return out(await save(key, Number(args[1]), args.slice(2).join(' ')));
   }
-  if ((cmd === 'plan' || cmd === 'stop') && key) {
-    const info = cmd === 'plan' ? await ensureService(process.argv[1]!) : await serviceInfo();
+  if ((cmd === 'plan' || cmd === 'develop' || cmd === 'stop') && key) {
+    const info = cmd !== 'stop' ? await ensureService(process.argv[1]!) : await serviceInfo();
     if (!info) {
       return out({ stopped: false });
     }

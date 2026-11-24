@@ -1,0 +1,67 @@
+{
+  "stage": "development",
+  "branch": "feature/PROJ-111-project-usage-chart",
+  "worktree": "/code/example-app-feature-PROJ-111-project-usage-chart",
+  "questions": [],
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "A usage chart",
+      "check": "Click path"
+    }
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "text": "Add the chart",
+      "covers": ["R1"],
+      "state": "done"
+    },
+    {
+      "n": 2,
+      "text": "Run the tests",
+      "covers": ["R1"],
+      "state": "done"
+    },
+    {
+      "n": 3,
+      "text": "Check the chart in the browser",
+      "covers": ["R1"],
+      "state": "todo",
+      "note": "The browser and phone-width check did not run. It needs a dev server and mock data in each state, which this session could not start."
+    }
+  ],
+  "checks": [
+    {
+      "name": "Type check",
+      "ok": true
+    },
+    {
+      "name": "Lint",
+      "ok": true
+    },
+    {
+      "name": "Tests",
+      "ok": true
+    }
+  ],
+  "need": {
+    "kind": "problem",
+    "ask": "Step 3 is not done.",
+    "detail": "The browser and phone-width check did not run. It needs a dev server and mock data in each state, which this session could not start.",
+    "actions": [
+      {
+        "id": "toTesting",
+        "label": "Move to Testing"
+      },
+      {
+        "id": "startDevelopment",
+        "label": "Try again"
+      },
+      {
+        "id": "openWorktree",
+        "label": "Open worktree"
+      }
+    ]
+  }
+}
