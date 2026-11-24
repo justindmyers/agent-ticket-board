@@ -29,7 +29,9 @@ import {
   withNextStep,
   type AgentRun,
   type Flow,
-  type Ticket
+  type Ticket,
+  memorySection,
+  projectMemory
 } from '@agent-ticket-board/core';
 import { sessionOf, TestBrowser } from './browser';
 import type { Processes } from './processes';
@@ -68,6 +70,8 @@ export type RunDeps = {
   notify?: (message: string) => void;
   /** The ticket's test browser. Default: the board's own playwright-cli browser. */
   browser?: (key: string, cwd: string) => BrowserLike;
+  /** Claude Code's home, for the project memory of the repository. Default: ~/.claude. */
+  claudeHome?: string;
   /** The command that takes a screenshot set. Default: this CLI's `shots`. */
   shotsCommand?: string;
 };
@@ -303,8 +307,15 @@ export class Runs {
         spec.stage === 'development'
           ? await this.worktree(key, t, log)
           : (app?.cwd ?? (await worktreeOf(FLOWS[key]!)) ?? this.d.repo()!);
-      const prompt = spec.prompt(t, FLOWS[key]!, await this.d.comments(key), app);
-      const options = this.options(key, spec, cwd, ac, log, app);
+      // The developer's Claude Code memory of the main checkout: a worktree has none of its own.
+      const memory = projectMemory(this.d.repo()!, this.d.claudeHome);
+      const prompt =
+        spec.prompt(t, FLOWS[key]!, await this.d.comments(key), app) +
+        (memory ? `\n${memorySection(memory)}` : '');
+      const options = {
+        ...this.options(key, spec, cwd, ac, log, app),
+        ...(memory ? { additionalDirectories: [memory.dir] } : {})
+      };
       await log.prompt(prompt, options as Record<string, unknown>);
       for await (const m of this.d.query({ prompt, options })) {
         await log.message(m);

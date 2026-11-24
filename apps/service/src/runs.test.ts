@@ -245,6 +245,31 @@ describe('Runs.plan', () => {
   });
 });
 
+describe('Runs and the project memory', () => {
+  it('gives every agent run the memory index of the main checkout, and lets it read the notes', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'atb-claude-'));
+    const dir = join(home, 'projects', '-code-example-app', 'memory');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'MEMORY.md'),
+      '# Memory Index\n- [Mocks](feedback_mocks.md) — reuse mock.js'
+    );
+    await saveFlow('PROJ-61', { stage: 'planning' });
+    const plan = {
+      requirements: [{ id: 'R1', text: 'x', check: 'y' }],
+      questions: [],
+      assumptions: [],
+      steps: [{ text: 'a', covers: ['R1'] }]
+    };
+    const { query, calls: q } = fakeQuery([init, success(plan)]);
+    const { r } = runs(query, { claudeHome: home });
+    await r.plan('PROJ-61');
+    await idle(r);
+    expect(q[0]!.prompt).toContain('- [Mocks](feedback_mocks.md) — reuse mock.js');
+    expect(q[0]!.options!.additionalDirectories).toEqual([dir]);
+  });
+});
+
 describe('Runs.plan in a worktree', () => {
   it('plans a change in the ticket worktree, where the built code is', async () => {
     const wt = mkdtempSync(join(tmpdir(), 'atb-wt-'));

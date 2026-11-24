@@ -41,3 +41,4 @@ export async function loadState() {
   await Promise.all([loadAgents(), loadPrCache(), loadSettings()]);
 }
 export * from './changes';
+export * from './memory';
