@@ -2,9 +2,15 @@ import { Label as AriaLabel, TextArea, TextField } from 'react-aria-components';
 import { Button } from '../../shared/components/Button';
 import { Kbd } from '../../shared/components/Kbd';
 
-type Props = { draft: string; setDraft: (s: string) => void; post: (run: boolean) => void };
+type Props = {
+  draft: string;
+  setDraft: (s: string) => void;
+  post: (run: boolean) => void;
+  /** False while an agent runs: a re-plan waits for the run. */
+  canReplan: boolean;
+};
 
-export function CommentComposer({ draft, setDraft, post }: Props) {
+export function CommentComposer({ draft, setDraft, post, canReplan }: Props) {
   const empty = !draft.trim();
 
   return (
@@ -18,7 +24,7 @@ export function CommentComposer({ draft, setDraft, post }: Props) {
         <AriaLabel className="sr-only">Comment for the agent</AriaLabel>
         <TextArea
           id="draft"
-          placeholder="The agent reads every comment at the start of its next run."
+          placeholder="The agent reads every comment at the start of its next run. Comment and re-plan sends built work back to Planning for the change."
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -39,8 +45,8 @@ export function CommentComposer({ draft, setDraft, post }: Props) {
         <Button onPress={() => post(false)} isDisabled={empty}>
           Comment
         </Button>
-        <Button onPress={() => post(true)} isDisabled={empty}>
-          Comment and resume agent
+        <Button onPress={() => post(true)} isDisabled={empty || !canReplan}>
+          Comment and re-plan
         </Button>
       </div>
     </>

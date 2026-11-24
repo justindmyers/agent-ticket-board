@@ -10,14 +10,13 @@ export function ticketComments($: EngineInterface, ctx: Ctx, d: Detail) {
   const { dim, sectionTitle } = kit(ctx);
   const key = d.ticket.key;
   const comments = d.comments ?? [];
+  const running = d.flow?.run?.state === 'running' || d.flow?.run?.state === 'queued';
   const add = async (text: string, run: boolean) => {
     if (!text.trim()) {
       return;
     }
-    await atb($, ['comment', key, text, ...(run ? ['--run'] : [])]);
-    if (run) {
-      $.ui.toast(key + ': comment saved. Not built yet: the agent does not resume.');
-    }
+    // Comment and re-plan: built work goes back to Planning for the change.
+    await atb($, run ? ['change', key, text] : ['comment', key, text]);
     store.draft = '';
     await reloadTicket($, key);
   };
@@ -51,10 +50,13 @@ export function ticketComments($: EngineInterface, ctx: Ctx, d: Detail) {
       },
       onSubmit: (v: string) => add(v, false)
     }),
-    Button({
-      key: 'comment-run',
-      label: 'Comment and resume agent',
-      onPress: () => add(store.draft, true)
-    })
+    // A re-plan waits for the run that is active.
+    running
+      ? dim('Comment and re-plan is available when the agent run ends.')
+      : Button({
+          key: 'comment-run',
+          label: 'Comment and re-plan',
+          onPress: () => add(store.draft, true)
+        })
   ];
 }

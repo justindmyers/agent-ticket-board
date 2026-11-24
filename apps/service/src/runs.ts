@@ -298,10 +298,11 @@ export class Runs {
     try {
       const t = await this.d.ticket(key);
       const app = spec.stage === 'testing' ? await this.startApp(key, log) : undefined;
+      // A ticket with a worktree is read there: a re-plan for a change must see the built code.
       const cwd =
         spec.stage === 'development'
           ? await this.worktree(key, t, log)
-          : (app?.cwd ?? this.d.repo()!);
+          : (app?.cwd ?? (await worktreeOf(FLOWS[key]!)) ?? this.d.repo()!);
       const prompt = spec.prompt(t, FLOWS[key]!, await this.d.comments(key), app);
       const options = this.options(key, spec, cwd, ac, log, app);
       await log.prompt(prompt, options as Record<string, unknown>);
@@ -644,4 +645,9 @@ export class Runs {
     await saveFlow(key, f, 'service');
     this.d.changed(key);
   }
+}
+
+/** The ticket's worktree when it still exists on disk. */
+async function worktreeOf(f: Flow) {
+  return f.worktree && existsSync(f.worktree) ? f.worktree : null;
 }

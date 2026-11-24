@@ -1,3 +1,4 @@
+import { changeSection, pendingChanges } from './changes';
 import { REUSE_RULES } from './reuse';
 import { omit } from 'lodash-es';
 import { z } from 'zod';
@@ -77,7 +78,7 @@ export const FINAL_PLAN_SCHEMA = z.toJSONSchema(FinalPlanSchema, {
 
 /** True when the developer has answered questions: the next plan is final and may not ask more. */
 export const isFinalPlan = (f: Flow | null) =>
-  mergeAnswers(f?.answered ?? [], f?.questions ?? []).length > 0;
+  mergeAnswers(f?.answered ?? [], f?.questions ?? []).length > 0 || pendingChanges(f).length > 0;
 
 /** The agent's answer as a plan, or an error that says what is wrong with its shape. */
 export function parsePlan(output: unknown, final = false): PlanResult {
@@ -98,7 +99,8 @@ export function planPrompt(
   boardComments: string[],
   current: Question[] = [],
   earlier: Answered[] = [],
-  commands: string[] = []
+  commands: string[] = [],
+  revise: Flow | null = null
 ) {
   const answered = mergeAnswers(earlier, current);
   const description = mdSections(t.description)
@@ -158,7 +160,8 @@ export function planPrompt(
           '',
           ...answered.map((q) => `- ${q.q} Answer: ${q.a}`)
         ]
-      : [])
+      : []),
+    ...(revise ? changeSection(revise) : [])
   ].join('\n');
 }
 
@@ -187,6 +190,20 @@ export function applyPlan(f: Flow, r: PlanResult): Flow {
     })),
     steps: r.steps.map((s, i) => ({ n: i + 1, text: s.text, covers: s.covers, state: 'todo' }))
   };
+  if (pendingChanges(f).length) {
+    // A change re-plan returns the steps still to do: the built steps stay, and the new ones follow.
+    const built = (f.steps ?? []).filter((s) => s.state === 'done');
+    out.steps = [
+      ...built.map((s, i) => ({ ...s, n: i + 1 })),
+      ...r.steps.map((s, i) => ({
+        n: built.length + i + 1,
+        text: s.text,
+        covers: s.covers,
+        state: 'todo' as const
+      }))
+    ];
+    out.changes = (f.changes ?? []).map((c) => ({ ...c, planned: true }));
+  }
   return { ...out, need: planNeed(out) };
 }
 
@@ -227,6 +244,13 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** What the developer does next with a plan: answer the questions, re-plan, or approve. */
 export function planNeed(f: Flow): Need {
+  if (pendingChanges(f).length) {
+    return {
+      kind: 'decision',
+      ask: 'Plan your change: re-plan',
+      actions: [{ id: 'replan', label: 'Re-plan' }]
+    };
+  }
   const all = f.questions ?? [];
   const open = all.filter((q) => !q.a).length;
   if (open) {

@@ -16,6 +16,7 @@ import {
   parseBuild,
   parsePlan,
   PLAN_SCHEMA,
+  withoutNeed,
   FINAL_PLAN_SCHEMA,
   isFinalPlan,
   planPrompt,
@@ -113,7 +114,7 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
     refuse: () => null,
     begin: (f) => ({ ...withoutNeed(f ?? { stage: 'planning' }), stage: 'planning' }),
     prompt: (t, f, comments) =>
-      planPrompt(t, comments, f.questions, f.answered, commandsOf(PLAN_ALLOWED)),
+      planPrompt(t, comments, f.questions, f.answered, commandsOf(PLAN_ALLOWED), f),
     tools: PLAN_TOOLS,
     allowed: PLAN_ALLOWED,
     // Once the developer has answered, the plan is final: its schema has no questions.
@@ -135,11 +136,9 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
     begin: (f) => ({
       ...withoutNeed(f!),
       stage: 'development',
-      // From an approved plan every step starts again; a retry keeps the steps that are done.
-      steps:
-        f!.stage === 'planning'
-          ? f!.steps?.map((s) => ({ ...s, state: 'todo' as const }))
-          : f!.steps
+      // A new plan has only todo steps. A plan revised for a change keeps its built steps, and a
+      // retry keeps the steps that are done: the build makes only what is still to do.
+      steps: f!.steps?.map((s) => (s.state === 'current' ? { ...s, state: 'todo' as const } : s))
     }),
     prompt: (t, f, comments) => buildPrompt(t, f, comments, ALLOWED_COMMANDS),
     tools: BUILD_TOOLS,
@@ -185,12 +184,6 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
     })
   }
 };
-
-function withoutNeed(f: Flow): Flow {
-  const { need: _need, ...rest } = f;
-  void _need;
-  return rest;
-}
 
 /** Testing: the build commands, the browser CLI, and the board's own screenshot command. */
 export function testAllowed(shots = `${process.execPath} ${process.argv[1]} shots`) {

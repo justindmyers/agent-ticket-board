@@ -5,16 +5,20 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import {
+  addComment,
   approveTesting,
   audit,
   CONFIG,
   errorData,
   detail,
   listComments,
+  loadFlow,
   loadState,
   PLUGIN_DIR,
   PROCESSES_FILE,
   rememberTicket,
+  requestChange,
+  saveFlow,
   SERVICE_FILE,
   SERVICE_LOG,
   serviceInfo
@@ -118,6 +122,18 @@ export async function serve() {
       processes: processes.list()
     }),
     'POST /tickets/:key/plan': async ({ key }) => runs.plan(key!),
+    // A comment that revisits the ticket: built work goes back to Planning for the change, then re-plans.
+    'POST /tickets/:key/change': async ({ key }, body) => {
+      const text = String((body as { text?: unknown } | null)?.text ?? '');
+      const f = requestChange(
+        (await loadFlow(key!)) ?? { stage: 'planning' },
+        text,
+        new Date().toISOString()
+      );
+      await addComment(key!, text.trim(), true);
+      await saveFlow(key!, f);
+      return runs.plan(key!);
+    },
     'POST /tickets/:key/develop': async ({ key }) => runs.develop(key!),
     'POST /tickets/:key/test': async ({ key }) => runs.test(key!),
     // Approval ends Testing: the ticket's test browser closes as well.

@@ -1,4 +1,5 @@
 import { mdiForumOutline } from '@mdi/js';
+import { runActive } from '@agent-ticket-board/core/look';
 import { Section } from '../../shared/components/Section';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
@@ -28,7 +29,12 @@ export function CommentsSection({ d, draft, setDraft, theme }: Props) {
       theme={theme}
     >
       <CommentList comments={d.comments} theme={theme} />
-      <CommentComposer draft={draft} setDraft={setDraft} post={post} />
+      <CommentComposer
+        draft={draft}
+        setDraft={setDraft}
+        post={post}
+        canReplan={!runActive(d.flow)}
+      />
     </Section>
   );
 }

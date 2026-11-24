@@ -245,6 +245,30 @@ describe('Runs.plan', () => {
   });
 });
 
+describe('Runs.plan in a worktree', () => {
+  it('plans a change in the ticket worktree, where the built code is', async () => {
+    const wt = mkdtempSync(join(tmpdir(), 'atb-wt-'));
+    await saveFlow('PROJ-60', {
+      stage: 'planning',
+      worktree: wt,
+      changes: [{ text: 'Stricter', at: 'now' }],
+      requirements: [{ id: 'R1', text: 'x', check: 'y' }],
+      steps: [{ n: 1, text: 'Built', covers: ['R1'], state: 'done' }]
+    });
+    const plan = {
+      requirements: [{ id: 'R1', text: 'x', check: 'y' }],
+      assumptions: [],
+      steps: [{ text: 'New', covers: ['R1'] }]
+    };
+    const { query, calls: q } = fakeQuery([init, success(plan)]);
+    const { r } = runs(query);
+    await r.plan('PROJ-60');
+    await idle(r);
+    expect(q[0]!.options!.cwd).toBe(wt);
+    expect((await loadFlow('PROJ-60'))?.steps?.map((s) => s.state)).toEqual(['done', 'todo']);
+  });
+});
+
 describe('Runs.develop', () => {
   const approved = {
     stage: 'planning' as const,

@@ -40,3 +40,4 @@ export async function loadState() {
   await loadConfig();
   await Promise.all([loadAgents(), loadPrCache(), loadSettings()]);
 }
+export * from './changes';

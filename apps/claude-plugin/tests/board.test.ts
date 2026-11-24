@@ -227,11 +227,10 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await ui.find({ type: 'Text', text: /Claude's take/ })).toBeDefined();
     await ui.input({ key: 'comment', text: 'Forward is wrong on Safari', kind: 'change' });
     await ui.press({ key: 'comment-run' });
-    expect(calls.find((c) => c[0] === 'comment')).toEqual([
-      'comment',
+    expect(calls.find((c) => c[0] === 'change')).toEqual([
+      'change',
       'PROJ-102',
-      'Forward is wrong on Safari',
-      '--run'
+      'Forward is wrong on Safari'
     ]);
     await ui.unmount();
   });

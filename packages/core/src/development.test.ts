@@ -208,3 +208,24 @@ describe('an unfinished build', () => {
     ).toThrow(/gate/);
   });
 });
+
+describe('applyBuild after a change', () => {
+  it('keeps built steps done when the build reports only the new steps', () => {
+    const f = {
+      stage: 'development' as const,
+      requirements: [{ id: 'R1', text: 'x', check: 'y' }],
+      steps: [
+        { n: 1, text: 'Built', covers: ['R1'], state: 'done' as const },
+        { n: 2, text: 'New', covers: ['R1'], state: 'todo' as const }
+      ]
+    };
+    const ok = { ok: true, note: '' };
+    const out = applyBuild(f, {
+      steps: [{ n: 2, done: true, check: 't', ok: true, note: '' }],
+      gate: { typecheck: ok, lint: ok, tests: ok },
+      summary: 's'
+    } as never);
+    expect(out.steps?.map((s) => s.state)).toEqual(['done', 'done']);
+    expect(out.need?.ask).toMatch(/Ready to test: 2 of 2 steps done/);
+  });
+});

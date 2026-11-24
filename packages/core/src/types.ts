@@ -93,6 +93,9 @@ export type AgentRun = {
 };
 
 /** The local agent record for one ticket. The service writes it; every client reads it. */
+/** A change that the developer asked for after the build. */
+export type Change = { text: string; at: string; planned?: boolean };
+
 export type Flow = {
   stage: Stage;
   need?: Need;
@@ -103,6 +106,8 @@ export type Flow = {
   /** What the agent decided where the ticket is not clear. */
   assumptions?: string[];
   steps?: Step[];
+  /** What the developer asked to change after the build. A re-plan plans the pending ones. */
+  changes?: Change[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
   /** Testing: the evidence for each requirement id. */

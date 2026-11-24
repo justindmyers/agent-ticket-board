@@ -53,6 +53,7 @@ const USAGE = `usage:
   atb sprint [--cached]                  sprint snapshot (cached: from ~/.agent-ticket-board/cache)
   atb ticket <KEY> [--cached]            ticket detail, agent record, comments and group
   atb comment <KEY> <text> [--run]       a comment for the agent (never sent to Jira)
+  atb change <KEY> <TEXT>                comment and re-plan: built work goes back to Planning for the change
   atb move <KEY> <STATUS> [--approved]   a Jira move by the agent, or one that the developer approved
   atb agent-may-move <KEY> on|off        the developer's permission for one ticket
   atb after-merge <KEY> <STATUS>|default the status for this ticket after its merge
@@ -231,6 +232,12 @@ async function main() {
   }
   if (cmd === 'ticket' && key) {
     return out(await ticket(key));
+  }
+  if (cmd === 'change' && key && args[1]) {
+    const info = await ensureService(process.argv[1]!);
+    return out(
+      await callService(info, `/tickets/${key}/change`, { text: args.slice(1).join(' ') })
+    );
   }
   if (cmd === 'comment' && key && args[1]) {
     return out(await addComment(key, args.slice(1).join(' '), flags.has('--run')));

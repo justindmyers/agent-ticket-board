@@ -477,12 +477,12 @@ async function handle(m: Msg, ctx: vscode.ExtensionContext) {
       if (!text) {
         return;
       }
-      await addComment(m.key, text, !!m.run);
       if (m.run) {
-        void vscode.window.showInformationMessage(
-          `${m.key}: comment saved. Not built yet: the agent does not resume.`
-        );
+        // Comment and re-plan: built work goes back to Planning for the change.
+        await startRun(m.key, 'change', { text }).catch((err: unknown) => showError(m.key, err));
+        return sendTicket(m.key, true);
       }
+      await addComment(m.key, text, false);
       return sendTicket(m.key, true);
     }
     case 'action':

@@ -17,7 +17,8 @@ type Env = { node: string; atb: string };
 /** Starts a planning or a build run for one ticket. Starts the service if it does not run. */
 export async function startRun(
   key: string,
-  verb: 'plan' | 'develop' | 'test' | 'approve-testing' = 'plan'
+  verb: 'plan' | 'develop' | 'test' | 'approve-testing' | 'change' = 'plan',
+  body: Record<string, unknown> = {}
 ) {
   const env = await readJson<Env | null>(ENV_FILE, null);
   if (!env) {
@@ -26,7 +27,7 @@ export async function startRun(
     );
   }
   const info = await ensureService(env.atb, env.node);
-  await callService(info, `/tickets/${key}/${verb}`, {});
+  await callService(info, `/tickets/${key}/${verb}`, body);
 }
 
 export async function stopRun(key: string) {

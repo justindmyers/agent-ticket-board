@@ -141,6 +141,13 @@ const GATE = [
 /** The record after a build run: Testing when every step is done and the gate passed, else a problem. */
 export function applyBuild(f: Flow, r: BuildResult): Flow {
   const done = new Set(r.steps.filter((s) => s.done).map((s) => s.n));
+  // The build skips steps that were done before it: they stay done unless it reports them not done.
+  const undone = new Set(r.steps.filter((s) => !s.done).map((s) => s.n));
+  for (const s of f.steps ?? []) {
+    if (s.state === 'done' && !undone.has(s.n)) {
+      done.add(s.n);
+    }
+  }
   const notes = new Map(r.steps.filter((s) => s.note).map((s) => [s.n, s.note]));
   const steps = (f.steps ?? []).map(({ note: _old, ...s }) => {
     void _old;
