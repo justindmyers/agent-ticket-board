@@ -4,6 +4,7 @@
 // paths.gen.ts is written by `pnpm install-local`: absolute paths, because the Claude app's PATH
 // may not include the folder that has node.
 import { ATB, NODE } from './paths.gen';
+import { loadSettings, renderSettings, settings } from './settings';
 
 const PANE = 'board';
 
@@ -297,6 +298,20 @@ export function register(on) {
     };
     const act = (key: string, label: string) =>
       $.ui.toast(`${key}: ${label}. Not built yet: nothing started.`);
+    const run = <T>(args: string[]) => atb<T>($, args);
+
+    if (settings.open) {
+      return renderSettings(
+        { Box, Text, Button, Input },
+        run,
+        redraw,
+        () => {
+          settings.open = false;
+          redraw();
+        },
+        (text) => $.ui.toast(text)
+      );
+    }
 
     // ---------- Ticket ----------
     if (open) {
@@ -836,7 +851,28 @@ export function register(on) {
             })
           ]
         }),
-        Button({ key: 'refresh', label: 'Refresh', plain: true, onPress: () => void loadSprint($) })
+        Box({
+          key: 'qa',
+          flexDirection: 'row',
+          columnGap: 1,
+          children: [
+            Button({
+              key: 'settings',
+              label: 'Settings',
+              plain: true,
+              onPress: () => {
+                settings.open = true;
+                void loadSettings(run, redraw);
+              }
+            }),
+            Button({
+              key: 'refresh',
+              label: 'Refresh',
+              plain: true,
+              onPress: () => void loadSprint($)
+            })
+          ]
+        })
       ]
     });
     if (!sprint) {

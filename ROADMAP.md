@@ -26,8 +26,11 @@ Done:
 
 To do:
 
-- [ ] Setup with Claude: detectors, the review screen and `/atb-setup` (`PLAN.md` section 10).
-- [ ] Settings page in VS Code and in the Claude Code pane. It edits the config, including the branch rules for the status after a merge.
+- [x] Setup detectors for the tracker (site, project, query, statuses, points field) and the repository (remote, worktree script, branch pattern, dev command, port). `atb detect` shows the values. `atb config set` saves one value.
+- [x] `/atb-setup` in the Claude Code plugin. Claude fills the gaps from the named files, and the developer accepts each value.
+- [ ] Edit the lists and the branch rules with their own controls. Now each value is one line of text.
+- [ ] Find the dev command in a monorepo, where each app has its own `dev` script.
+- [x] Settings page in VS Code and in the Claude Code pane. It shows each value, its source and the detected value with its confidence. It has "Detect again" for each section, and nothing changes until the developer saves.
 - [ ] Measure the cold start. The target is less than 1 second after the first sync.
 - [ ] Look at the Claude Code pane in the Claude app and in the terminal. The tests pass, but nobody looked at the colors in the real app.
 - [ ] Adopt existing work: find worktrees, branches, pull requests and sessions for a ticket. Show "Adopt" or "Ignore". Propose a stage and wait for the developer.

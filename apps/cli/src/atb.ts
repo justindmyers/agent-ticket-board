@@ -6,9 +6,15 @@
 //   atb move <KEY> <STATUS> --approved    a move that the developer approved in a client
 //   atb agent-may-move <KEY> on|off       the developer's permission for one ticket
 //   atb after-merge <KEY> <STATUS>|default   the status for this ticket after its merge
+//   atb detect [--repo=<path>] [--only=tracker|repo]   proposed config values; writes nothing
+//   atb config [set <key> <json>]          the config, or one value that the developer accepted
+//   atb settings [--detect] [--only=…] [--repo=…] | atb settings save <json>   the settings view
 import {
   addComment,
   agentFor,
+  CONFIG,
+  detect,
+  isSection,
   detail,
   findPr,
   flowFor,
@@ -21,9 +27,12 @@ import {
   PRS,
   setAfterMerge,
   readCache,
+  saveSettings,
+  settingsView,
   refreshPrs,
   refreshSprint,
   setAgentMayMove,
+  setConfigValue,
   shapeSprint,
   STATUS,
   ticketUrl
@@ -31,10 +40,14 @@ import {
 
 const USAGE =
   'usage: atb sprint [--cached] | atb ticket <KEY> [--cached] | atb comment <KEY> <text> [--run] | ' +
-  'atb move <KEY> <STATUS> [--approved] | atb agent-may-move <KEY> on|off | atb after-merge <KEY> <STATUS>|default\n';
+  'atb move <KEY> <STATUS> [--approved] | atb agent-may-move <KEY> on|off | atb after-merge <KEY> <STATUS>|default | ' +
+  'atb detect [--repo=<path>] [--only=tracker|repo] | atb config [set <key> <json>] | ' +
+  'atb settings [--detect] [--only=tracker|repo] | atb settings save <json>\n';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const flags = new Set(rest.filter((a) => a.startsWith('--')));
+const option = (name: string) =>
+  rest.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const args = rest.filter((a) => !a.startsWith('--'));
 const out = (v: unknown) => process.stdout.write(`${JSON.stringify(v)}\n`);
 
@@ -62,9 +75,33 @@ async function ticket(key: string) {
   };
 }
 
+function runDetect() {
+  const only = option('only');
+  if (only !== undefined && !isSection(only)) {
+    throw new Error('--only must be tracker or repo');
+  }
+  return detect({ only, repoPath: option('repo') ?? CONFIG.repo.path });
+}
+
 async function main() {
   await loadState();
   const key = args[0]?.toUpperCase();
+  if (cmd === 'detect') {
+    return out(await runDetect());
+  }
+  if (cmd === 'settings' && args[0] === 'save' && args[1]) {
+    return out(await saveSettings(JSON.parse(args.slice(1).join(' ')) as Record<string, string>));
+  }
+  if (cmd === 'settings' && !args.length) {
+    const wanted = flags.has('--detect') || option('only') !== undefined;
+    return out(await settingsView(wanted ? await runDetect() : undefined));
+  }
+  if (cmd === 'config' && !args.length) {
+    return out(CONFIG);
+  }
+  if (cmd === 'config' && args[0] === 'set' && args[1] && args[2] !== undefined) {
+    return out(await setConfigValue(args[1], JSON.parse(args.slice(2).join(' '))));
+  }
   if (cmd === 'sprint') {
     if (flags.has('--cached')) {
       return out(shapeSprint(await readCache()));

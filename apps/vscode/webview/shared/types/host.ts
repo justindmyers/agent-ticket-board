@@ -1,3 +1,5 @@
+import type { SectionId, SettingsView } from './settings';
+
 export type Kind = 'problem' | 'decision' | 'running' | 'waiting' | 'finished';
 
 export type Agent = {
@@ -95,4 +97,7 @@ export type HostMsg =
   | ({ type: 'ticket' } & Detail)
   | { type: 'select'; key: string }
   | { type: 'current'; key: string | null }
-  | { type: 'layout'; queue: boolean };
+  | { type: 'layout'; queue: boolean }
+  | { type: 'settings'; view: SettingsView }
+  | { type: 'detecting'; only: SectionId | null }
+  | { type: 'settingsSaved'; saved: string[]; errors: Record<string, string> };

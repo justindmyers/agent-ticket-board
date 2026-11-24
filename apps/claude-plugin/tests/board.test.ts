@@ -269,3 +269,109 @@ test('desktop: Jira move needs the confirm press; permission toggle', async ($, 
   expect(calls.find((c) => c[0] === 'after-merge')).toEqual(['after-merge', 'PROJ-102', 'Done']);
   await ui.unmount();
 });
+
+const field = (key: string, label: string, text: string, extra = {}) => ({
+  key,
+  label,
+  help: 'Help text.',
+  kind: 'text',
+  value: text,
+  text,
+  source: 'default',
+  ...extra
+});
+const SETTINGS = {
+  file: '/tmp/atb/config.json',
+  sections: [
+    {
+      id: 'tracker',
+      title: 'Tracker',
+      fields: [
+        field('tracker.project', 'Project key', 'PROJ', { source: 'config' }),
+        field('tracker.columns', 'Board columns', 'To Do, Done')
+      ]
+    },
+    { id: 'repo', title: 'Repository', fields: [field('repo.branch', 'Branch name', '{key}')] }
+  ],
+  gaps: [],
+  checks: []
+};
+const DETECTED = {
+  ...SETTINGS,
+  sections: SETTINGS.sections.map((s) => ({
+    ...s,
+    fields: s.fields.map((f) =>
+      f.key === 'tracker.columns'
+        ? {
+            ...f,
+            proposal: {
+              text: 'To Do, In Progress, Done',
+              confidence: 'medium',
+              source: 'acli jira workitem search',
+              same: false
+            }
+          }
+        : f
+    )
+  })),
+  checks: [{ name: 'Jira (acli)', ok: true, detail: 'Signed in' }]
+};
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: settings: detect, use a detected value, save`, async ($, on) => {
+    const calls: string[][] = [];
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      const out =
+        a[0] === 'sprint'
+          ? SPRINT
+          : a[0] === 'settings' && a[1] === 'save'
+            ? { saved: Object.keys(JSON.parse(a[2] ?? '{}')), errors: {} }
+            : a[0] === 'settings' && a.includes('--detect')
+              ? DETECTED
+              : a[0] === 'settings'
+                ? SETTINGS
+                : {};
+      return { value: { exitCode: 0, stdout: JSON.stringify(out), stderr: '' } };
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run({ command: 'board', args: '' });
+    await tick();
+    const remount = async (ui?: { unmount: () => Promise<void> }) => {
+      await tick();
+      await ui?.unmount();
+      return $.ui.mount({ ...PANE, surface });
+    };
+    let ui = await remount();
+    await ui.press({ key: 'settings' });
+    ui = await remount(ui);
+    expect(calls.find((c) => c[0] === 'settings')).toEqual(['settings']);
+    expect(await ui.find({ key: 'field-tracker.project' })).toBeDefined();
+    await ui.press({ key: 'detect-all' });
+    ui = await remount(ui);
+    expect(calls.find((c) => c.includes('--detect'))).toEqual(['settings', '--detect']);
+    expect(await ui.find({ type: 'Text', text: /Jira \(acli\)/ })).toBeDefined();
+    await ui.press({ key: 'use-tracker.columns' });
+    ui = await remount(ui);
+    expect(await ui.find({ type: 'Text', text: /1 unsaved change/ })).toBeDefined();
+    await ui.input({ key: 'field-tracker.project', text: 'DEMO', kind: 'change' });
+    ui = await remount(ui);
+    expect(await ui.find({ type: 'Text', text: /2 unsaved changes/ })).toBeDefined();
+    await ui.press({ key: 'settings-save' });
+    ui = await remount(ui);
+    const save = calls.find((c) => c[1] === 'save');
+    expect(JSON.parse(save?.[2] ?? '{}')).toEqual({
+      'tracker.columns': 'To Do, In Progress, Done',
+      'tracker.project': 'DEMO'
+    });
+    await ui.press({ key: 'detect-repo' });
+    ui = await remount(ui);
+    expect(calls.at(-1)).toEqual(['settings', '--detect', '--only=repo']);
+    await ui.press({ key: 'settings-back' });
+    ui = await remount(ui);
+    expect(await ui.find({ key: 'grp-Needs you' })).toBeDefined();
+    await ui.unmount();
+  });
+}

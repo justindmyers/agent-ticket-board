@@ -13,6 +13,12 @@ export * from './moves';
 export * from './settings';
 export * from './after-merge';
 export * from './adf-md';
+export * from './detect';
+export * from './detect-repo';
+export * from './detect-tracker';
+export * from './config-fields';
+export * from './field-text';
+export * from './settings-view';
 
 import { loadConfig } from './config';
 import { loadAgents, loadPrCache } from './agents';

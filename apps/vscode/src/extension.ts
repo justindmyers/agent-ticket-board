@@ -1,9 +1,17 @@
 import * as vscode from 'vscode';
+import { existsSync } from 'node:fs';
 import {
   addComment,
   agentFor,
   agentMayMove,
+  CONFIG,
   detail,
+  detect,
+  mergeDetection,
+  saveSettings,
+  settingsView,
+  type Detection,
+  type Section,
   findPr,
   FLOWS,
   flowFor,
@@ -36,7 +44,10 @@ type Msg =
   | { type: 'comment'; key: string; text: string; run?: boolean }
   | { type: 'action'; key: string; id: string }
   | { type: 'openJira'; key: string }
-  | { type: 'openUrl'; url: string };
+  | { type: 'openUrl'; url: string }
+  | { type: 'openSettings' | 'setupWithClaude' | 'openConfigFile' }
+  | { type: 'detect'; only?: Section }
+  | { type: 'saveSettings'; texts: Record<string, string> };
 
 const REFRESH_MS = 5 * 60_000;
 const SAMPLE_ACTIONS: Record<string, string> = {
@@ -56,6 +67,8 @@ let loading: Promise<void> | undefined;
 const views = new Set<vscode.Webview>();
 let board: vscode.WebviewPanel | undefined;
 let inbox: vscode.WebviewPanel | undefined;
+let settings: vscode.WebviewPanel | undefined;
+let detection: Detection | undefined;
 let inboxKey: string | undefined;
 let sidebarVisible = false;
 const tried = new Set<string>();
@@ -331,6 +344,62 @@ async function handle(m: Msg, ctx: vscode.ExtensionContext) {
       return runAction(m.key, 'openJira');
     case 'openUrl':
       return open(m.url);
+    case 'openSettings':
+      return openSettings(ctx);
+  }
+}
+
+async function sendSettings() {
+  await settings?.webview.postMessage({ type: 'settings', view: await settingsView(detection) });
+}
+
+async function runDetect(only?: Section) {
+  await settings?.webview.postMessage({ type: 'detecting', only: only ?? null });
+  try {
+    detection = mergeDetection(detection, await detect({ only }), only);
+  } catch (e) {
+    void vscode.window.showErrorMessage(`Detection failed. ${errorText(e)}`);
+  }
+  await sendSettings();
+}
+
+function setupWithClaude() {
+  const t = vscode.window.createTerminal({
+    name: 'Agent Ticket Board setup',
+    cwd: CONFIG.repo.path ?? undefined
+  });
+  t.show();
+  t.sendText('claude "/atb-setup"');
+}
+
+async function openConfigFile() {
+  const { file } = await settingsView();
+  if (!existsSync(file)) {
+    void vscode.window.showInformationMessage('There is no config file yet. Save a value first.');
+    return;
+  }
+  await vscode.window.showTextDocument(vscode.Uri.file(file));
+}
+
+async function handleSettings(m: Msg) {
+  switch (m.type) {
+    case 'ready':
+      return sendSettings();
+    case 'detect':
+      return runDetect(m.only);
+    case 'saveSettings': {
+      const result = await saveSettings(m.texts);
+      await settings?.webview.postMessage({ type: 'settingsSaved', ...result });
+      await sendSettings();
+      if (result.saved.length) {
+        void refresh(true);
+      }
+      return;
+    }
+    case 'setupWithClaude':
+      return setupWithClaude();
+    case 'openConfigFile':
+      return openConfigFile();
   }
 }
 
@@ -338,7 +407,7 @@ async function handle(m: Msg, ctx: vscode.ExtensionContext) {
 function webviewHtml(
   webview: vscode.Webview,
   ctx: vscode.ExtensionContext,
-  mode: 'split' | 'sidebar' | 'board'
+  mode: 'split' | 'sidebar' | 'board' | 'settings'
 ) {
   const n = nonce();
   const uri = (f: string) =>
@@ -360,7 +429,8 @@ function createPanel(
   ctx: vscode.ExtensionContext,
   id: string,
   title: string,
-  mode: 'split' | 'board'
+  mode: 'split' | 'board' | 'settings',
+  onMessage: (m: Msg) => unknown = (m) => handle(m, ctx)
 ) {
   const p = vscode.window.createWebviewPanel(id, title, vscode.ViewColumn.Active, {
     enableScripts: true,
@@ -369,8 +439,10 @@ function createPanel(
   });
   p.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.svg');
   p.webview.html = webviewHtml(p.webview, ctx, mode);
-  p.webview.onDidReceiveMessage((m: Msg) => handle(m, ctx));
-  views.add(p.webview);
+  p.webview.onDidReceiveMessage(onMessage);
+  if (mode !== 'settings') {
+    views.add(p.webview);
+  }
   return p;
 }
 
@@ -410,6 +482,17 @@ function openBoard(ctx: vscode.ExtensionContext) {
   });
 }
 
+function openSettings(ctx: vscode.ExtensionContext) {
+  if (settings) {
+    return settings.reveal();
+  }
+  const p = createPanel(ctx, 'agentTicketBoard.settings', 'Settings', 'settings', handleSettings);
+  settings = p;
+  p.onDidDispose(() => {
+    settings = undefined;
+  });
+}
+
 export async function activate(ctx: vscode.ExtensionContext) {
   await loadState();
   // Sync with Jira and GitHub every 5 minutes while a view is open.
@@ -423,6 +506,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand('agentTicketBoard.board', () => openBoard(ctx)),
     vscode.commands.registerCommand('agentTicketBoard.inbox', () => openInbox(ctx)),
     vscode.commands.registerCommand('agentTicketBoard.refresh', () => refresh(true)),
+    vscode.commands.registerCommand('agentTicketBoard.settings', () => openSettings(ctx)),
     vscode.window.registerWebviewViewProvider(
       'agentTicketBoard.queue',
       {

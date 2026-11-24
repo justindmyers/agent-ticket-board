@@ -16,6 +16,15 @@
     ]
   },
   "repo": {
-    "path": "~/code/example-app"
+    "path": "~/code/example-app",
+    "remote": "example/example-app",
+    "worktreeScript": "./scripts/new-worktree.sh",
+    "branch": "{type}/{key}-{slug}",
+    "prTitle": "{type}({scope}): {description} ({key})"
+  },
+  "app": {
+    "devCommand": "pnpm dev --port {port} --strictPort",
+    "ownerPort": 3000,
+    "buildPorts": [3001, 3005]
   }
 }

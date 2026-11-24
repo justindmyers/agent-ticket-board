@@ -15,13 +15,15 @@ const ROOT_DOCS = [
   'CONTRIBUTING.md'
 ];
 
+const DOC_DIRS = ['docs', 'apps/claude-plugin/commands'];
+
 const docs = [
   ...ROOT_DOCS.filter((f) => existsSync(f)),
-  ...(existsSync('docs')
-    ? readdirSync('docs')
-        .filter((f) => f.endsWith('.md'))
-        .map((f) => join('docs', f))
-    : [])
+  ...DOC_DIRS.filter((d) => existsSync(d)).flatMap((d) =>
+    readdirSync(d)
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => join(d, f))
+  )
 ];
 
 let failed = 0;

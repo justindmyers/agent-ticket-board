@@ -1,4 +1,4 @@
-import { mdiViewColumnOutline } from '@mdi/js';
+import { mdiCogOutline, mdiViewColumnOutline } from '@mdi/js';
 import { Bullet } from '../../shared/components/Bullet';
 import { Button } from '../../shared/components/Button';
 import { Icon } from '../../shared/components/Icon';
@@ -8,6 +8,7 @@ import { RefreshButton } from '../../shared/components/RefreshButton';
 import type { Snapshot } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import { send } from '../../shared/utils/vscodeApi';
+import { SIDEBAR } from '../utils/mode';
 import { clockTime } from '../utils/time';
 
 type Props = { data: Snapshot | null; offline: boolean; needsN: number; theme: Theme };
@@ -48,6 +49,16 @@ export function SprintHeader({ data, offline, needsN, theme }: Props) {
         <Icon path={mdiViewColumnOutline} size={15} />
         Board<Kbd>B</Kbd>
       </Button>
+      {!SIDEBAR && (
+        <Button
+          variant="ghost"
+          className="size-7 justify-center px-0"
+          aria-label="Settings"
+          onPress={() => send({ type: 'openSettings' })}
+        >
+          <Icon path={mdiCogOutline} size={15} />
+        </Button>
+      )}
       <RefreshButton
         updating={data?.updating}
         label={`Refresh from Jira. Last refresh ${clockTime(data?.at)}`}

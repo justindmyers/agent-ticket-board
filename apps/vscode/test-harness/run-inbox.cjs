@@ -296,6 +296,92 @@ function page(theme, mode) {
   await k.screenshot({ path: path.join(OUT, 'inbox-dark-solo.png') });
   await k.close();
 
+  // Settings page: invented values from the fixture home, plus invented detected values.
+  const settings = atb('settings');
+  const propose = (key, text, confidence, same = false) => {
+    const f = settings.sections.flatMap((x) => x.fields).find((x) => x.key === key);
+    f.proposal = { key, value: text, text, source: 'acli jira workitem search', confidence, same };
+  };
+  propose('tracker.columns', 'To Do, In Progress, Code Review, Verifying, Done', 'medium');
+  propose('tracker.site', settings.sections[0].fields[0].text, 'high', true);
+  propose('repo.branch', '{type}/{key}-{slug}', 'medium');
+  settings.checks = [
+    { name: 'Jira (acli)', ok: true, detail: 'Signed in' },
+    { name: 'GitHub (gh)', ok: false, detail: 'Not signed in. Run: gh auth login' }
+  ];
+  settings.gaps = [{ key: 'repo.prTitle', files: ['.github/pull_request_template.md'] }];
+  async function openSettings(theme, width) {
+    const p = await b.newPage({ viewport: { width, height: 1000 } });
+    p.on('pageerror', (e) => report.errors.push(`${theme}/settings: ${e.message}`));
+    await p.goto(page(theme, 'settings'));
+    await p.waitForFunction(() => window.__sent.some((m) => m.type === 'ready'));
+    await p.evaluate((view) => window.postMessage({ type: 'settings', view }, '*'), settings);
+    await p.waitForSelector('input');
+    return p;
+  }
+  for (const theme of Object.keys(THEMES)) {
+    const sp = await openSettings(theme, 1100);
+    await axe(sp, `${theme}/settings`);
+    await sp.screenshot({ path: path.join(OUT, `settings-${theme}.png`), fullPage: true });
+    await sp.close();
+  }
+  const sk = await openSettings('dark', 1100);
+  const sent = (type) => sk.evaluate((t) => window.__sent.filter((m) => m.type === t), type);
+  const inView = (loc) =>
+    loc.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top >= 0 && r.bottom <= innerHeight && r.width > 0;
+    });
+  const headerSave = sk.getByRole('button', { name: /^Save( \d+)?$/ }).first();
+  kb.settingsSaveBefore = {
+    inView: await inView(headerSave),
+    disabled: await headerSave.isDisabled()
+  };
+  await sk.getByRole('textbox', { name: 'Project key' }).focus();
+  await sk.keyboard.press('Meta+A');
+  await sk.keyboard.type('DEMO');
+  await sk.getByRole('button', { name: 'Use the detected Board columns' }).focus();
+  await sk.keyboard.press('Enter');
+  kb.settingsSaveBar = await sk.getByRole('region', { name: 'Unsaved changes' }).innerText();
+  kb.settingsSaveAfter = {
+    label: await headerSave.innerText(),
+    disabled: await headerSave.isDisabled()
+  };
+  await sk.getByRole('textbox', { name: 'Ports for builds' }).focus();
+  await sk.keyboard.type('0');
+  kb.settingsBarInViewAtBottom = await inView(sk.getByRole('region', { name: 'Unsaved changes' }));
+  await sk.getByRole('button', { name: 'Save', exact: true }).focus();
+  await sk.keyboard.press('Enter');
+  kb.settingsSave = (await sent('saveSettings'))[0];
+  await sk.evaluate(() =>
+    window.postMessage(
+      {
+        type: 'settingsSaved',
+        saved: ['tracker.columns'],
+        errors: { 'tracker.project': 'Project key must be text' }
+      },
+      '*'
+    )
+  );
+  await sk.waitForTimeout(100);
+  kb.settingsError = await sk
+    .getByRole('textbox', { name: 'Project key' })
+    .getAttribute('aria-invalid');
+  await sk.getByRole('button', { name: 'Detect the repository values again' }).click();
+  kb.settingsDetect = (await sent('detect'))[0];
+  await sk.evaluate(() => window.postMessage({ type: 'detecting', only: 'repo' }, '*'));
+  await sk.waitForTimeout(50);
+  kb.settingsDetecting = await sk
+    .getByRole('button', { name: 'Detect the repository values again' })
+    .innerText();
+  await axe(sk, 'dark/settings-edited');
+  await sk.screenshot({ path: path.join(OUT, 'settings-dark-edited.png'), fullPage: true });
+  await sk.close();
+  const sn = await openSettings('dark', 520);
+  await axe(sn, 'dark/settings-narrow');
+  await sn.screenshot({ path: path.join(OUT, 'settings-dark-narrow.png'), fullPage: true });
+  await sn.close();
+
   fs.writeFileSync(path.join(OUT, 'inbox-report.json'), JSON.stringify(report, null, 1));
   const summary = Object.entries(report.axe).map(
     ([k, v]) =>
