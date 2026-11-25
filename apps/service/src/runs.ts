@@ -32,7 +32,8 @@ import {
   type Ticket,
   HOME,
   memorySection,
-  projectMemory
+  projectMemory,
+  boardCommand
 } from '@agent-ticket-board/core';
 import { sessionOf, TestBrowser } from './browser';
 import { planBase } from './plan-base';
@@ -490,7 +491,7 @@ export class Runs {
 
   /** The command that the agent runs to take a screenshot set: the board's own CLI. */
   shotsCommand() {
-    return this.d.shotsCommand ?? `${process.execPath} ${process.argv[1]} shots`;
+    return this.d.shotsCommand ?? `${boardCommand()} shots`;
   }
 
   /**

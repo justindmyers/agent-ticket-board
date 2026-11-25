@@ -59,6 +59,8 @@ const USAGE = `usage:
   atb comment <KEY> <text> [--run]       a comment for the agent (never sent to Jira)
   atb heavy acquire|release <OWNER>      the lock that runs heavy commands one at a time (used by the guard hook)
   atb change <KEY> <TEXT>                comment and re-plan: built work goes back to Planning for the change
+  atb handoff <KEY>                      write the handoff file for a Claude Code chat; prints it and the prompt
+  atb handback <KEY> <TEXT> [--replan]   the chat hands the ticket back: what changed, and the next step
   atb move <KEY> <STATUS> [--approved]   a Jira move by the agent, or one that the developer approved
   atb agent-may-move <KEY> on|off        the developer's permission for one ticket
   atb after-merge <KEY> <STATUS>|default the status for this ticket after its merge
@@ -246,6 +248,23 @@ async function main() {
       return out({ ok: true });
     }
     return out({ ok: await acquireHeavy(lock, args[1]) });
+  }
+  if (cmd === 'handoff' && key) {
+    const info = await ensureService(process.argv[1]!);
+    return out(await callService(info, `/tickets/${key}/handoff`, {}));
+  }
+  if (cmd === 'handback' && key && args.slice(1).some((a) => a !== '--replan')) {
+    const info = await ensureService(process.argv[1]!);
+    const summary = args
+      .slice(1)
+      .filter((a) => a !== '--replan')
+      .join(' ');
+    return out(
+      await callService(info, `/tickets/${key}/handback`, {
+        summary,
+        replan: args.includes('--replan')
+      })
+    );
   }
   if (cmd === 'change' && key && args[1]) {
     const info = await ensureService(process.argv[1]!);

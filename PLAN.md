@@ -111,9 +111,9 @@ Each stage is a row in the workflow config. A row names the skills, the helper a
 - **Settings in agent sessions.** Agent sessions load only the settings of the target repository (`settingSources: ['project', 'local']`, `strictMcpConfig: true`). They do not load the developer's own CLAUDE.md, MCP servers or plugins. The board adds its guard plugin.
 - **Continue in chat.** The Claude Code panel does not show sessions that the Agent SDK starts. Thus the board hands off a summary, not the session:
   1. The board writes a handoff file in `~/.agent-ticket-board/tickets/<KEY>/`. It has the ticket, the stage, the result so far, the open questions and the path of the agent transcript.
-  2. The board opens a new panel chat in the worktree with `vscode://anthropic.claude-code/open?prompt=<text>`. The prompt tells the chat to read the handoff file. The developer sends it.
+  2. The board opens a new Claude Code chat with a prompt that tells the chat to read the handoff file. The board types the prompt in. The developer sends it. In VS Code, the chat opens in a window on the worktree. In the Claude app and the terminal, the pane puts the prompt in the prompt box.
   3. The developer iterates in the chat with the normal setup.
-  4. The chat runs `atb handback <KEY>` with a summary, and a revised plan if there is one. The board shows the stage result as "Changed in chat".
+  4. The chat runs `atb handback <KEY> "<summary>"`. The ticket then shows "Changed in chat" and offers the next step of its stage, for example Test again. With `--replan`, the ticket goes back to Planning for the change.
 - **Exact session.** "Continue in terminal" runs `claude --resume <id>` in the worktree, with the same settings as the agent.
 - **Outside work.** If the worktree changes outside the board, the ticket page shows the changed files and the new commits. The developer can use them and continue. The next agent run starts a new session from the handback and the current diff.
 - **Guards.** A plugin hook refuses these commands and tells the agent why:

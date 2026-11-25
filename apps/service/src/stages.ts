@@ -23,7 +23,8 @@ import {
   isFinalPlan,
   planPrompt,
   type Flow,
-  type Ticket
+  type Ticket,
+  boardCommand
 } from '@agent-ticket-board/core';
 import type { AppEnv } from './runs';
 
@@ -192,7 +193,7 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
 };
 
 /** Testing: the build commands, the browser CLI, and the board's own screenshot command. */
-export function testAllowed(shots = `${process.execPath} ${process.argv[1]} shots`) {
+export function testAllowed(shots = `${boardCommand()} shots`) {
   return [...BUILD_ALLOWED, 'Bash(pnpm exec playwright-cli:*)', `Bash(${shots}:*)`];
 }
 

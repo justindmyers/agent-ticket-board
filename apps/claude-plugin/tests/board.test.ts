@@ -115,7 +115,14 @@ function stubAtb(on: On, calls: string[][]) {
   on('process.run', ($, e) => {
     const args = e.argv.slice(2);
     calls.push(args);
-    const out = args[0] === 'sprint' ? SPRINT : args[0] === 'ticket' ? TICKET : { id: 'x' };
+    const out =
+      args[0] === 'sprint'
+        ? SPRINT
+        : args[0] === 'ticket'
+          ? TICKET
+          : args[0] === 'handoff'
+            ? { prompt: 'Read /h/PROJ-102/handoff.md and continue.', folder: null }
+            : { id: 'x' };
     return printed(out);
   });
 }
@@ -232,6 +239,33 @@ for (const surface of ['desktop', 'terminal'] as const) {
       'PROJ-102',
       'Forward is wrong on Safari'
     ]);
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: continue in chat puts the handoff prompt in the prompt box`, async ($, on) => {
+    const calls: string[][] = [];
+    const filled: string[] = [];
+    stubAtb(on, calls);
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    on('prompt.fill', ($, e) => {
+      filled.push(e.text);
+      return { isFilled: true };
+    });
+    on('ui.toast', () => ({ value: undefined }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'chat' });
+    await tick();
+    expect(calls).toContainEqual(['handoff', 'PROJ-102']);
+    expect(filled).toEqual(['Read /h/PROJ-102/handoff.md and continue.']);
     await ui.unmount();
   });
 }

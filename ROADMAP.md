@@ -78,8 +78,8 @@ Build:
 - [ ] Testing feedback: "Not right" with a note sends the change back for a fix.
 - [ ] The Code review actions start real work. Now they show a message only.
 - [ ] "Comment and resume" sends the comment to the agent session.
-- [ ] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
-- [ ] `atb handback <KEY>` records the result of a chat. The ticket page shows "Changed in chat".
+- [x] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
+- [x] `atb handback <KEY>` records the result of a chat. The ticket page shows "Changed in chat".
 - [ ] The ticket page shows work that changed outside the board since the last agent run.
 - [ ] "Continue in terminal" resumes the exact agent session.
 - [ ] The guard refuses `git push` before approval, in every session.

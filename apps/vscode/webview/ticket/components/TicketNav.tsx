@@ -3,7 +3,7 @@ import { Button } from '../../shared/components/Button';
 import { Icon } from '../../shared/components/Icon';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
-import { accentOf } from '@agent-ticket-board/core/look';
+import { accentOf, runActive } from '@agent-ticket-board/core/look';
 import { type stageOf } from '../../shared/utils/stages';
 import { ink } from '../../shared/utils/surfaces';
 import type { Act } from '../types/ticket';
@@ -56,7 +56,12 @@ export function TicketNav({ d, stage, act, onBack, theme }: Props) {
           variant="ghost"
           className="h-7 px-2"
           onPress={() => act('openChat')}
-          isDisabled={!f?.session}
+          isDisabled={!f || runActive(f)}
+          aria-label={
+            f && runActive(f)
+              ? 'Continue in a Claude Code chat: stop the agent run first'
+              : 'Continue in a Claude Code chat'
+          }
         >
           <Icon path={mdiCommentTextOutline} size={14} />
           Chat

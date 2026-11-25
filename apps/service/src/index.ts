@@ -6,11 +6,13 @@ import { dirname, join } from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import {
   addComment,
+  boardCommand,
   approveTesting,
   audit,
   CONFIG,
   errorData,
   detail,
+  TICKETS_DIR,
   listComments,
   loadFlow,
   loadState,
@@ -24,6 +26,7 @@ import {
   serviceInfo
 } from '@agent-ticket-board/core';
 import { Processes } from './processes';
+import { handback, writeHandoff } from './handoff';
 import { Runs } from './runs';
 import { createApi } from './server';
 
@@ -133,6 +136,31 @@ export async function serve() {
       await addComment(key!, text.trim(), true);
       await saveFlow(key!, f);
       return runs.plan(key!);
+    },
+    // Continue in chat: the handoff file for a new Claude Code chat in the ticket's worktree.
+    'POST /tickets/:key/handoff': async ({ key }) => {
+      const flow = await loadFlow(key!);
+      if (!flow) {
+        throw new Error(`${key} has no agent record. Start it on the board first.`);
+      }
+      const r = await writeHandoff({
+        ticket: await detail(key!),
+        flow,
+        comments: (await listComments(key!)).map((c) => c.text),
+        dir: join(TICKETS_DIR, key!),
+        atb: boardCommand()
+      });
+      await audit(key!, 'service', 'chat.handoff', { file: r.file });
+      return r;
+    },
+    // The chat hands the ticket back: what changed there, and the stage's next step.
+    'POST /tickets/:key/handback': async ({ key }, body) => {
+      const f = handback(await loadFlow(key!), body, new Date().toISOString());
+      await addComment(key!, f.need!.ask, false);
+      await saveFlow(key!, f);
+      await audit(key!, 'service', 'chat.handback', { summary: f.chat?.summary, stage: f.stage });
+      events.send({ key });
+      return f;
     },
     'POST /tickets/:key/develop': async ({ key }) => runs.develop(key!),
     'POST /tickets/:key/test': async ({ key }) => runs.test(key!),

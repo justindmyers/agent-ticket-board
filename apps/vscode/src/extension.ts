@@ -1,6 +1,7 @@
 import { isEqual } from 'lodash-es';
 import * as vscode from 'vscode';
 import { startRun, stopRun, watchAgents } from './agent-runs';
+import { continueInChat, openPendingChat } from './chat';
 import { existsSync } from 'node:fs';
 import {
   addComment,
@@ -315,7 +316,7 @@ async function confirmMove(key: string, to: string, fromStatus?: string) {
   await doMove(key, to, 'you', from);
 }
 
-async function runAction(key: string, id: string) {
+async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext) {
   const f = flowFor(key);
   if (id.startsWith('move:')) {
     return confirmMove(key, id.slice(5), STATUS[key]);
@@ -325,9 +326,7 @@ async function runAction(key: string, id: string) {
     return url ? open(url) : undefined;
   }
   if (id === 'openChat') {
-    return f?.session
-      ? open(`vscode://anthropic.claude-code/open?session=${f.session}`)
-      : undefined;
+    return ctx ? continueInChat(ctx, key).catch((err: unknown) => showError(key, err)) : undefined;
   }
   if (id === 'openWorktree') {
     return f?.worktree
@@ -486,7 +485,7 @@ async function handle(m: Msg, ctx: vscode.ExtensionContext) {
       return sendTicket(m.key, true);
     }
     case 'action':
-      return runAction(m.key, String(m.id));
+      return runAction(m.key, String(m.id), ctx);
     case 'openJira':
       return runAction(m.key, 'openJira');
     case 'openUrl':
@@ -642,6 +641,7 @@ function openSettings(ctx: vscode.ExtensionContext) {
 
 export async function activate(ctx: vscode.ExtensionContext) {
   await loadState();
+  void openPendingChat(ctx);
   // Sync with Jira and GitHub every 5 minutes while a view is open.
   const timer = setInterval(() => {
     if (views.size) {

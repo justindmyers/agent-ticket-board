@@ -44,3 +44,4 @@ export * from './changes';
 export * from './memory';
 export * from './writes';
 export * from './heavy-lock';
+export * from './handoff';

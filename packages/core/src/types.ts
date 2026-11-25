@@ -126,7 +126,8 @@ export type Flow = {
   branch?: string;
   worktree?: string;
   adopted?: string;
-  session?: string;
+  /** The last hand-back from a Claude Code chat: what changed there. */
+  chat?: { at: string; summary: string };
   run?: AgentRun;
   closed?: { reason: 'tracker' | 'merged'; text: string };
 };

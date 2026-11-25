@@ -156,3 +156,18 @@ export async function openShot($: EngineInterface, key: string, path: string) {
     $.ui.toast(`${key}: ${errorText(e)}`);
   }
 }
+
+/** Continue in chat: writes the ticket's handoff file and puts the prompt for it in the prompt box. */
+export async function continueInChat($: EngineInterface, key: string) {
+  try {
+    const h = await atb<{ prompt: string; folder: string | null }>($, ['handoff', key]);
+    const r = await $.prompt.fill({ text: h.prompt });
+    $.ui.toast(
+      r.isFilled
+        ? `${key}: the prompt is in the prompt box. Send it to continue the ticket here.`
+        : `${key}: send this prompt: ${h.prompt}`
+    );
+  } catch (e) {
+    $.ui.toast(`${key}: ${errorText(e)}`);
+  }
+}

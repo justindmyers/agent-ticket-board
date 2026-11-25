@@ -1,11 +1,35 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { readJson } from './files';
-import { SERVICE_FILE } from './paths';
+import { ENV_FILE, SERVICE_FILE } from './paths';
 
 // How a client (CLI, VS Code, the pane through the CLI) finds and calls the service. The service
 // listens on 127.0.0.1 only, and every request must send the token from the service file.
 
 export type ServiceInfo = { port: number; token: string; pid: number };
+
+/**
+ * The developer's node and the installed CLI, as `pnpm install-local` recorded them. Commands that
+ * the board writes for agents and chats use these, never the node of the process that runs now:
+ * a client that another tool started may run on that tool's own node.
+ */
+export function boardCli(file = ENV_FILE): { node: string; atb: string } {
+  try {
+    const env = JSON.parse(readFileSync(file, 'utf8')) as { node?: string; atb?: string };
+    if (env.node && env.atb) {
+      return { node: env.node, atb: env.atb };
+    }
+  } catch {
+    // Not installed: a development run from the repository.
+  }
+  return { node: process.execPath, atb: process.argv[1] ?? 'atb' };
+}
+
+/** The shell command that runs the board CLI. */
+export const boardCommand = (file = ENV_FILE) => {
+  const c = boardCli(file);
+  return `${c.node} ${c.atb}`;
+};
 
 const alive = (pid: number) => {
   try {
@@ -44,7 +68,7 @@ export async function callService<T>(info: ServiceInfo, path: string, body?: unk
  */
 export async function ensureService(
   atb: string,
-  node = process.execPath,
+  node = boardCli().node,
   waitMs = 10_000
 ): Promise<ServiceInfo> {
   const running = await serviceInfo();

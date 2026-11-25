@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code';
 import { accentHex, hex, kit, type Ctx } from './kit';
-import { STAGES, spentText } from './look.gen';
+import { continueInChat } from './cli';
+import { runActive, STAGES, spentText } from './look.gen';
 import { store } from './store';
 import { ticketAdopt } from './ticket-adopt';
 import { ticketNeed } from './ticket-need';
@@ -86,6 +87,16 @@ export function ticketHeader($: EngineInterface, ctx: Ctx, d: Detail) {
           ]
         : []),
       ...(need ? [ticketNeed($, ctx, t, need)] : []),
+      ...(f && !runActive(f)
+        ? [
+            Button({
+              key: 'chat',
+              variant: 'secondary',
+              label: 'Continue in chat',
+              onPress: () => void continueInChat($, t.key)
+            })
+          ]
+        : []),
       Box({
         key: 'tabs',
         flexDirection: 'row',
