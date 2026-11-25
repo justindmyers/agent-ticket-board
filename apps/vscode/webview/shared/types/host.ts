@@ -20,10 +20,11 @@ import type {
   CodeReview,
   Evidence,
   Finding,
+  Gate,
   Question
 } from '@agent-ticket-board/core/types';
 
-export type { AgentRun, Answered, CodeReview, Evidence, Finding, Question, TrackerState };
+export type { AgentRun, Answered, CodeReview, Evidence, Finding, Gate, Question, TrackerState };
 
 export type LocalWork = { branch: string; worktree: string | null; changed: number; label: string };
 
@@ -76,6 +77,7 @@ export type Flow = {
   review?: string;
   evidence?: Record<string, Evidence>;
   codeReview?: CodeReview;
+  gate?: Gate;
   approved?: string;
   spent?: number;
   app?: string;

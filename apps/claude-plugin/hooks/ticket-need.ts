@@ -42,6 +42,8 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
                 ctx.redraw();
               } else if (x.id === 'startTesting') {
                 void agentRun($, t.key, 'test');
+              } else if (x.id === 'startGate') {
+                void agentRun($, t.key, 'gate');
               } else if (x.id === 'startCodeReview') {
                 void agentRun($, t.key, 'review');
               } else if (x.id === 'approveTesting') {

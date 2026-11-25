@@ -28,6 +28,7 @@ export * from './audit';
 export * from './worktree';
 export * from './development';
 export * from './next-step';
+export * from './gate';
 export * from './review';
 export * from './testing';
 export * from './service-client';

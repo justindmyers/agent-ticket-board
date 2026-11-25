@@ -77,7 +77,8 @@ Build:
 - [x] Testing stage: the service starts the app of the worktree on a free build port. It opens the test browser of the ticket with `playwright-cli`. The developer logs in once. The browser stays open between test runs. The agent checks each requirement in the live app or with its test, takes screenshots with `atb shots`, views them and fixes what looks wrong. The developer approves the evidence.
 - [ ] Testing feedback: "Not right" with a note sends the change back for a fix.
 - [x] "Approve for code review" starts the review run. Reviewers report. A checker reads the source and drops each finding that it cannot find in the code. The agent fixes the rest and runs the repository tests. `atb review <KEY>` runs it again.
-- [ ] Next for Code review: the pre-push gate, atomic commits, the push, the draft pull request and its live state.
+- [x] Pre-push gate: `atb gate <KEY>` runs the checks of `repo.checks` in order, merges the base branch and runs them again. No agent runs, and the first failure stops it.
+- [ ] Next for Code review: atomic commits, the push, the draft pull request and its live state.
 - [ ] "Comment and resume" sends the comment to the agent session.
 - [x] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
 - [x] `atb handback <KEY>` records the result of a chat. The ticket page shows "Changed in chat".

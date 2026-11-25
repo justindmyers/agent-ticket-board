@@ -173,6 +173,7 @@ export async function serve() {
       return f;
     },
     'POST /tickets/:key/review': async ({ key }) => runs.review(key!),
+    'POST /tickets/:key/gate': async ({ key }) => runs.gate(key!),
     'POST /tickets/:key/stop': async ({ key }) => ({ stopped: await runs.stop(key!) }),
     'POST /shutdown': async () => {
       setTimeout(() => void shutdown('asked by a client'), 10);

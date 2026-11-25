@@ -74,7 +74,14 @@ export function runLine(
   return `The last agent run ${how} (${run.model}${cost}).`;
 }
 
-type RunLike = { state: string; stage?: string; model: string; waiting?: string; app?: string };
+type RunLike = {
+  state: string;
+  stage?: string;
+  task?: 'gate';
+  model: string;
+  waiting?: string;
+  app?: string;
+};
 
 /** The title, the caption and the colour of a queued or running agent run. */
 export function runText(run: RunLike): {
@@ -110,6 +117,14 @@ export function runText(run: RunLike): {
           caption: `The agent checks each requirement in the live app${run.app ? ` at ${run.app}` : ''} with ${run.model}, and fixes what looks wrong.`,
           accent
         };
+  }
+  if (run.task === 'gate') {
+    return {
+      title: 'Running the checks',
+      caption:
+        'The board runs the checks of the repository, merges the base branch and runs them again. No agent runs.',
+      accent
+    };
   }
   if (run.stage === 'code-review') {
     return {

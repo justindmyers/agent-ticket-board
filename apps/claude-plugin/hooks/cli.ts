@@ -79,7 +79,7 @@ export function watchRun($: EngineInterface, key: string) {
 export async function agentRun(
   $: EngineInterface,
   key: string,
-  verb: 'plan' | 'develop' | 'test' | 'review' | 'stop'
+  verb: 'plan' | 'develop' | 'test' | 'review' | 'gate' | 'stop'
 ) {
   try {
     await atb($, [verb, key], 30000);

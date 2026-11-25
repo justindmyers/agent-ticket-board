@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -822,5 +823,80 @@ describe('Runs.review', () => {
     const f = await loadFlow('PROJ-62');
     expect(f?.need?.kind).toBe('problem');
     expect(f?.need?.actions[0]?.id).toBe('startCodeReview');
+  });
+});
+
+describe('Runs.gate', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+  const reviewed = (worktree: string) => ({
+    stage: 'code-review' as const,
+    worktree,
+    approved: '2026-01-01T00:00:00Z',
+    codeReview: { at: 'now', summary: 'Done.', findings: [], checks: [] }
+  });
+  /** A worktree whose origin has the same main: nothing to merge. */
+  const worktree = () => {
+    const root = mkdtempSync(join(tmpdir(), 'atb-gate-'));
+    git(root, 'init', '--bare', '-b', 'main', 'origin.git');
+    git(root, 'clone', join(root, 'origin.git'), 'wt');
+    const wt = join(root, 'wt');
+    writeFileSync(join(wt, 'a.txt'), 'a\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    git(wt, 'push', 'origin', 'HEAD:main');
+    return wt;
+  };
+
+  it('needs a finished review and checks in the config, and says which is missing', async () => {
+    const { r } = runs(fakeQuery([]).query);
+    await saveFlow('PROJ-70', { stage: 'testing', worktree: '/nope' });
+    await expect(r.gate('PROJ-70')).rejects.toThrow(/after the review/);
+    await saveFlow('PROJ-71', reviewed(worktree()));
+    CONFIG.repo.checks = [];
+    await expect(r.gate('PROJ-71')).rejects.toThrow(/Settings/);
+  });
+
+  it('runs the configured checks in the worktree without an agent, and records the steps', async () => {
+    CONFIG.repo.checks = ['echo ok > ran.txt'];
+    const wt = worktree();
+    await saveFlow('PROJ-72', reviewed(wt));
+    const query = vi.fn();
+    const { r } = runs(query as unknown as QueryFn);
+    const run = await r.gate('PROJ-72');
+    expect(run).toMatchObject({ task: 'gate', stage: 'code-review', state: 'running' });
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-72'))?.run?.state).toBe('done'), {
+      timeout: 5000
+    });
+    const f = await loadFlow('PROJ-72');
+    expect(query).not.toHaveBeenCalled();
+    expect(f?.gate?.ok).toBe(true);
+    expect(f?.gate?.steps.map((s) => s.name)).toEqual([
+      'Clean worktree',
+      'Fetch origin/main',
+      'echo ok > ran.txt',
+      'Merge origin/main'
+    ]);
+    expect(readFileSync(join(wt, 'ran.txt'), 'utf8')).toBe('ok\n');
+    expect(f?.need?.kind).toBe('decision');
+    CONFIG.repo.checks = [];
+  });
+
+  it('records a failing check as a problem with its output and a retry', async () => {
+    CONFIG.repo.checks = ['echo broken >&2; exit 3'];
+    await saveFlow('PROJ-73', reviewed(worktree()));
+    const { r } = runs(fakeQuery([]).query);
+    await r.gate('PROJ-73');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-73'))?.run?.state).toBe('failed'), {
+      timeout: 5000
+    });
+    const f = await loadFlow('PROJ-73');
+    expect(f?.need).toMatchObject({ kind: 'problem', detail: expect.stringContaining('broken') });
+    expect(f?.need?.actions[0]?.id).toBe('startGate');
+    CONFIG.repo.checks = [];
   });
 });

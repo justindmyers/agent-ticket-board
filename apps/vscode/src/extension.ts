@@ -350,6 +350,9 @@ async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext)
   if (id === 'startTesting') {
     return startRun(key, 'test').catch((e: unknown) => showError(key, e));
   }
+  if (id === 'startGate') {
+    return startRun(key, 'gate').catch((e: unknown) => showError(key, e));
+  }
   if (id === 'startCodeReview') {
     return startRun(key, 'review').catch((e: unknown) => showError(key, e));
   }

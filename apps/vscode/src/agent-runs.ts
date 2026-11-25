@@ -17,7 +17,7 @@ type Env = { node: string; atb: string };
 /** Starts a planning or a build run for one ticket. Starts the service if it does not run. */
 export async function startRun(
   key: string,
-  verb: 'plan' | 'develop' | 'test' | 'review' | 'approve-testing' | 'change' = 'plan',
+  verb: 'plan' | 'develop' | 'test' | 'review' | 'gate' | 'approve-testing' | 'change' = 'plan',
   body: Record<string, unknown> = {}
 ) {
   const env = await readJson<Env | null>(ENV_FILE, null);

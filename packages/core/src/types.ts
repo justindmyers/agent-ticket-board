@@ -82,6 +82,15 @@ export type CodeReview = {
   checks: { name: string; ok: boolean; note?: string }[];
 };
 
+/** The pre-push gate: each step, in order. It stops at the first step that fails. */
+export type Gate = {
+  at: string;
+  ok: boolean;
+  /** True when the merge of the base branch brought changes. */
+  merged: boolean;
+  steps: { name: string; ok: boolean; note?: string }[];
+};
+
 export type Pr = {
   number: number;
   branch?: string;
@@ -100,6 +109,8 @@ export type AgentRun = {
   id?: string;
   state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
   stage: Stage;
+  /** `gate`: the pre-push checks. The board runs them, with no agent. */
+  task?: 'gate';
   started: string;
   model: string;
   ended?: string;
@@ -138,6 +149,8 @@ export type Flow = {
   evidence?: Record<string, Evidence>;
   /** Code review: what the reviewers found and what the agent fixed. */
   codeReview?: CodeReview;
+  /** Code review: the last run of the pre-push checks. */
+  gate?: Gate;
   /** When the developer approved the tested change. */
   approved?: string;
   /** The cost of every agent run of this ticket, in US dollars. */

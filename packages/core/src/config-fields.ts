@@ -111,6 +111,24 @@ export const CONFIG_SECTIONS: ConfigSection[] = [
         label: 'Pull request title',
         help: 'A template with {type}, {scope}, {description} and {key}.',
         kind: 'optionalText'
+      },
+      {
+        key: 'repo.baseBranch',
+        label: 'Base branch',
+        help: 'The branch that pull requests target. The checks merge it, never rebase.',
+        kind: 'text'
+      },
+      {
+        key: 'repo.checks',
+        label: 'Checks before a push',
+        help: 'Commands, in order. {changed} is the changed files. {tests} is the changed test files.',
+        kind: 'list'
+      },
+      {
+        key: 'repo.testMock',
+        label: 'Whole-package mock',
+        help: 'Test files with this text always run, for example the name of a shared package that tests mock whole.',
+        kind: 'optionalText'
       }
     ]
   },

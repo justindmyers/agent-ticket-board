@@ -34,6 +34,13 @@ export function restingNeed(f: Flow): Need | null {
       actions: [{ id: 'startTesting', label: 'Test again' }]
     };
   }
+  if (f.stage === 'code-review' && !f.pr && f.run?.task === 'gate' && f.run.state === 'stopped') {
+    return {
+      kind: 'decision',
+      ask: 'The checks were stopped.',
+      actions: [{ id: 'startGate', label: 'Run the checks again' }]
+    };
+  }
   if (
     f.stage === 'code-review' &&
     !f.pr &&

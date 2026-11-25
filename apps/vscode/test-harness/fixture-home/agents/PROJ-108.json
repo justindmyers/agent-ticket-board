@@ -40,8 +40,43 @@
       }
     ],
     "checks": [
-      { "name": "check:types", "ok": true },
-      { "name": "eslint and prettier on the changed files", "ok": true }
+      {
+        "name": "check:types",
+        "ok": true
+      },
+      {
+        "name": "eslint and prettier on the changed files",
+        "ok": true
+      }
+    ]
+  },
+  "gate": {
+    "at": "2026-01-01T00:10:00Z",
+    "ok": false,
+    "merged": true,
+    "steps": [
+      {
+        "name": "Clean worktree",
+        "ok": true
+      },
+      {
+        "name": "Fetch origin/main",
+        "ok": true
+      },
+      {
+        "name": "pnpm check:types",
+        "ok": true
+      },
+      {
+        "name": "Merge origin/main",
+        "ok": true,
+        "note": "The merge brought changes: the checks run again."
+      },
+      {
+        "name": "pnpm check:types (after the merge)",
+        "ok": false,
+        "note": "src/SignIn.tsx(42,7): error TS2322: Type 'string' is not assignable to type 'number'."
+      }
     ]
   }
 }

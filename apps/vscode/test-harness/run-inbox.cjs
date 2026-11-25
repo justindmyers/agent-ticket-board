@@ -356,7 +356,8 @@ function page(theme, mode) {
   kb.codeReview = await rh.evaluate(() => ({
     rows: document.querySelectorAll('[aria-label="Review"] li').length,
     fixed: document.body.textContent.includes('Fixed'),
-    dropped: document.body.textContent.includes('Dropped')
+    dropped: document.body.textContent.includes('Dropped'),
+    gateRows: document.querySelectorAll('[aria-label="Checks before a push"] li').length
   }));
   await axe(rh, 'dark/ticket-code-review');
   await rh.screenshot({ path: path.join(OUT, 'ticket-code-review.png') });

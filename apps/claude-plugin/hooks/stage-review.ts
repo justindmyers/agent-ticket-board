@@ -2,6 +2,7 @@ import type { EngineInterface } from 'claude-code';
 import { hex, kit, type Ctx } from './kit';
 import { runBox } from './run-box';
 import { store } from './store';
+import { gateRows } from './gate-rows';
 import { reviewRows } from './review-rows';
 import type { Flow } from './types';
 
@@ -9,7 +10,11 @@ export function stageReview($: EngineInterface, ctx: Ctx, f: Flow) {
   const { Text, Link } = ctx.els;
   const { dim, sectionTitle } = kit(ctx);
   const pr = f.pr;
-  const head = [...runBox($, ctx, store.open ?? '', f, 'code-review'), ...reviewRows(ctx, f)];
+  const head = [
+    ...runBox($, ctx, store.open ?? '', f, 'code-review'),
+    ...reviewRows(ctx, f),
+    ...gateRows(ctx, f)
+  ];
   if (!pr) {
     return head.length ? head : [dim('No pull request yet.')];
   }

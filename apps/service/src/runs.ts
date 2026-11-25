@@ -15,6 +15,7 @@ import PQueue from 'p-queue';
 import { z } from 'zod';
 import {
   activityText,
+  applyGate,
   audit,
   branchName,
   CONFIG,
@@ -27,6 +28,7 @@ import {
   RunLog,
   saveFlow,
   withNextStep,
+  withoutNeed,
   type AgentRun,
   type Flow,
   type Ticket,
@@ -36,6 +38,7 @@ import {
   boardCommand
 } from '@agent-ticket-board/core';
 import { sessionOf, TestBrowser } from './browser';
+import { runGate } from './gate';
 import { planBase } from './plan-base';
 import type { Processes } from './processes';
 import { STAGE_SPECS, testAllowed, type StageId, type StageSpec } from './stages';
@@ -198,6 +201,8 @@ async function waitFor(check: () => Promise<boolean>, ms: number) {
   return false;
 }
 
+type ShellResult = { code: number; out: string };
+
 export class Runs {
   private queue: PQueue;
   /** Worktree setup runs `pnpm install`: one at a time. */
@@ -234,6 +239,114 @@ export class Runs {
 
   review(key: string) {
     return this.start(key, 'code-review');
+  }
+
+  /**
+   * The pre-push gate: no agent, no cost. The checks run one at a time on this computer. The run
+   * shows on the ticket like an agent run, with Stop.
+   */
+  async gate(key: string) {
+    if (this.active.has(key)) {
+      throw new Error(`${key}: a run is active already.`);
+    }
+    const base = await loadFlow(key);
+    if (!base?.codeReview || !base.worktree || !existsSync(base.worktree)) {
+      throw new Error(`${key}: the checks run after the review, in the ticket's worktree.`);
+    }
+    if (!CONFIG.repo.checks.length) {
+      throw new Error(
+        'Set the checks before a push in Settings first: the gate has nothing to run.'
+      );
+    }
+    const cwd = base.worktree;
+    const ac = new AbortController();
+    this.active.set(key, ac);
+    const id = `${this.now().replace(/[:.]/g, '-')}-gate`;
+    await audit(key, 'service', 'gate.started', { run: id, checks: CONFIG.repo.checks });
+    await this.write(key, {
+      ...withoutNeed(base),
+      stage: 'code-review',
+      run: {
+        id,
+        state: 'running',
+        stage: 'code-review',
+        task: 'gate',
+        started: this.now(),
+        model: 'none'
+      }
+    });
+    void (async () => {
+      try {
+        const gate = await runGate({
+          checks: CONFIG.repo.checks,
+          base: CONFIG.repo.baseBranch,
+          testMock: CONFIG.repo.testMock,
+          now: this.now,
+          step: (name) => void this.patchRun(key, { activity: `Running ${name}` }),
+          exec: (cmd, heavy) => {
+            const run = () => this.shell(key, cmd, cwd, ac.signal);
+            return heavy
+              ? (this.heavy.add(run, { signal: ac.signal }) as Promise<ShellResult>)
+              : run();
+          }
+        });
+        if (ac.signal.aborted) {
+          return;
+        }
+        await audit(key, 'service', 'gate.done', {
+          ok: gate.ok,
+          merged: gate.merged,
+          steps: gate.steps.map((s) => `${s.name}: ${s.ok ? 'ok' : 'failed'}`)
+        });
+        const f = applyGate(FLOWS[key]!, gate);
+        await this.write(key, {
+          ...f,
+          run: {
+            ...f.run!,
+            state: gate.ok ? 'done' : 'failed',
+            ended: this.now(),
+            activity: undefined
+          }
+        });
+      } catch (e) {
+        if (!ac.signal.aborted) {
+          await this.fail(
+            key,
+            STAGE_SPECS['code-review'],
+            e instanceof Error ? e.message : String(e),
+            undefined,
+            e
+          );
+        }
+      } finally {
+        this.active.delete(key);
+      }
+    })();
+    return FLOWS[key]!.run!;
+  }
+
+  /** One shell command in a worktree: its exit code and its output. Stop kills it. */
+  private shell(key: string, cmd: string, cwd: string, signal: AbortSignal): Promise<ShellResult> {
+    return new Promise((resolve) => {
+      const child = this.d.processes.spawn(
+        'sh',
+        ['-c', cmd],
+        {
+          cwd,
+          env: { ...process.env, PATH: toolPath(process.env.PATH) },
+          stdio: ['ignore', 'pipe', 'pipe']
+        },
+        key,
+        'check'
+      );
+      let out = '';
+      const add = (c: Buffer) => (out = (out + c.toString()).slice(-20000));
+      child.stdout?.on('data', add);
+      child.stderr?.on('data', add);
+      signal.addEventListener('abort', () => void this.d.processes.stop(key));
+      child.once('error', (e) => resolve({ code: 1, out: e.message }));
+      child.once('close', (code) => resolve({ code: code ?? 1, out }));
+    });
   }
 
   /** Queues a run of one stage. Returns at once; the run updates the record as it goes. */

@@ -27,6 +27,12 @@ export type Config = {
     worktreeScript: string | null;
     branch: string;
     prTitle: string | null;
+    /** The branch that a pull request targets, and that the gate merges. */
+    baseBranch: string;
+    /** The pre-push checks, in order. `{changed}` and `{tests}` are lists of files. */
+    checks: string[];
+    /** Test files that contain this text count as changed tests: they mock a shared package whole. */
+    testMock: string | null;
   };
   app: {
     devCommand: string | null;
@@ -60,7 +66,10 @@ export const DEFAULTS: Config = {
     remote: null,
     worktreeScript: null,
     branch: '{type}/{key}-{slug}',
-    prTitle: null
+    prTitle: null,
+    baseBranch: 'main',
+    checks: [],
+    testMock: null
   },
   app: {
     devCommand: null,

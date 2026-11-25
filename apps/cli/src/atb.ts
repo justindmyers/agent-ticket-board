@@ -79,6 +79,7 @@ const USAGE = `usage:
   atb open-shot <KEY> <PATH>             open a screenshot from the ticket's evidence
   atb approve-testing <KEY>              approve a tested change: the code review starts
   atb review <KEY>                       run the code review again
+  atb gate <KEY>                         run the checks before a push, merge the base branch
   atb develop <KEY>                      start building the approved plan in the ticket's worktree
   atb plan <KEY>                         start a planning run (starts the service if it does not run)
   atb stop <KEY>                         stop the agent run of a ticket
@@ -206,7 +207,12 @@ async function main() {
     return out(await callService(info, `/tickets/${key}/approve-testing`, {}));
   }
   if (
-    (cmd === 'plan' || cmd === 'develop' || cmd === 'test' || cmd === 'review' || cmd === 'stop') &&
+    (cmd === 'plan' ||
+      cmd === 'develop' ||
+      cmd === 'test' ||
+      cmd === 'review' ||
+      cmd === 'gate' ||
+      cmd === 'stop') &&
     key
   ) {
     const info = cmd !== 'stop' ? await ensureService(process.argv[1]!) : await serviceInfo();
