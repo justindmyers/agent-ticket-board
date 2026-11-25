@@ -77,7 +77,7 @@ export function runLine(
 type RunLike = {
   state: string;
   stage?: string;
-  task?: 'gate';
+  task?: 'gate' | 'commit-plan' | 'commit';
   model: string;
   waiting?: string;
   app?: string;
@@ -117,6 +117,21 @@ export function runText(run: RunLike): {
           caption: `The agent checks each requirement in the live app${run.app ? ` at ${run.app}` : ''} with ${run.model}, and fixes what looks wrong.`,
           accent
         };
+  }
+  if (run.task === 'commit-plan') {
+    return {
+      title: 'Planning the commits',
+      caption: `The agent groups the change into commits with ${run.model}. It changes no files.`,
+      accent
+    };
+  }
+  if (run.task === 'commit') {
+    return {
+      title: 'Making the commits',
+      caption:
+        'The board commits each group in order. The hooks of the repository run. No agent runs.',
+      accent
+    };
   }
   if (run.task === 'gate') {
     return {

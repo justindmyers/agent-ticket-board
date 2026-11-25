@@ -91,6 +91,13 @@ export type Gate = {
   steps: { name: string; ok: boolean; note?: string }[];
 };
 
+/** The commits of Code review: the plan that the developer approves, and the commits made. */
+export type Commits = {
+  plan: { title: string; files: string[] }[];
+  done: { title: string; sha: string }[];
+  summary?: string;
+};
+
 export type Pr = {
   number: number;
   branch?: string;
@@ -110,7 +117,7 @@ export type AgentRun = {
   state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
   stage: Stage;
   /** `gate`: the pre-push checks. The board runs them, with no agent. */
-  task?: 'gate';
+  task?: 'gate' | 'commit-plan' | 'commit';
   started: string;
   model: string;
   ended?: string;
@@ -151,6 +158,7 @@ export type Flow = {
   codeReview?: CodeReview;
   /** Code review: the last run of the pre-push checks. */
   gate?: Gate;
+  commits?: Commits;
   /** When the developer approved the tested change. */
   approved?: string;
   /** The cost of every agent run of this ticket, in US dollars. */

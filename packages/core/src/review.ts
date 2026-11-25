@@ -168,6 +168,6 @@ function reviewNeed(findings: Finding[], checks: { name: string; ok: boolean }[]
   return {
     kind: 'decision',
     ask: `Reviewed: ${fixed} fixed, ${count(findings, (x) => x.state === 'dropped')} dropped, ${style} style note${style === 1 ? '' : 's'}. Every check passes.`,
-    actions: [worktree]
+    actions: [{ id: 'startCommitPlan', label: 'Plan the commits' }, worktree]
   };
 }

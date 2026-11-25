@@ -174,6 +174,8 @@ export async function serve() {
     },
     'POST /tickets/:key/review': async ({ key }) => runs.review(key!),
     'POST /tickets/:key/gate': async ({ key }) => runs.gate(key!),
+    'POST /tickets/:key/commit-plan': async ({ key }) => runs.commitPlan(key!),
+    'POST /tickets/:key/commit': async ({ key }) => runs.commit(key!),
     'POST /tickets/:key/stop': async ({ key }) => ({ stopped: await runs.stop(key!) }),
     'POST /shutdown': async () => {
       setTimeout(() => void shutdown('asked by a client'), 10);

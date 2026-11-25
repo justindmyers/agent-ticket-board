@@ -7,6 +7,7 @@ import type { Flow } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import type { Act } from '../types/ticket';
 import { ChecksSection } from './ChecksSection';
+import { CommitsSection } from './CommitsSection';
 import { GateSection } from './GateSection';
 import { ReviewSection } from './ReviewSection';
 import { RunSection } from './RunSection';
@@ -20,6 +21,7 @@ export function CodeReviewStage({ f, act, theme }: Props) {
         <RunSection run={f.run} act={act} theme={theme} />
       )}
       {f.codeReview && <ReviewSection review={f.codeReview} theme={theme} />}
+      {f.commits && <CommitsSection commits={f.commits} theme={theme} />}
       {f.gate && <GateSection gate={f.gate} theme={theme} />}
     </>
   );

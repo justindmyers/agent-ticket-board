@@ -16,6 +16,8 @@ import { z } from 'zod';
 import {
   activityText,
   applyGate,
+  commitsDone,
+  shellQuote,
   audit,
   branchName,
   CONFIG,
@@ -241,69 +243,59 @@ export class Runs {
     return this.start(key, 'code-review');
   }
 
+  commitPlan(key: string) {
+    return this.start(key, 'commit-plan');
+  }
+
   /**
-   * The pre-push gate: no agent, no cost. The checks run one at a time on this computer. The run
-   * shows on the ticket like an agent run, with Stop.
+   * A job of the board itself: no agent, no cost. The run shows on the ticket like an agent run,
+   * with Stop. `work` gets the worktree and returns the record to save, or throws.
    */
-  async gate(key: string) {
+  private async job(
+    key: string,
+    task: 'gate' | 'commit',
+    refuse: (f: Flow | null) => string | null,
+    work: (f: Flow, cwd: string, ac: AbortController) => Promise<Flow>
+  ) {
     if (this.active.has(key)) {
       throw new Error(`${key}: a run is active already.`);
     }
     const base = await loadFlow(key);
-    if (!base?.codeReview || !base.worktree || !existsSync(base.worktree)) {
-      throw new Error(`${key}: the checks run after the review, in the ticket's worktree.`);
+    const why = refuse(base);
+    if (why) {
+      throw new Error(`${key}: ${why}`);
     }
-    if (!CONFIG.repo.checks.length) {
-      throw new Error(
-        'Set the checks before a push in Settings first: the gate has nothing to run.'
-      );
+    const cwd = base!.worktree!;
+    if (!existsSync(cwd)) {
+      throw new Error(`${key}: the worktree is gone: ${cwd}`);
     }
-    const cwd = base.worktree;
     const ac = new AbortController();
     this.active.set(key, ac);
-    const id = `${this.now().replace(/[:.]/g, '-')}-gate`;
-    await audit(key, 'service', 'gate.started', { run: id, checks: CONFIG.repo.checks });
+    const id = `${this.now().replace(/[:.]/g, '-')}-${task}`;
+    await audit(key, 'service', `${task}.started`, { run: id });
     await this.write(key, {
-      ...withoutNeed(base),
+      ...withoutNeed(base!),
       stage: 'code-review',
       run: {
         id,
         state: 'running',
         stage: 'code-review',
-        task: 'gate',
+        task,
         started: this.now(),
         model: 'none'
       }
     });
     void (async () => {
       try {
-        const gate = await runGate({
-          checks: CONFIG.repo.checks,
-          base: CONFIG.repo.baseBranch,
-          testMock: CONFIG.repo.testMock,
-          now: this.now,
-          step: (name) => void this.patchRun(key, { activity: `Running ${name}` }),
-          exec: (cmd, heavy) => {
-            const run = () => this.shell(key, cmd, cwd, ac.signal);
-            return heavy
-              ? (this.heavy.add(run, { signal: ac.signal }) as Promise<ShellResult>)
-              : run();
-          }
-        });
+        const f = await work(FLOWS[key]!, cwd, ac);
         if (ac.signal.aborted) {
           return;
         }
-        await audit(key, 'service', 'gate.done', {
-          ok: gate.ok,
-          merged: gate.merged,
-          steps: gate.steps.map((s) => `${s.name}: ${s.ok ? 'ok' : 'failed'}`)
-        });
-        const f = applyGate(FLOWS[key]!, gate);
         await this.write(key, {
           ...f,
           run: {
             ...f.run!,
-            state: gate.ok ? 'done' : 'failed',
+            state: f.need?.kind === 'problem' ? 'failed' : 'done',
             ended: this.now(),
             activity: undefined
           }
@@ -312,7 +304,10 @@ export class Runs {
         if (!ac.signal.aborted) {
           await this.fail(
             key,
-            STAGE_SPECS['code-review'],
+            {
+              ...STAGE_SPECS['code-review'],
+              retry: task === 'gate' ? 'startGate' : 'approveCommits'
+            },
             e instanceof Error ? e.message : String(e),
             undefined,
             e
@@ -323,6 +318,96 @@ export class Runs {
       }
     })();
     return FLOWS[key]!.run!;
+  }
+
+  /** The pre-push gate: the checks of the repository, the merge of the base branch, the checks again. */
+  gate(key: string) {
+    return this.job(
+      key,
+      'gate',
+      (f) => {
+        if (!f?.codeReview || !f.worktree) {
+          return "the checks run after the review, in the ticket's worktree.";
+        }
+        return CONFIG.repo.checks.length
+          ? null
+          : 'Set the checks before a push in Settings first: the gate has nothing to run.';
+      },
+      async (f, cwd, ac) => {
+        const gate = await runGate({
+          checks: CONFIG.repo.checks,
+          base: CONFIG.repo.baseBranch,
+          testMock: CONFIG.repo.testMock,
+          now: this.now,
+          step: (name) => void this.patchRun(key, { activity: `Running ${name}` }),
+          exec: (cmd, heavy) => this.heavyShell(key, cmd, cwd, ac, heavy)
+        });
+        await audit(key, 'service', 'gate.done', {
+          ok: gate.ok,
+          merged: gate.merged,
+          steps: gate.steps.map((s) => `${s.name}: ${s.ok ? 'ok' : 'failed'}`)
+        });
+        return applyGate(f, gate);
+      }
+    );
+  }
+
+  /** The planned commits, one after the other. The hooks of the repository run: never `--no-verify`. */
+  commit(key: string) {
+    return this.job(
+      key,
+      'commit',
+      (f) => (f?.commits?.plan.length && f.worktree ? null : 'There is no commit plan to make.'),
+      async (f, cwd, ac) => {
+        let cur = f;
+        for (const c of f.commits!.plan) {
+          this.patchRun(key, { activity: c.title }).catch(() => undefined);
+          const files = c.files.map(shellQuote).join(' ');
+          const add = await this.heavyShell(key, `git add -A -- ${files}`, cwd, ac, false);
+          const made = add.code
+            ? add
+            : await this.heavyShell(key, `git commit -m ${shellQuote(c.title)}`, cwd, ac, true);
+          if (made.code) {
+            await audit(key, 'service', 'commit.failed', {
+              title: c.title,
+              out: made.out.slice(-2000)
+            });
+            return {
+              ...cur,
+              need: {
+                kind: 'problem' as const,
+                ask: `The commit failed: ${c.title}`,
+                detail: made.out.trim().split('\n').slice(-12).join('\n').slice(-1200),
+                actions: [
+                  { id: 'startCommitPlan', label: 'Plan the commits again' },
+                  { id: 'openWorktree', label: 'Open worktree' }
+                ]
+              }
+            };
+          }
+          const sha = (
+            await this.shell(key, 'git rev-parse --short HEAD', cwd, ac.signal)
+          ).out.trim();
+          await audit(key, 'service', 'commit.made', { title: c.title, sha });
+          cur = {
+            ...cur,
+            commits: {
+              ...cur.commits!,
+              plan: cur.commits!.plan.filter((x) => x !== c),
+              done: [...cur.commits!.done, { title: c.title, sha }]
+            }
+          };
+          await this.write(key, cur);
+        }
+        return commitsDone(cur);
+      }
+    );
+  }
+
+  /** A shell command, under the queue of heavy commands when `heavy`: one at a time on this computer. */
+  private heavyShell(key: string, cmd: string, cwd: string, ac: AbortController, heavy: boolean) {
+    const run = () => this.shell(key, cmd, cwd, ac.signal);
+    return heavy ? (this.heavy.add(run, { signal: ac.signal }) as Promise<ShellResult>) : run();
   }
 
   /** One shell command in a worktree: its exit code and its output. Stop kills it. */
@@ -376,7 +461,14 @@ export class Runs {
     });
     await this.write(key, {
       ...spec.begin(base),
-      run: { id, state: 'queued', stage, started: this.now(), model: spec.model }
+      run: {
+        id,
+        state: 'queued',
+        stage: spec.stage,
+        ...(spec.task ? { task: spec.task } : {}),
+        started: this.now(),
+        model: spec.model
+      }
     });
     this.queue
       .add(() => this.execute(key, spec, ac), { signal: ac.signal })

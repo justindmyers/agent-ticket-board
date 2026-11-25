@@ -79,6 +79,8 @@ const USAGE = `usage:
   atb open-shot <KEY> <PATH>             open a screenshot from the ticket's evidence
   atb approve-testing <KEY>              approve a tested change: the code review starts
   atb review <KEY>                       run the code review again
+  atb commit-plan <KEY>                  an agent plans the commits of the change
+  atb commit <KEY>                       make the planned commits
   atb gate <KEY>                         run the checks before a push, merge the base branch
   atb develop <KEY>                      start building the approved plan in the ticket's worktree
   atb plan <KEY>                         start a planning run (starts the service if it does not run)
@@ -212,6 +214,8 @@ async function main() {
       cmd === 'test' ||
       cmd === 'review' ||
       cmd === 'gate' ||
+      cmd === 'commit-plan' ||
+      cmd === 'commit' ||
       cmd === 'stop') &&
     key
   ) {

@@ -78,5 +78,20 @@
         "note": "src/SignIn.tsx(42,7): error TS2322: Type 'string' is not assignable to type 'number'."
       }
     ]
+  },
+  "commits": {
+    "plan": [
+      {
+        "title": "fix(sign-in): clear the error after a retry (PROJ-108)",
+        "files": ["src/SignIn.tsx"]
+      }
+    ],
+    "done": [
+      {
+        "title": "test(sign-in): cover the retry (PROJ-108)",
+        "sha": "a1b2c3d"
+      }
+    ],
+    "summary": "One topic is left."
   }
 }

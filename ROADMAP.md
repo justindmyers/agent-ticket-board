@@ -78,7 +78,8 @@ Build:
 - [ ] Testing feedback: "Not right" with a note sends the change back for a fix.
 - [x] "Approve for code review" starts the review run. Reviewers report. A checker reads the source and drops each finding that it cannot find in the code. The agent fixes the rest and runs the repository tests. `atb review <KEY>` runs it again.
 - [x] Pre-push gate: `atb gate <KEY>` runs the checks of `repo.checks` in order, merges the base branch and runs them again. No agent runs, and the first failure stops it.
-- [ ] Next for Code review: atomic commits, the push, the draft pull request and its live state.
+- [x] Atomic commits: `atb commit-plan <KEY>` has an agent group the change by topic, with titles `type(scope): description (KEY)`. The developer reads the plan. `atb commit <KEY>` makes the commits with the hooks of the repository.
+- [ ] Next for Code review: the push, the draft pull request and its live state.
 - [ ] "Comment and resume" sends the comment to the agent session.
 - [x] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
 - [x] `atb handback <KEY>` records the result of a chat. The ticket page shows "Changed in chat".

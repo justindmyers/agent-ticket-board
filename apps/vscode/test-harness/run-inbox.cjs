@@ -357,6 +357,7 @@ function page(theme, mode) {
     rows: document.querySelectorAll('[aria-label="Review"] li').length,
     fixed: document.body.textContent.includes('Fixed'),
     dropped: document.body.textContent.includes('Dropped'),
+    commitRows: document.querySelectorAll('[aria-label="Commits"] li').length,
     gateRows: document.querySelectorAll('[aria-label="Checks before a push"] li').length
   }));
   await axe(rh, 'dark/ticket-code-review');

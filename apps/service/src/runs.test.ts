@@ -900,3 +900,115 @@ describe('Runs.gate', () => {
     CONFIG.repo.checks = [];
   });
 });
+
+describe('Runs.commitPlan and Runs.commit', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+  /** A repository with one commit and two changed files. */
+  const repo = () => {
+    const wt = mkdtempSync(join(tmpdir(), 'atb-commit-'));
+    git(wt, 'init', '-b', 'main');
+    writeFileSync(join(wt, 'base.txt'), 'base\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    writeFileSync(join(wt, 'a.ts'), 'a\n');
+    writeFileSync(join(wt, 'a.test.ts'), 'a\n');
+    return wt;
+  };
+  const reviewed = (worktree: string) => ({
+    stage: 'code-review' as const,
+    worktree,
+    codeReview: { at: 'now', summary: 'Done.', findings: [], checks: [] }
+  });
+  const plan = {
+    commits: [
+      { type: 'feat', scope: 'edges', description: 'add a', files: ['a.ts'] },
+      { type: 'test', scope: 'edges', description: 'cover a', files: ['a.test.ts'] }
+    ],
+    summary: 'Two topics.'
+  };
+
+  it('plans with a read-only agent that cannot stage or commit, and shows the plan', async () => {
+    const wt = repo();
+    await saveFlow('PROJ-80', reviewed(wt));
+    const { query, calls } = fakeQuery([init, success(plan)]);
+    const { r } = runs(query);
+    await r.commitPlan('PROJ-80');
+    await idle(r);
+    const o = calls[0]!.options!;
+    expect(o).toMatchObject({ cwd: wt, model: 'sonnet', maxBudgetUsd: 1 });
+    expect(o.allowedTools?.some((t) => /git (add|commit|push)/.test(t))).toBe(false);
+    expect(o.tools).not.toContain('Edit');
+    expect(calls[0]!.prompt).toContain('- a.ts');
+    const f = await loadFlow('PROJ-80');
+    expect(f?.run).toMatchObject({ task: 'commit-plan', state: 'done', stage: 'code-review' });
+    expect(f?.commits?.plan.map((c) => c.title)).toEqual([
+      'feat(edges): add a (PROJ-80)',
+      'test(edges): cover a (PROJ-80)'
+    ]);
+  });
+
+  it('fails the run with a retry when the plan leaves a changed file out', async () => {
+    const wt = repo();
+    await saveFlow('PROJ-81', reviewed(wt));
+    const half = { ...plan, commits: plan.commits.slice(0, 1) };
+    const { r } = runs(fakeQuery([init, success(half)]).query);
+    await r.commitPlan('PROJ-81');
+    await idle(r);
+    const f = await loadFlow('PROJ-81');
+    expect(f?.need).toMatchObject({ kind: 'problem', ask: expect.stringContaining('a.test.ts') });
+    expect(f?.need?.actions[0]?.id).toBe('startCommitPlan');
+  });
+
+  it('makes each planned commit in order, with the hooks, and offers the checks', async () => {
+    const wt = repo();
+    await saveFlow('PROJ-82', reviewed(wt));
+    const { r } = runs(fakeQuery([init, success(plan)]).query);
+    await r.commitPlan('PROJ-82');
+    await idle(r);
+    await r.commit('PROJ-82');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-82'))?.run?.task).toBe('commit'));
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-82'))?.run?.state).toBe('done'), {
+      timeout: 8000
+    });
+    expect(git(wt, 'log', '--format=%s', '-3').trim().split('\n')).toEqual([
+      'test(edges): cover a (PROJ-82)',
+      'feat(edges): add a (PROJ-82)',
+      'base'
+    ]);
+    expect(git(wt, 'status', '--porcelain')).toBe('');
+    const f = await loadFlow('PROJ-82');
+    expect(f?.commits?.done).toHaveLength(2);
+    expect(f?.need?.actions[0]?.id).toBe('startGate');
+  });
+
+  it('stops at a commit that a hook refuses, keeps the commits made, and says which failed', async () => {
+    const wt = repo();
+    mkdirSync(join(wt, '.git', 'hooks'), { recursive: true });
+    writeFileSync(
+      join(wt, '.git', 'hooks', 'commit-msg'),
+      '#!/bin/sh\ngrep -q "^test" "$1" && { echo "hook says no" >&2; exit 1; }\nexit 0\n',
+      { mode: 0o755 }
+    );
+    await saveFlow('PROJ-83', reviewed(wt));
+    const { r } = runs(fakeQuery([init, success(plan)]).query);
+    await r.commitPlan('PROJ-83');
+    await idle(r);
+    await r.commit('PROJ-83');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-83'))?.run?.state).toBe('failed'), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-83');
+    expect(f?.need).toMatchObject({
+      kind: 'problem',
+      ask: 'The commit failed: test(edges): cover a (PROJ-83)',
+      detail: expect.stringContaining('hook says no')
+    });
+    expect(f?.commits?.done.map((c) => c.title)).toEqual(['feat(edges): add a (PROJ-83)']);
+    expect(git(wt, 'log', '--format=%s', '-1').trim()).toBe('feat(edges): add a (PROJ-83)');
+  });
+});

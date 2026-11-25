@@ -2,7 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  applyCommitPlan,
   applyReview,
+  canPlanCommits,
+  changedFiles,
+  COMMIT_PLAN_SCHEMA,
+  commitPrompt,
+  parseCommitPlan,
   canReview,
   parseReview,
   REVIEW_SCHEMA,
@@ -29,6 +35,7 @@ import {
   isFinalPlan,
   planPrompt,
   type Flow,
+  type Stage,
   type Ticket,
   boardCommand
 } from '@agent-ticket-board/core';
@@ -37,7 +44,7 @@ import type { AppEnv } from './runs';
 // What differs between the stages that an agent runs: the checks before a run, the model and the
 // cost cap, the tools, the prompt, the answer shape and how the answer goes into the record.
 
-export type StageId = 'planning' | 'development' | 'testing' | 'code-review';
+export type StageId = 'planning' | 'development' | 'testing' | 'code-review' | 'commit-plan';
 
 export const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
 
@@ -96,8 +103,18 @@ export const ALLOWED_COMMANDS = commandsOf(BUILD_ALLOWED);
 export const REVIEW_TOOLS = [...BUILD_TOOLS, 'Agent', 'Task'];
 export const REVIEW_ALLOWED = [...BUILD_ALLOWED, 'Agent', 'Task'];
 
+/** Commit plan: read the change. The agent stages and commits nothing. */
+export const COMMIT_PLAN_ALLOWED = [
+  ...READ_ONLY_TOOLS,
+  'Bash(git status:*)',
+  'Bash(git diff:*)',
+  'Bash(git log:*)'
+];
+
 export type StageSpec = {
-  stage: StageId;
+  stage: Stage;
+  /** The part of a stage that is not its main run, like the commit plan of Code review. */
+  task?: 'commit-plan';
   model: string;
   budgetUsd: number;
   /** The action that runs the stage again after a failure. */
@@ -223,8 +240,38 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
       dropped: f.codeReview?.findings.filter((x) => x.state === 'dropped').length,
       checks: f.codeReview?.checks.map((c) => `${c.name}: ${c.ok ? 'ok' : 'failed'}`)
     })
+  },
+  'commit-plan': {
+    stage: 'code-review',
+    task: 'commit-plan',
+    model: 'sonnet',
+    budgetUsd: 1,
+    retry: 'startCommitPlan',
+    refuse: canPlanCommits,
+    begin: (f) => withoutNeed(f!),
+    prompt: (t, f) => commitPrompt(t, f, changedIn(f.worktree!), commandsOf(COMMIT_PLAN_ALLOWED)),
+    tools: [...READ_ONLY_TOOLS, 'Bash'],
+    allowed: COMMIT_PLAN_ALLOWED,
+    schema: () => COMMIT_PLAN_SCHEMA,
+    apply: (f, output, key) =>
+      applyCommitPlan(f, parseCommitPlan(output), changedIn(f.worktree!), key),
+    counts: (f) => ({ commits: f.commits?.plan.length })
   }
 };
+
+/** The files that changed in a worktree and are not committed: staged, unstaged and new. */
+export function changedIn(worktree: string) {
+  try {
+    return changedFiles(
+      execFileSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all'], {
+        cwd: worktree,
+        encoding: 'utf8'
+      })
+    );
+  } catch {
+    return [];
+  }
+}
 
 /** Testing: the build commands, the browser CLI, and the board's own screenshot command. */
 export function testAllowed(shots = `${boardCommand()} shots`) {
