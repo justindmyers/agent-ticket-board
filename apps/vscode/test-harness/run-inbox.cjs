@@ -350,6 +350,16 @@ function page(theme, mode) {
     .getByRole('button', { name: 'Open the R2-forward dark 1400×900 screenshot of R2' })
     .click();
   kb.shotSent = await rh.evaluate(() => window.__sent.find((m) => m.type === 'action'));
+  await rh.click('[role=option][data-key="PROJ-108"]');
+  await rh.waitForTimeout(300);
+  // Code review: each finding with what became of it, and the repository checks.
+  kb.codeReview = await rh.evaluate(() => ({
+    rows: document.querySelectorAll('[aria-label="Review"] li').length,
+    fixed: document.body.textContent.includes('Fixed'),
+    dropped: document.body.textContent.includes('Dropped')
+  }));
+  await axe(rh, 'dark/ticket-code-review');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-code-review.png') });
   await rh.click('[role=option][data-key="PROJ-112"]');
   await rh.waitForTimeout(300);
   kb.loginRun = await rh.evaluate(() => {

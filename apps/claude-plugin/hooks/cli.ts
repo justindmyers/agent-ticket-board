@@ -79,7 +79,7 @@ export function watchRun($: EngineInterface, key: string) {
 export async function agentRun(
   $: EngineInterface,
   key: string,
-  verb: 'plan' | 'develop' | 'test' | 'stop'
+  verb: 'plan' | 'develop' | 'test' | 'review' | 'stop'
 ) {
   try {
     await atb($, [verb, key], 30000);
@@ -146,6 +146,7 @@ export async function approveTested($: EngineInterface, key: string) {
     return;
   }
   await reloadTicket($, key);
+  watchRun($, key);
 }
 
 /** Opens one of the ticket's screenshots in the system viewer. The CLI checks that the evidence lists it. */

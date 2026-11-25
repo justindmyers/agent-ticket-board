@@ -1,4 +1,47 @@
 {
   "stage": "code-review",
-  "branch": "hotfix/PROJ-108-sign-in"
+  "branch": "hotfix/PROJ-108-sign-in",
+  "codeReview": {
+    "at": "2026-01-01T00:00:00Z",
+    "summary": "Two findings were confirmed and fixed. One was dropped. Every check passes.",
+    "findings": [
+      {
+        "id": "F1",
+        "reviewer": "correctness",
+        "file": "src/SignIn.tsx",
+        "line": 42,
+        "problem": "The error state never clears after a retry.",
+        "fix": "Reset the error when the form submits.",
+        "severity": "blocking",
+        "state": "fixed",
+        "note": ""
+      },
+      {
+        "id": "F2",
+        "reviewer": "a11y-reviewer",
+        "file": "src/SignIn.tsx",
+        "line": 58,
+        "problem": "The password toggle has no accessible name.",
+        "fix": "Add an aria-label.",
+        "severity": "blocking",
+        "state": "fixed",
+        "note": ""
+      },
+      {
+        "id": "F3",
+        "reviewer": "code-style",
+        "file": "src/SignIn.tsx",
+        "line": 12,
+        "problem": "The handler name does not match the repository naming.",
+        "fix": "Rename it.",
+        "severity": "style",
+        "state": "dropped",
+        "note": "The source already uses the repository naming."
+      }
+    ],
+    "checks": [
+      { "name": "check:types", "ok": true },
+      { "name": "eslint and prettier on the changed files", "ok": true }
+    ]
+  }
 }

@@ -61,6 +61,27 @@ export type Step = {
   note?: string;
 };
 
+/** One finding of the code review. */
+export type Finding = {
+  id: string;
+  reviewer: string;
+  file: string;
+  line: number;
+  problem: string;
+  fix: string;
+  severity: 'blocking' | 'style';
+  state: 'fixed' | 'open' | 'dropped';
+  note: string;
+};
+
+/** The result of the review round: the findings, the repository checks and a summary. */
+export type CodeReview = {
+  at: string;
+  summary: string;
+  findings: Finding[];
+  checks: { name: string; ok: boolean; note?: string }[];
+};
+
 export type Pr = {
   number: number;
   branch?: string;
@@ -115,6 +136,8 @@ export type Flow = {
   review?: string;
   /** Testing: the evidence for each requirement id. */
   evidence?: Record<string, Evidence>;
+  /** Code review: what the reviewers found and what the agent fixed. */
+  codeReview?: CodeReview;
   /** When the developer approved the tested change. */
   approved?: string;
   /** The cost of every agent run of this ticket, in US dollars. */

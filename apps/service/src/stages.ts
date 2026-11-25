@@ -2,6 +2,12 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  applyReview,
+  canReview,
+  parseReview,
+  REVIEW_SCHEMA,
+  reviewPrompt,
+  REVIEWERS,
   applyTest,
   markStaleShots,
   canTest,
@@ -31,7 +37,7 @@ import type { AppEnv } from './runs';
 // What differs between the stages that an agent runs: the checks before a run, the model and the
 // cost cap, the tools, the prompt, the answer shape and how the answer goes into the record.
 
-export type StageId = 'planning' | 'development' | 'testing';
+export type StageId = 'planning' | 'development' | 'testing' | 'code-review';
 
 export const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
 
@@ -86,6 +92,10 @@ export const commandsOf = (allowed: string[]) =>
   allowed.filter((x) => x.startsWith('Bash(')).map((x) => x.slice(5, -1).replace(/:\*$/, ''));
 export const ALLOWED_COMMANDS = commandsOf(BUILD_ALLOWED);
 
+/** Code review: the build tools, and the subagents that review. */
+export const REVIEW_TOOLS = [...BUILD_TOOLS, 'Agent', 'Task'];
+export const REVIEW_ALLOWED = [...BUILD_ALLOWED, 'Agent', 'Task'];
+
 export type StageSpec = {
   stage: StageId;
   model: string;
@@ -100,6 +110,8 @@ export type StageSpec = {
   prompt: (t: Ticket, f: Flow, comments: string[], app?: AppEnv) => string;
   tools: string[];
   allowed: string[];
+  /** Subagents of the run, by name: the reviewers of Code review. */
+  agents?: Record<string, { description: string; prompt: string; tools: string[]; model: string }>;
   /** The answer's JSON schema, for the record at the start of the run. */
   schema: (f: Flow) => Record<string, unknown>;
   /** The record after a valid answer. */
@@ -188,6 +200,28 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
       passing: Object.values(f.evidence ?? {}).filter((e) => e.ok).length,
       requirements: f.requirements?.length,
       shots: Object.values(f.evidence ?? {}).reduce((n, e) => n + (e.shots?.length ?? 0), 0)
+    })
+  },
+  'code-review': {
+    stage: 'code-review',
+    model: 'opus',
+    budgetUsd: 8,
+    retry: 'startCodeReview',
+    refuse: canReview,
+    begin: (f) => ({ ...withoutNeed(f!), stage: 'code-review' }),
+    prompt: (t, f, comments) => reviewPrompt(t, f, comments, commandsOf(REVIEW_ALLOWED)),
+    tools: REVIEW_TOOLS,
+    allowed: REVIEW_ALLOWED,
+    agents: Object.fromEntries(
+      Object.entries(REVIEWERS).map(([k, v]) => [k, { ...v, tools: [...v.tools] }])
+    ),
+    schema: () => REVIEW_SCHEMA,
+    apply: (f, output) => applyReview(f, parseReview(output), new Date().toISOString()),
+    counts: (f) => ({
+      findings: f.codeReview?.findings.length,
+      fixed: f.codeReview?.findings.filter((x) => x.state === 'fixed').length,
+      dropped: f.codeReview?.findings.filter((x) => x.state === 'dropped').length,
+      checks: f.codeReview?.checks.map((c) => `${c.name}: ${c.ok ? 'ok' : 'failed'}`)
     })
   }
 };

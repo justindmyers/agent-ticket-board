@@ -165,11 +165,14 @@ export async function serve() {
     'POST /tickets/:key/develop': async ({ key }) => runs.develop(key!),
     'POST /tickets/:key/test': async ({ key }) => runs.test(key!),
     // Approval ends Testing: the ticket's test browser closes as well.
+    // The approval also starts the review: its first step is the reviewers.
     'POST /tickets/:key/approve-testing': async ({ key }) => {
       const f = await approveTesting(key!);
       await runs.closeBrowser(key!);
+      await runs.review(key!);
       return f;
     },
+    'POST /tickets/:key/review': async ({ key }) => runs.review(key!),
     'POST /tickets/:key/stop': async ({ key }) => ({ stopped: await runs.stop(key!) }),
     'POST /shutdown': async () => {
       setTimeout(() => void shutdown('asked by a client'), 10);

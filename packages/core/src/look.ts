@@ -80,9 +80,16 @@ type RunLike = { state: string; stage?: string; model: string; waiting?: string;
 export function runText(run: RunLike): {
   title: string;
   caption: string;
-  accent: 'blue' | 'aqua' | 'amber';
+  accent: 'blue' | 'aqua' | 'amber' | 'green';
 } {
-  const accent = run.stage === 'development' ? 'aqua' : run.stage === 'testing' ? 'amber' : 'blue';
+  const accent =
+    run.stage === 'development'
+      ? 'aqua'
+      : run.stage === 'testing'
+        ? 'amber'
+        : run.stage === 'code-review'
+          ? 'green'
+          : 'blue';
   if (run.state === 'queued') {
     return {
       title: 'Queued',
@@ -103,6 +110,13 @@ export function runText(run: RunLike): {
           caption: `The agent checks each requirement in the live app${run.app ? ` at ${run.app}` : ''} with ${run.model}, and fixes what looks wrong.`,
           accent
         };
+  }
+  if (run.stage === 'code-review') {
+    return {
+      title: 'Reviewing now',
+      caption: `Reviewers read the change and the agent fixes what they confirm, with ${run.model}. It does not commit or push.`,
+      accent
+    };
   }
   if (run.stage === 'development') {
     return {

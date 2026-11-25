@@ -34,6 +34,17 @@ export function restingNeed(f: Flow): Need | null {
       actions: [{ id: 'startTesting', label: 'Test again' }]
     };
   }
+  if (
+    f.stage === 'code-review' &&
+    !f.pr &&
+    (f.run?.state === 'stopped' || f.run?.state === 'failed')
+  ) {
+    return {
+      kind: 'decision',
+      ask: 'The review was stopped.',
+      actions: [{ id: 'startCodeReview', label: 'Review again' }]
+    };
+  }
   return null;
 }
 

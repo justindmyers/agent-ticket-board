@@ -350,6 +350,9 @@ async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext)
   if (id === 'startTesting') {
     return startRun(key, 'test').catch((e: unknown) => showError(key, e));
   }
+  if (id === 'startCodeReview') {
+    return startRun(key, 'review').catch((e: unknown) => showError(key, e));
+  }
   if (id === 'approveTesting') {
     // Through the service: it also closes the ticket's test browser.
     return startRun(key, 'approve-testing').catch((err: unknown) => showError(key, err));

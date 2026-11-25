@@ -1,4 +1,5 @@
 import { mdiOpenInNew, mdiSourceBranch } from '@mdi/js';
+import { runActive } from '@agent-ticket-board/core/look';
 import { Button } from '../../shared/components/Button';
 import { Icon } from '../../shared/components/Icon';
 import { Section } from '../../shared/components/Section';
@@ -6,12 +7,27 @@ import type { Flow } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import type { Act } from '../types/ticket';
 import { ChecksSection } from './ChecksSection';
+import { ReviewSection } from './ReviewSection';
+import { RunSection } from './RunSection';
 
 type Props = { f: Flow; act: Act; theme: Theme };
 
 export function CodeReviewStage({ f, act, theme }: Props) {
+  const review = (
+    <>
+      {f.run?.stage === 'code-review' && runActive(f) && (
+        <RunSection run={f.run} act={act} theme={theme} />
+      )}
+      {f.codeReview && <ReviewSection review={f.codeReview} theme={theme} />}
+    </>
+  );
   if (!f.pr) {
-    return <p className="px-1 text-muted">No pull request yet.</p>;
+    return (
+      <>
+        {review}
+        {!f.codeReview && !runActive(f) && <p className="px-1 text-muted">No pull request yet.</p>}
+      </>
+    );
   }
   const facts = [
     ['State', f.pr.state ?? 'Open'],
@@ -22,6 +38,7 @@ export function CodeReviewStage({ f, act, theme }: Props) {
 
   return (
     <>
+      {review}
       <Section
         icon={mdiSourceBranch}
         title={`Pull request #${f.pr.number}`}

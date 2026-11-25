@@ -232,6 +232,10 @@ export class Runs {
     return this.start(key, 'testing');
   }
 
+  review(key: string) {
+    return this.start(key, 'code-review');
+  }
+
   /** Queues a run of one stage. Returns at once; the run updates the record as it goes. */
   async start(key: string, stage: StageId) {
     const spec = STAGE_SPECS[stage];
@@ -604,6 +608,7 @@ export class Runs {
       settingSources: ['project', 'local'],
       strictMcpConfig: true,
       plugins: [{ type: 'local', path: this.d.plugin }],
+      ...(spec.agents ? { agents: spec.agents } : {}),
       outputFormat: { type: 'json_schema', schema: spec.schema(FLOWS[key]!) },
       maxBudgetUsd: spec.budgetUsd,
       abortController: ac,

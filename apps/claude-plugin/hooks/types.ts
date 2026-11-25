@@ -56,6 +56,22 @@ export type Flow = {
   steps?: { n: number; text: string; covers: string[]; state: string; note?: string }[];
   checks?: { name: string; ok: boolean | null; note?: string }[];
   review?: string;
+  codeReview?: {
+    at: string;
+    summary: string;
+    findings: {
+      id: string;
+      reviewer: string;
+      file: string;
+      line: number;
+      problem: string;
+      fix: string;
+      severity: 'blocking' | 'style';
+      state: 'fixed' | 'open' | 'dropped';
+      note: string;
+    }[];
+    checks: { name: string; ok: boolean; note?: string }[];
+  };
   evidence?: Record<
     string,
     { ok: boolean; test?: string; shots?: string[]; seen?: string; note?: string }

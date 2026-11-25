@@ -755,3 +755,72 @@ describe('Runs.test', () => {
     expect(b.calls).toEqual([]);
   });
 });
+
+describe('Runs.review', () => {
+  const tested = (wt: string) => ({
+    stage: 'testing' as const,
+    worktree: wt,
+    approved: '2026-01-01T00:00:00Z',
+    requirements: [{ id: 'R1', text: 'Works', check: 'A test' }]
+  });
+  const reviewed = {
+    findings: [
+      {
+        reviewer: 'correctness',
+        file: 'a.ts',
+        line: 3,
+        problem: 'Unhandled empty list',
+        fix: 'Guard it',
+        severity: 'blocking',
+        state: 'fixed',
+        note: ''
+      }
+    ],
+    checks: [{ name: 'check:types', ok: true, note: '' }],
+    summary: 'One fix.'
+  };
+
+  it('refuses a change that the developer has not approved', async () => {
+    await saveFlow('PROJ-60', { ...tested('/wt'), approved: undefined });
+    const { r } = runs(fakeQuery([]).query);
+    await expect(r.review('PROJ-60')).rejects.toThrow(/approve/);
+  });
+
+  it('reviews in the worktree with reviewers that cannot edit, then records the findings', async () => {
+    const wt = mkdtempSync(join(tmpdir(), 'atb-wt-'));
+    await saveFlow('PROJ-61', tested(wt));
+    const { query, calls } = fakeQuery([init, success(reviewed)]);
+    const { r } = runs(query);
+    await r.review('PROJ-61');
+    await idle(r);
+
+    const o = calls[0]!.options!;
+    expect(o).toMatchObject({
+      cwd: wt,
+      model: 'opus',
+      permissionMode: 'dontAsk',
+      settingSources: ['project', 'local'],
+      strictMcpConfig: true
+    });
+    expect(Object.keys(o.agents ?? {})).toEqual(['correctness', 'code-style']);
+    expect(o.allowedTools).toContain('Agent');
+
+    const f = await loadFlow('PROJ-61');
+    expect(f?.stage).toBe('code-review');
+    expect(f?.codeReview?.findings[0]).toMatchObject({ id: 'F1', state: 'fixed' });
+    expect(f?.need?.kind).toBe('decision');
+    expect(f?.run).toMatchObject({ state: 'done', stage: 'code-review' });
+  });
+
+  it('records a review that leaves a failing check as a problem with Review again', async () => {
+    const wt = mkdtempSync(join(tmpdir(), 'atb-wt-'));
+    await saveFlow('PROJ-62', tested(wt));
+    const bad = { ...reviewed, checks: [{ name: 'eslint', ok: false, note: 'no-unused-vars' }] };
+    const { r } = runs(fakeQuery([init, success(bad)]).query);
+    await r.review('PROJ-62');
+    await idle(r);
+    const f = await loadFlow('PROJ-62');
+    expect(f?.need?.kind).toBe('problem');
+    expect(f?.need?.actions[0]?.id).toBe('startCodeReview');
+  });
+});
