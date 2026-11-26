@@ -1,6 +1,6 @@
 # Agent Ticket Board
 
-Agent Ticket Board shows your Jira sprint as a queue, a ticket page and a board. Each ticket can have an agent session. The agent moves the ticket through four stages: Planning, Development, Testing and Code review. You approve each stage, you test the change, and then the agent opens a draft pull request.
+Agent Ticket Board shows your Jira sprint as a queue, a ticket page and a board. Each ticket can have an agent session. The agent moves the ticket through four stages: Planning, Development, Testing and Code review. You approve the plan and the tested change. The board runs the repository checks, and you read the commit plan before the board commits.
 
 The board has these clients:
 
@@ -13,7 +13,31 @@ All clients read the same data in `~/.agent-ticket-board`.
 
 ## Status
 
-The team finished milestone M0 (scaffold). Milestone M1 (read-only board in both clients) is in progress. The agent service does not exist yet. The agent records are sample files. See `PLAN.md` for the design and `ROADMAP.md` for the open work.
+The board plans, builds, tests and reviews a ticket, makes atomic commits, and runs the checks before a push. The push, the draft pull request and the pull request tracking are not built yet. See `ROADMAP.md` for the open work and `PLAN.md` for the design.
+
+## How it works
+
+`FLOW.md` holds seven charts. Open `~/.agent-ticket-board/FLOW.html` for the same charts in a page. Each chart ends with the places where you can check it: an audit event, a field of the ticket record, or a command.
+
+1. **The parts.** The clients, the shared core library, the board service, the store and the agent sessions.
+2. **How tickets arrive.** The board reads your sprint with `acli`, the pull requests with `gh`, and the local work with git. It shows the cache first and fills in the details one by one.
+3. **The stages and who decides.** Four stages, three of them with an approval from you. You can start a ticket over at any time.
+4. **One agent run.** A button starts a run. The service queues it, starts a Claude agent with a command allowlist and a cost cap, and writes the result into the ticket record. A guard refuses a push and every write to GitHub or Jira.
+5. **Development and Testing.** The agent builds the plan in a new worktree. Then the board runs the checks of your repository. A failure goes back to the agent. Testing opens the app and a browser for the ticket, and the agent collects evidence for each requirement.
+6. **Code review.** Reviewers read the change, and the agent fixes each finding that the code shows. The board runs the checks again. An agent plans atomic commits, and you read the plan. The board makes the commits with your git hooks. The last step is the pre-push gate: the checks, a merge of the base branch, and the checks again.
+7. **What the board may write.** Agents edit files in the worktree of their ticket. Only you approve a plan, a code review or a Jira move.
+
+Each ticket has one record, `~/.agent-ticket-board/agents/KEY.json`. The audit log is `tickets/KEY/events.jsonl`. Each agent run has its own folder in `tickets/KEY/runs/`. Run `atb audit KEY` to read the log.
+
+## Checks for your repository
+
+The board runs the commands in `repo.checks` of `~/.agent-ticket-board/config.json`, in order. A command can use these placeholders:
+
+- `{changed}` is the changed files, and `{tests}` is the changed test files.
+- `{tests:apps/web/}` is only the test files in that folder, without the folder in the path.
+- `{atb}` is the command of the board CLI. `{atb} diff-scope` keeps the findings of a check on the lines that the ticket changed.
+
+The commands in `repo.beforeCommit` run before the commit plan. Use them for generators. `repo.baseBranch` is the branch that the board merges.
 
 ## Requirements
 

@@ -77,6 +77,9 @@ Build:
 - [x] Testing stage: the service starts the app of the worktree on a free build port. It opens the test browser of the ticket with `playwright-cli`. The developer logs in once. The browser stays open between test runs. The agent checks each requirement in the live app or with its test, takes screenshots with `atb shots`, views them and fixes what looks wrong. The developer approves the evidence.
 - [ ] Testing feedback: "Not right" with a note sends the change back for a fix.
 - [x] "Approve for code review" starts the review run. Reviewers report. A checker reads the source and drops each finding that it cannot find in the code. The agent fixes the rest and runs the repository tests. `atb review <KEY>` runs it again.
+- [x] The board runs the repository checks when a build says it is ready. A failure keeps the ticket in Development with the output, and the next build gets it. Only passing checks move it to Testing.
+- [x] "Start over" archives the uncommitted work as a patch, removes the worktree and branch, and returns the ticket to Planning. The lessons of the first build go in as a comment. `atb restart <KEY> --yes`.
+- [x] A clean review starts the checks by itself (`atb verify <KEY>`), on the change before the commits. A failure offers "Fix and review again": the next review gets the output.
 - [x] Pre-push gate: `atb gate <KEY>` runs the checks of `repo.checks` in order, merges the base branch and runs them again. No agent runs, and the first failure stops it.
 - [x] Atomic commits: `atb commit-plan <KEY>` has an agent group the change by topic, with titles `type(scope): description (KEY)`. The developer reads the plan. `atb commit <KEY>` makes the commits with the hooks of the repository.
 - [ ] Next for Code review: the push, the draft pull request and its live state.
