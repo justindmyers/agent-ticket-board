@@ -707,6 +707,38 @@ for (const surface of ['desktop', 'terminal'] as const) {
 }
 
 for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: Start over asks first, and only the confirmation archives and removes the work`, async ($, on) => {
+    const calls: string[][] = [];
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      return printed(a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? TICKET : {});
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'start-over' });
+    await tick();
+    expect(calls.some((c) => c[0] === 'restart')).toBe(false);
+    expect(await ui.find({ type: 'Text', text: /removed/ })).toBeDefined();
+    await ui.press({ key: 'restart-no' });
+    await tick();
+    expect(calls.some((c) => c[0] === 'restart')).toBe(false);
+    await ui.press({ key: 'start-over' });
+    await ui.press({ key: 'restart-yes' });
+    await tick();
+    expect(calls).toContainEqual(['restart', 'PROJ-102', '--yes']);
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
   test(`${surface}: Approve plan and start builds, and the Development tab shows the run`, async ($, on) => {
     const calls: string[][] = [];
     const steps = [

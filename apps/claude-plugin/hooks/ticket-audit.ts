@@ -1,6 +1,6 @@
 import type { EngineInterface, RenderElement } from 'claude-code';
-import { atb, errorText } from './cli';
-import { kit, type Ctx } from './kit';
+import { atb, errorText, loadSprint, loadTicket } from './cli';
+import { hex, kit, type Ctx } from './kit';
 import { store } from './store';
 
 async function showTimeline($: EngineInterface, ctx: Ctx, key: string) {
@@ -49,14 +49,78 @@ export function ticketAudit($: EngineInterface, ctx: Ctx, key: string): RenderEl
           label: 'Debug bundle',
           plain: true,
           onPress: () => void makeBundle($, key)
+        }),
+        Button({
+          key: 'start-over',
+          label: 'Start over',
+          plain: true,
+          onPress: () => {
+            store.confirmRestart = store.confirmRestart === key ? null : key;
+            ctx.redraw();
+          }
         })
       ]
     }),
+    ...(store.confirmRestart === key ? confirmRestart($, ctx, key) : []),
     ...(open
       ? [
           dim('The last 40 events. All of them: atb audit ' + key),
           Text({ wrap: 'wrap', children: [store.audit!.text] })
         ]
       : [])
+  ];
+}
+
+/** The developer's confirmation of "Start over": it removes the worktree and the branch of the ticket. */
+function confirmRestart($: EngineInterface, ctx: Ctx, key: string): RenderElement[] {
+  const { Box, Button, Text } = ctx.els;
+  return [
+    Box({
+      key: 'confirm-restart',
+      flexDirection: 'column',
+      rowGap: 'xs',
+      borderStyle: 'round',
+      borderColor: hex('amber'),
+      paddingX: 1,
+      children: [
+        Text({
+          wrap: 'wrap',
+          children: [
+            `Start ${key} over? The uncommitted work is saved as a patch in the ticket archive. The worktree and its branch are removed. The ticket returns to Planning with the lessons of this build.`
+          ]
+        }),
+        Box({
+          key: 'confirm-restart-buttons',
+          flexDirection: 'row',
+          columnGap: 1,
+          children: [
+            Button({
+              key: 'restart-yes',
+              label: 'Start over',
+              variant: 'primary',
+              onPress: async () => {
+                store.confirmRestart = null;
+                try {
+                  await atb($, ['restart', key, '--yes'], 120000);
+                  $.ui.toast(`${key} started over`);
+                } catch (e) {
+                  $.ui.toast(`${key}: ${errorText(e)}`);
+                }
+                await loadTicket($, key);
+                void loadSprint($);
+              }
+            }),
+            Button({
+              key: 'restart-no',
+              label: 'Cancel',
+              onPress: () => {
+                store.confirmRestart = null;
+                ctx.redraw();
+              }
+            })
+          ]
+        })
+      ]
+    })
   ];
 }

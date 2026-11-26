@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { createWriteStream } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { createConnection, createServer } from 'node:net';
@@ -15,6 +17,10 @@ import PQueue from 'p-queue';
 import { z } from 'zod';
 import {
   activityText,
+  addComment,
+  lessonsText,
+  startOver,
+  TICKETS_DIR,
   acceptBuild,
   applyGate,
   commitsDone,
@@ -326,6 +332,86 @@ export class Runs {
   /** The pre-push gate: the checks of the repository, the merge of the base branch, the checks again. */
   gate(key: string) {
     return this.checks(key, false);
+  }
+
+  /**
+   * Start over: the uncommitted work and the record go to an archive in the ticket's folder, the
+   * worktree and its branch are removed, and the ticket returns to Planning with the lessons of the
+   * first build as a comment. The next run must not find the old worktree by the ticket's branch.
+   */
+  startOver(key: string): Promise<{ archive: string | null }> {
+    // The guard is set before anything is awaited: two clicks at once cannot both pass it.
+    const going = this.starting.get(key);
+    if (going) {
+      return going;
+    }
+    const job = this.startOverOnce(key).finally(() => this.starting.delete(key));
+    this.starting.set(key, job);
+    return job;
+  }
+
+  private async startOverOnce(key: string) {
+    if (this.active.has(key)) {
+      throw new Error(`${key}: stop the active run first.`);
+    }
+    const f = await loadFlow(key);
+    if (!f) {
+      throw new Error(`${key}: there is no agent record to start over.`);
+    }
+    // A click after the first one ended does nothing more.
+    if (f.stage === 'planning' && !f.worktree && f.need?.ask.startsWith('Started over')) {
+      return { archive: null };
+    }
+    return this.doStartOver(key, f);
+  }
+
+  private starting = new Map<string, Promise<{ archive: string | null }>>();
+
+  private async doStartOver(key: string, f: Flow) {
+    // Removing a worktree takes a while: say so at once, so the ticket never looks idle.
+    await this.write(key, {
+      ...f,
+      need: {
+        kind: 'decision',
+        ask: 'Starting over: saving the work and removing the worktree. This takes about a minute.',
+        actions: []
+      }
+    });
+    const dir = join(TICKETS_DIR, key, 'archive', this.now().replace(/[:.]/g, '-'));
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'flow.json'), JSON.stringify(f, null, 2));
+    const lessons = lessonsText(f);
+    await writeFile(join(dir, 'lessons.md'), `${lessons}\n`);
+    const git = promisify(execFile);
+    const wt = f.worktree && existsSync(f.worktree) ? f.worktree : null;
+    if (wt) {
+      const base = `origin/${CONFIG.repo.baseBranch}`;
+      // New files count: intent-to-add makes the diff show them.
+      await git('git', ['add', '-N', '.'], { cwd: wt }).catch(() => undefined);
+      const work = await git('git', ['diff', 'HEAD'], { cwd: wt, maxBuffer: 1 << 28 }).catch(
+        () => ({ stdout: '' })
+      );
+      const made = await git('git', ['diff', `${base}...HEAD`], {
+        cwd: wt,
+        maxBuffer: 1 << 28
+      }).catch(() => ({ stdout: '' }));
+      await writeFile(join(dir, 'uncommitted.patch'), work.stdout);
+      if (made.stdout) {
+        await writeFile(join(dir, 'committed.patch'), made.stdout);
+      }
+      await this.closeBrowser(key).catch(() => undefined);
+      await this.d.processes.stop(key);
+      await git('git', ['worktree', 'remove', '--force', wt], { cwd: this.d.repo()! });
+      if (f.branch) {
+        await git('git', ['branch', '-D', f.branch], { cwd: this.d.repo()! }).catch(
+          () => undefined
+        );
+      }
+    }
+    await audit(key, 'developer', 'start-over', { archive: dir, worktree: wt, branch: f.branch });
+    await this.write(key, startOver(f));
+    await addComment(key, lessons, false);
+    return { archive: dir };
   }
 
   /** The checks of the repository on the change as it is, before the commits. No merge. */

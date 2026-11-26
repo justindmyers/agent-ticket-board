@@ -31,6 +31,7 @@ export * from './next-step';
 export * from './commits';
 export * from './diff-scope';
 export * from './gate';
+export * from './restart';
 export * from './review';
 export * from './testing';
 export * from './service-client';

@@ -8,6 +8,8 @@ export const store = {
   open: null as string | null,
   detail: null as Detail | null,
   draft: '',
+  /** The ticket whose "Start over" waits for the developer's confirmation. */
+  confirmRestart: null as string | null,
   confirmMove: null as { key: string; to: string; from?: string } | null,
   tabs: {} as Record<string, string>,
   collapsed: {} as Record<string, boolean>,

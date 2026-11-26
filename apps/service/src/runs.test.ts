@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +16,7 @@ vi.hoisted(() => {
 import {
   CONFIG,
   FLOWS,
+  listComments,
   loadFlow,
   readTimeline,
   saveFlow,
@@ -1175,6 +1176,105 @@ describe('a clean review leads to the checks', () => {
     expect(calls[1]!.prompt).toContain('# Checks that failed');
     expect(calls[1]!.prompt).toContain('TS2322 in a.ts');
     CONFIG.repo.checks = [];
+  });
+});
+
+describe('Runs.startOver', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+
+  /** A repository with a worktree on a ticket branch, a changed file and a new file. */
+  const setup = () => {
+    const root = mkdtempSync(join(tmpdir(), 'atb-over-'));
+    const repo = join(root, 'repo');
+    mkdirSync(repo);
+    git(repo, 'init', '-b', 'main');
+    writeFileSync(join(repo, 'a.txt'), 'a\n');
+    git(repo, 'add', '.');
+    git(repo, 'commit', '-m', 'base');
+    const wt = join(root, 'repo-feature-PROJ-5-x');
+    git(repo, 'worktree', 'add', '-b', 'feature/PROJ-5-x', wt, 'main');
+    writeFileSync(join(wt, 'a.txt'), 'changed\n');
+    writeFileSync(join(wt, 'new.ts'), 'new file\n');
+    return { repo, wt };
+  };
+  const built = (wt: string) => ({
+    stage: 'code-review' as const,
+    worktree: wt,
+    branch: 'feature/PROJ-5-x',
+    requirements: [{ id: 'R1', text: 'Works', check: 'A test' }],
+    steps: [{ n: 1, text: 'Do it', covers: ['R1'], state: 'done' as const }],
+    codeReview: {
+      at: 'n',
+      summary: 's',
+      checks: [],
+      findings: [
+        {
+          id: 'F1',
+          reviewer: 'correctness',
+          file: 'a.ts',
+          line: 3,
+          problem: 'Stale PUT.',
+          fix: 'Use the saved value.',
+          severity: 'blocking' as const,
+          state: 'fixed' as const,
+          note: ''
+        }
+      ]
+    }
+  });
+
+  it('archives the work, removes the worktree and its branch, and returns to Planning with the lessons', async () => {
+    const { repo, wt } = setup();
+    await saveFlow('PROJ-5', built(wt));
+    const { r } = runs(fakeQuery([]).query, { repo: () => repo });
+    const { archive } = (await r.startOver('PROJ-5')) as { archive: string };
+
+    const patch = readFileSync(join(archive, 'uncommitted.patch'), 'utf8');
+    expect(patch).toContain('+changed');
+    expect(patch).toContain('+new file');
+    expect(JSON.parse(readFileSync(join(archive, 'flow.json'), 'utf8')).stage).toBe('code-review');
+    expect(readFileSync(join(archive, 'lessons.md'), 'utf8')).toContain('a.ts:3: Stale PUT.');
+
+    expect(existsSync(wt)).toBe(false);
+    expect(git(repo, 'worktree', 'list', '--porcelain')).not.toContain('PROJ-5');
+    expect(git(repo, 'branch', '--list', 'feature/PROJ-5-x').trim()).toBe('');
+
+    const f = await loadFlow('PROJ-5');
+    expect(f).toMatchObject({ stage: 'planning', requirements: [{ id: 'R1' }] });
+    expect(f?.worktree).toBeUndefined();
+    expect(f?.steps).toBeUndefined();
+    expect((await listComments('PROJ-5')).at(-1)?.text).toContain('Stale PUT.');
+  });
+
+  it('does the work once for two clicks, also when the second comes after the first ended', async () => {
+    const { repo, wt } = setup();
+    await saveFlow('PROJ-77', built(wt));
+    const { r } = runs(fakeQuery([]).query, { repo: () => repo });
+    const [a, b] = await Promise.all([r.startOver('PROJ-77'), r.startOver('PROJ-77')]);
+    expect(b).toEqual(a);
+    const later = await r.startOver('PROJ-77');
+    expect(later.archive).toBeNull();
+    const lessons = (await listComments('PROJ-77')).filter((c) => c.text.startsWith('Lessons'));
+    expect(lessons).toHaveLength(1);
+    const types = (await readTimeline('PROJ-77')).filter((e) => e.type === 'start-over');
+    expect(types).toHaveLength(1);
+  });
+
+  it('refuses while a run is active', async () => {
+    const { repo, wt } = setup();
+    await saveFlow('PROJ-6', built(wt));
+    let release!: () => void;
+    const gate = new Promise<void>((res) => (release = res));
+    const { r } = runs(fakeQuery([init, success(plan)], gate).query, { repo: () => repo });
+    await r.plan('PROJ-6');
+    await expect(r.startOver('PROJ-6')).rejects.toThrow(/stop the active run/);
+    release();
+    await idle(r);
   });
 });
 

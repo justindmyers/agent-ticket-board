@@ -84,6 +84,7 @@ const USAGE = `usage:
   atb review <KEY>                       run the code review again
   atb commit-plan <KEY>                  an agent plans the commits of the change
   atb commit <KEY>                       make the planned commits
+  atb restart <KEY> --yes                archive the work, remove the worktree and branch, return to Planning
   atb diff-scope                         keep the findings on stdin that touch changed lines
   atb verify <KEY>                       run the checks on the change before the commits
   atb gate <KEY>                         run the checks before a push, merge the base branch
@@ -208,6 +209,15 @@ async function main() {
       process.exitCode = 2;
     }
     return;
+  }
+  if (cmd === 'restart' && key) {
+    if (!flags.has('--yes')) {
+      throw new Error(
+        `This archives the uncommitted work of ${key}, removes its worktree and branch, and returns it to Planning. Run it again with --yes.`
+      );
+    }
+    const info = await ensureService(process.argv[1]!);
+    return out(await callService(info, `/tickets/${key}/restart`, {}));
   }
   if (cmd === 'approve-testing' && key) {
     const info = await ensureService(process.argv[1]!);

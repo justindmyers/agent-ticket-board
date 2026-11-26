@@ -356,6 +356,18 @@ async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext)
   if (id === 'approveCommits') {
     return startRun(key, 'commit').catch((e: unknown) => showError(key, e));
   }
+  if (id === 'restart') {
+    const sure = await vscode.window.showWarningMessage(
+      `Start ${key} over?`,
+      {
+        modal: true,
+        detail:
+          'The uncommitted work is saved as a patch in the ticket archive. The worktree and its branch are removed. The ticket returns to Planning with the lessons of this build.'
+      },
+      'Start over'
+    );
+    return sure ? startRun(key, 'restart').catch((e: unknown) => showError(key, e)) : undefined;
+  }
   if (id === 'startVerify') {
     return startRun(key, 'verify').catch((e: unknown) => showError(key, e));
   }
