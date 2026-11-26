@@ -1013,6 +1013,64 @@ describe('Runs.commitPlan and Runs.commit', () => {
   });
 });
 
+describe('Runs.commitPlan and repo.beforeCommit', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+  const repo = () => {
+    const wt = mkdtempSync(join(tmpdir(), 'atb-before-'));
+    git(wt, 'init', '-b', 'main');
+    writeFileSync(join(wt, 'base.txt'), 'base\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    writeFileSync(join(wt, 'a.ts'), 'a\n');
+    return wt;
+  };
+  const reviewed = (worktree: string) => ({
+    stage: 'code-review' as const,
+    worktree,
+    codeReview: { at: 'now', summary: 'Done.', findings: [], checks: [] }
+  });
+  const plan = (files: string[]) => ({
+    commits: [{ type: 'feat', scope: 'x', description: 'add a', files }],
+    summary: 'One.'
+  });
+
+  it('runs the commands first: a generator that changes files puts them in the plan', async () => {
+    CONFIG.repo.beforeCommit = ['echo generated > gen.txt'];
+    const wt = repo();
+    await saveFlow('PROJ-90', reviewed(wt));
+    const { query, calls } = fakeQuery([init, success(plan(['a.ts', 'gen.txt']))]);
+    const { r } = runs(query);
+    await r.commitPlan('PROJ-90');
+    await idle(r);
+    expect(calls[0]!.prompt).toContain('- gen.txt');
+    expect((await loadFlow('PROJ-90'))?.commits?.plan[0]?.files).toEqual(['a.ts', 'gen.txt']);
+    CONFIG.repo.beforeCommit = [];
+  });
+
+  it('stops before the agent when a command fails, and shows its output', async () => {
+    CONFIG.repo.beforeCommit = ['echo "new component has no test" >&2; exit 1'];
+    const wt = repo();
+    await saveFlow('PROJ-91', reviewed(wt));
+    const { query, calls } = fakeQuery([init, success(plan(['a.ts']))]);
+    const { r } = runs(query);
+    await r.commitPlan('PROJ-91');
+    await idle(r);
+    expect(calls).toHaveLength(0);
+    const f = await loadFlow('PROJ-91');
+    expect(f?.run?.state).toBe('failed');
+    expect(f?.need).toMatchObject({
+      kind: 'problem',
+      detail: expect.stringContaining('new component has no test')
+    });
+    CONFIG.repo.beforeCommit = [];
+  });
+});
+
 describe('Runs.verify', () => {
   const git = (cwd: string, ...a: string[]) =>
     execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {

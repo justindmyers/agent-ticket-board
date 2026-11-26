@@ -438,6 +438,38 @@ export class Runs {
     );
   }
 
+  /**
+   * The commands of `repo.beforeCommit`, in the worktree, before the agent plans the commits. A
+   * generator can change files: the plan then covers them. False after a failure, which is recorded.
+   */
+  private async beforeCommit(key: string, ac: AbortController) {
+    const cwd = FLOWS[key]?.worktree;
+    for (const cmd of CONFIG.repo.beforeCommit) {
+      await this.patchRun(key, { activity: `Running ${cmd}` });
+      const r = await this.heavyShell(key, cmd, cwd!, ac, true);
+      await audit(key, 'service', 'before-commit', { cmd, code: r.code });
+      if (r.code) {
+        const out = r.out.trim().split('\n').slice(-12).join('\n').slice(-1200);
+        const f = FLOWS[key]!;
+        await this.write(key, {
+          ...f,
+          need: {
+            kind: 'problem',
+            ask: `${cmd.split('\n')[0]!.slice(0, 60)} failed.`,
+            detail: out,
+            actions: [
+              { id: 'startCommitPlan', label: 'Plan the commits again' },
+              { id: 'openWorktree', label: 'Open worktree' }
+            ]
+          },
+          run: { ...f.run!, state: 'failed', ended: this.now(), activity: undefined }
+        });
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** A shell command, under the queue of heavy commands when `heavy`: one at a time on this computer. */
   private heavyShell(key: string, cmd: string, cwd: string, ac: AbortController, heavy: boolean) {
     const run = () => this.shell(key, cmd, cwd, ac.signal);
@@ -576,6 +608,9 @@ export class Runs {
     await audit(key, 'service', 'run.started', { run: FLOWS[key]?.run?.id, stage: spec.stage });
     try {
       const t = await this.d.ticket(key);
+      if (spec.task === 'commit-plan' && !(await this.beforeCommit(key, ac))) {
+        return;
+      }
       const app = spec.stage === 'testing' ? await this.startApp(key, log) : undefined;
       // A ticket with a worktree is read there: a re-plan for a change must see the built code.
       const cwd =

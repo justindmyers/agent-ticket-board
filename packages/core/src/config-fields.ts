@@ -125,6 +125,12 @@ export const CONFIG_SECTIONS: ConfigSection[] = [
         kind: 'list'
       },
       {
+        key: 'repo.beforeCommit',
+        label: 'Before the commits',
+        help: 'Commands that run before the commit plan, in order. A generator can change files. A failure stops the plan.',
+        kind: 'list'
+      },
+      {
         key: 'repo.testMock',
         label: 'Whole-package mock',
         help: 'Test files with this text always run, for example the name of a shared package that tests mock whole.',

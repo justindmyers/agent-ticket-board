@@ -31,6 +31,8 @@ export type Config = {
     baseBranch: string;
     /** The pre-push checks, in order. `{changed}` and `{tests}` are lists of files. */
     checks: string[];
+    /** Commands that run in the worktree before the commit plan: generators, and checks of uncommitted files. */
+    beforeCommit: string[];
     /** Test files that contain this text count as changed tests: they mock a shared package whole. */
     testMock: string | null;
   };
@@ -69,6 +71,7 @@ export const DEFAULTS: Config = {
     prTitle: null,
     baseBranch: 'main',
     checks: [],
+    beforeCommit: [],
     testMock: null
   },
   app: {
