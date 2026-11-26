@@ -10,24 +10,33 @@ export const shellQuote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 export const isTestFile = (p: string) => /\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)__tests__\//.test(p);
 
 /**
- * A check command with its file lists filled in. A command that names a list with no files is
- * skipped: `{tests}` with no changed test has nothing to run.
+ * A check command with its file lists filled in. `{changed}` and `{tests}` are the changed files and
+ * the changed test files. `{atb}` is the command of the board CLI, for `{atb} diff-scope`. `{tests:apps/nq/}` is only the files under that folder, with the folder
+ * cut off: a tool that runs inside a package needs paths from the package. A list with no files
+ * skips the command: a package with no changed test has nothing to run.
  */
 export function expandCommand(
   cmd: string,
-  lists: { changed: string[]; tests: string[] }
+  lists: { changed: string[]; tests: string[] },
+  atb = ''
 ): { run: string } | { skip: string } {
-  for (const [name, files] of Object.entries(lists)) {
-    if (cmd.includes(`{${name}}`) && !files.length) {
-      return { skip: `No ${name === 'tests' ? 'changed test files' : 'changed files'}.` };
-    }
-  }
-  const words = (files: string[]) => files.map(shellQuote).join(' ');
-  return {
-    run: cmd
-      .replace('{changed}', () => words(lists.changed))
-      .replace('{tests}', () => words(lists.tests))
-  };
+  let skip = '';
+  const run = cmd
+    .replaceAll('{atb}', () => atb)
+    .replace(
+      /\{(changed|tests)(?::([^}]*))?\}/g,
+      (_m, name: 'changed' | 'tests', prefix?: string) => {
+        const files = lists[name]
+          .filter((p) => !prefix || p.startsWith(prefix))
+          .map((p) => (prefix ? p.slice(prefix.length) : p));
+        if (!files.length && !skip) {
+          const what = name === 'tests' ? 'changed test files' : 'changed files';
+          skip = `No ${what}${prefix ? ` in ${prefix}` : ''}.`;
+        }
+        return files.map(shellQuote).join(' ');
+      }
+    );
+  return skip ? { skip } : { run };
 }
 
 /** The record after a gate run, with the developer's next step. */

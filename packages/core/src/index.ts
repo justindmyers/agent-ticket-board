@@ -29,6 +29,7 @@ export * from './worktree';
 export * from './development';
 export * from './next-step';
 export * from './commits';
+export * from './diff-scope';
 export * from './gate';
 export * from './review';
 export * from './testing';

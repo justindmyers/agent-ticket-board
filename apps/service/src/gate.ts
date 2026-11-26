@@ -1,4 +1,4 @@
-import { expandCommand, isTestFile, type Gate } from '@agent-ticket-board/core';
+import { boardCommand, expandCommand, isTestFile, type Gate } from '@agent-ticket-board/core';
 
 // The pre-push gate. It runs the checks of the repository in the order of its config, merges the
 // base branch (never a rebase), and runs the checks again when the merge changed anything. It
@@ -74,7 +74,7 @@ export async function runGate(i: GateInput): Promise<Gate> {
     const lists = await files();
     for (const cmd of i.checks) {
       const name = cmd + suffix;
-      const x = expandCommand(cmd, lists);
+      const x = expandCommand(cmd, lists, boardCommand());
       const ok = await step(name, async () => {
         if ('skip' in x) {
           return { ok: true, note: x.skip };

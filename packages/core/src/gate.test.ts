@@ -27,6 +27,33 @@ describe('expandCommand', () => {
     });
   });
 
+  it('gives only the files under a folder, with the folder cut off', () => {
+    const l = {
+      changed: [],
+      tests: ['apps/nq/src/a.test.ts', 'libs/shared/b.test.ts', 'apps/nq/c.spec.ts']
+    };
+    expect(expandCommand('vitest {tests:apps/nq/}', l)).toEqual({
+      run: "vitest 'src/a.test.ts' 'c.spec.ts'"
+    });
+    expect(expandCommand('vitest {tests:libs/shared/}', l)).toEqual({ run: "vitest 'b.test.ts'" });
+  });
+
+  it('skips a package with no changed tests, and names the folder', () => {
+    expect(
+      expandCommand('vitest {tests:apps/aims/}', { changed: [], tests: ['apps/nq/a.test.ts'] })
+    ).toEqual({
+      skip: 'No changed test files in apps/aims/.'
+    });
+  });
+
+  it('fills {atb} with the board command', () => {
+    expect(
+      expandCommand('x | {atb} diff-scope', { changed: [], tests: [] }, 'node /b/atb.cjs')
+    ).toEqual({
+      run: 'x | node /b/atb.cjs diff-scope'
+    });
+  });
+
   it('does not read $ patterns in a file name as replacement patterns', () => {
     expect(expandCommand('x {changed}', { changed: ['$&.ts'], tests: [] })).toEqual({
       run: "x '$&.ts'"

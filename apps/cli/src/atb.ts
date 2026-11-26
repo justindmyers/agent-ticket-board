@@ -1,9 +1,12 @@
 // atb: the shared command line for every client; the Claude Code pane reaches core only through it.
 // Run it with no command for the usage. JSON goes to stdout.
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   acquireHeavy,
+  changedRanges,
+  scopeFindings,
   HOME,
   releaseHeavy,
   addComment,
@@ -81,6 +84,7 @@ const USAGE = `usage:
   atb review <KEY>                       run the code review again
   atb commit-plan <KEY>                  an agent plans the commits of the change
   atb commit <KEY>                       make the planned commits
+  atb diff-scope                         keep the findings on stdin that touch changed lines
   atb gate <KEY>                         run the checks before a push, merge the base branch
   atb develop <KEY>                      start building the approved plan in the ticket's worktree
   atb plan <KEY>                         start a planning run (starts the service if it does not run)
@@ -253,6 +257,25 @@ async function main() {
   }
   if (cmd === 'ticket' && key) {
     return out(await ticket(key));
+  }
+  if (cmd === 'diff-scope') {
+    // A check that audits whole files reports old code: keep the findings on lines that this change touched.
+    const base = `origin/${CONFIG.repo.baseBranch}`;
+    const git = (a: string[]) => {
+      try {
+        return execFileSync('git', a, { encoding: 'utf8', maxBuffer: 1 << 28 });
+      } catch {
+        return '';
+      }
+    };
+    const ranges = changedRanges(
+      `${git(['diff', '-U0', `${base}...HEAD`])}\n${git(['diff', '-U0', 'HEAD'])}`
+    );
+    const fresh = new Set(
+      git(['ls-files', '--others', '--exclude-standard']).split('\n').filter(Boolean)
+    );
+    process.stdout.write(scopeFindings(readFileSync(0, 'utf8'), ranges, fresh));
+    return;
   }
   if (cmd === 'heavy' && (args[0] === 'acquire' || args[0] === 'release') && args[1]) {
     // The guard hook runs heavy commands one at a time: it holds this lock around each one.
