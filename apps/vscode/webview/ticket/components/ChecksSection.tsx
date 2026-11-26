@@ -26,10 +26,10 @@ export function ChecksSection({ f, title, theme }: Props) {
             key={c.name}
             state={c.ok === true ? 'done' : c.ok === false ? 'fail' : 'todo'}
             theme={theme}
-            end={
-              <span className="text-[11px] text-muted">
-                {c.note ?? (c.ok === null ? 'Waiting' : '')}
-              </span>
+            sub={
+              c.note || c.ok === null ? (
+                <span className="text-[11px] text-muted">{c.note ?? 'Waiting'}</span>
+              ) : undefined
             }
           >
             {c.name}
