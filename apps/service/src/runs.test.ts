@@ -813,16 +813,16 @@ describe('Runs.review', () => {
     expect(f?.run).toMatchObject({ state: 'done', stage: 'code-review' });
   });
 
-  it('records a review that leaves a failing check as a problem with Review again', async () => {
+  it('does not count the checks that the agent reports: it plans the commits next', async () => {
     const wt = mkdtempSync(join(tmpdir(), 'atb-wt-'));
     await saveFlow('PROJ-62', tested(wt));
-    const bad = { ...reviewed, checks: [{ name: 'eslint', ok: false, note: 'no-unused-vars' }] };
+    const bad = { ...reviewed, checks: [{ name: 'eslint', ok: false, note: 'Not run' }] };
     const { r } = runs(fakeQuery([init, success(bad)]).query);
     await r.review('PROJ-62');
     await idle(r);
     const f = await loadFlow('PROJ-62');
-    expect(f?.need?.kind).toBe('problem');
-    expect(f?.need?.actions[0]?.id).toBe('startCodeReview');
+    expect(f?.need?.kind).toBe('decision');
+    expect(f?.need?.actions[0]?.id).toBe('startCommitPlan');
   });
 });
 
@@ -855,7 +855,7 @@ describe('Runs.gate', () => {
   it('needs a finished review and checks in the config, and says which is missing', async () => {
     const { r } = runs(fakeQuery([]).query);
     await saveFlow('PROJ-70', { stage: 'testing', worktree: '/nope' });
-    await expect(r.gate('PROJ-70')).rejects.toThrow(/after the review/);
+    await expect(r.gate('PROJ-70')).rejects.toThrow(/after a build or a review/);
     await saveFlow('PROJ-71', reviewed(worktree()));
     CONFIG.repo.checks = [];
     await expect(r.gate('PROJ-71')).rejects.toThrow(/Settings/);
@@ -1010,5 +1010,189 @@ describe('Runs.commitPlan and Runs.commit', () => {
     });
     expect(f?.commits?.done.map((c) => c.title)).toEqual(['feat(edges): add a (PROJ-83)']);
     expect(git(wt, 'log', '--format=%s', '-1').trim()).toBe('feat(edges): add a (PROJ-83)');
+  });
+});
+
+describe('Runs.verify', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+
+  it('runs the checks on the uncommitted change, with its files, and merges nothing', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'atb-verify-'));
+    git(root, 'init', '--bare', '-b', 'main', 'origin.git');
+    git(root, 'clone', join(root, 'origin.git'), 'wt');
+    const wt = join(root, 'wt');
+    writeFileSync(join(wt, 'a.txt'), 'a\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    git(wt, 'push', 'origin', 'HEAD:main');
+    git(wt, 'fetch', 'origin');
+    writeFileSync(join(wt, 'a.txt'), 'changed\n');
+    writeFileSync(join(wt, 'new.ts'), 'new\n');
+    CONFIG.repo.checks = ['echo {changed} > seen.txt'];
+    await saveFlow('PROJ-95', {
+      stage: 'code-review',
+      worktree: wt,
+      codeReview: { at: 'now', summary: 'Done.', findings: [], checks: [] }
+    });
+    const { r } = runs(fakeQuery([]).query);
+    await r.verify('PROJ-95');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-95'))?.run?.state).toBe('done'), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-95');
+    expect(readFileSync(join(wt, 'seen.txt'), 'utf8').trim()).toBe('a.txt new.ts');
+    expect(f?.gate).toMatchObject({ ok: true, verify: true, merged: false });
+    expect(f?.gate?.steps.map((s) => s.name)).toEqual(['echo {changed} > seen.txt']);
+    expect(f?.need?.actions[0]?.id).toBe('startCommitPlan');
+    CONFIG.repo.checks = [];
+  });
+});
+
+describe('a clean review leads to the checks', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+  const worktree = () => {
+    const root = mkdtempSync(join(tmpdir(), 'atb-chain-'));
+    git(root, 'init', '--bare', '-b', 'main', 'origin.git');
+    git(root, 'clone', join(root, 'origin.git'), 'wt');
+    const wt = join(root, 'wt');
+    writeFileSync(join(wt, 'a.txt'), 'a\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    git(wt, 'push', 'origin', 'HEAD:main');
+    git(wt, 'fetch', 'origin');
+    writeFileSync(join(wt, 'a.txt'), 'changed\n');
+    return wt;
+  };
+  const clean = {
+    findings: [],
+    checks: [{ name: 'check:types', ok: false, note: 'Not run' }],
+    summary: 'Nothing found.'
+  };
+  const tested = (wt: string) => ({
+    stage: 'testing' as const,
+    worktree: wt,
+    approved: 'now',
+    requirements: [{ id: 'R1', text: 'Works', check: 'A test' }]
+  });
+
+  it('runs the board checks by itself, and offers the commits when they pass', async () => {
+    CONFIG.repo.checks = ['true'];
+    await saveFlow('PROJ-96', tested(worktree()));
+    const { r } = runs(fakeQuery([init, success(clean)]).query);
+    await r.review('PROJ-96');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-96'))?.gate?.ok).toBe(true), {
+      timeout: 8000
+    });
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-96'))?.run?.task).toBe('verify'));
+    const f = await loadFlow('PROJ-96');
+    expect(f?.need?.actions.map((a) => a.id)).toEqual(['startCommitPlan', 'openWorktree']);
+    CONFIG.repo.checks = [];
+  });
+
+  it('offers a fix, with the output given to the next review, when a check fails', async () => {
+    CONFIG.repo.checks = ['echo "TS2322 in a.ts" >&2; exit 1'];
+    await saveFlow('PROJ-97', tested(worktree()));
+    const { query, calls } = fakeQuery([init, success(clean)]);
+    const { r } = runs(query);
+    await r.review('PROJ-97');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-97'))?.need?.kind).toBe('problem'), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-97');
+    expect(f?.need?.actions[0]).toEqual({ id: 'startCodeReview', label: 'Fix and review again' });
+    expect(f?.need?.detail).toContain('TS2322 in a.ts');
+    await vi.waitFor(() => expect(r.list()).toEqual([]));
+    await r.review('PROJ-97');
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]!.prompt).toContain('# Checks that failed');
+    expect(calls[1]!.prompt).toContain('TS2322 in a.ts');
+    CONFIG.repo.checks = [];
+  });
+});
+
+describe('a build goes through the board checks before Testing', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+  const repo = () => {
+    const root = mkdtempSync(join(tmpdir(), 'atb-build-'));
+    git(root, 'init', '--bare', '-b', 'main', 'origin.git');
+    git(root, 'clone', join(root, 'origin.git'), 'wt');
+    const wt = join(root, 'wt');
+    writeFileSync(join(wt, 'a.txt'), 'a\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    git(wt, 'push', 'origin', 'HEAD:main');
+    git(wt, 'fetch', 'origin');
+    writeFileSync(join(wt, 'a.txt'), 'changed\n');
+    return wt;
+  };
+  const approved = {
+    stage: 'planning' as const,
+    requirements: [{ id: 'R1', text: 'Works', check: 'A test' }],
+    questions: [],
+    steps: [{ n: 1, text: 'Do it', covers: ['R1'], state: 'todo' as const }]
+  };
+  const ok = { ok: true, note: '' };
+  // The agent says that its own gate passed. The board does not take its word.
+  const built = {
+    steps: [{ n: 1, done: true, check: 'pnpm vitest a', ok: true, note: '' }],
+    gate: { typecheck: ok, lint: ok, tests: ok },
+    summary: 'Done.',
+    followups: []
+  };
+
+  it('moves to Testing when the board checks pass', async () => {
+    CONFIG.repo.checks = ['true'];
+    const wt = repo();
+    await saveFlow('PROJ-98', approved);
+    const { r } = runs(fakeQuery([init, success(built)]).query, {
+      worktree: async (a) => ({ path: wt, branch: a.branch, made: false })
+    });
+    await r.develop('PROJ-98');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-98'))?.gate?.ok).toBe(true), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-98');
+    expect(f?.stage).toBe('testing');
+    expect(f?.need?.actions[0]?.id).toBe('startTesting');
+    CONFIG.repo.checks = [];
+  });
+
+  it('stays in Development with the output when a check fails, and the next build gets it', async () => {
+    CONFIG.repo.checks = ['echo "prettier: a.tsx is not formatted" >&2; exit 1'];
+    const wt = repo();
+    await saveFlow('PROJ-99', approved);
+    const { query, calls } = fakeQuery([init, success(built)]);
+    const { r } = runs(query, {
+      worktree: async (a) => ({ path: wt, branch: a.branch, made: false })
+    });
+    await r.develop('PROJ-99');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-99'))?.need?.kind).toBe('problem'), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-99');
+    expect(f?.stage).toBe('development');
+    expect(f?.need?.actions[0]).toEqual({ id: 'startDevelopment', label: 'Fix and build again' });
+    expect(f?.need?.detail).toContain('a.tsx is not formatted');
+    await vi.waitFor(() => expect(r.list()).toEqual([]));
+    await r.develop('PROJ-99');
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]!.prompt).toContain('# Checks that failed');
+    expect(calls[1]!.prompt).toContain('a.tsx is not formatted');
+    CONFIG.repo.checks = [];
   });
 });

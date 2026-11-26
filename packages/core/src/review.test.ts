@@ -80,7 +80,8 @@ describe('applyReview', () => {
     );
     expect(f.codeReview?.findings.map((x) => x.id)).toEqual(['F1', 'F2', 'F3']);
     expect(f.need?.kind).toBe('decision');
-    expect(f.need?.ask).toBe('Reviewed: 1 fixed, 1 dropped, 1 style note. Every check passes.');
+    expect(f.need?.ask).toBe('Review done: 1 fixed, 1 dropped, 1 style note.');
+    expect(f.need?.actions.map((a) => a.id)).toEqual(['startCommitPlan', 'openWorktree']);
   });
 
   it('never blocks on an open style finding', () => {
@@ -99,18 +100,39 @@ describe('applyReview', () => {
     expect(f.need?.actions[0]).toEqual({ id: 'startCodeReview', label: 'Review again' });
   });
 
-  it('is a problem when a check fails, and names it', () => {
+  it('ignores the checks that the agent reports: it can fail to run them, and the board runs them', () => {
     const f = applyReview(
       approved,
-      result({ checks: [{ name: 'check:types', ok: false, note: 'TS2322' }] }),
+      result({ checks: [{ name: 'check:types', ok: false, note: 'Not run: the guard failed' }] }),
       at
     );
-    expect(f.need?.ask).toBe('Check:types fails.');
-    expect(f.codeReview?.checks[0]).toEqual({ name: 'check:types', ok: false, note: 'TS2322' });
+    expect(f.need?.kind).toBe('decision');
+    expect(f.need?.detail).not.toMatch(/check/i);
   });
 });
 
 describe('reviewPrompt', () => {
+  it('gives the failed checks of the board to the agent, to fix first', () => {
+    const f: Flow = {
+      ...approved,
+      gate: {
+        at: 'n',
+        ok: false,
+        merged: false,
+        verify: true,
+        steps: [
+          { name: 'lint', ok: true },
+          { name: 'pnpm check:types', ok: false, note: 'TS2322 in a.ts(3,1)' }
+        ]
+      }
+    };
+    const p = reviewPrompt(ticket, f, [], []);
+    expect(p).toContain('# Checks that failed');
+    expect(p).toContain('- pnpm check:types\nTS2322 in a.ts(3,1)');
+    expect(p).not.toContain('- lint');
+    expect(reviewPrompt(ticket, approved, [], [])).not.toContain('# Checks that failed');
+  });
+
   it('names the reviewers, the checking step and the ban on commits', () => {
     const p = reviewPrompt(
       ticket,

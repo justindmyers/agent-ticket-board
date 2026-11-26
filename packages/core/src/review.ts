@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { failedChecksSection } from './gate';
 import { REUSE_RULES } from './reuse';
 import type { Finding, Flow, Need, Ticket } from './types';
 
@@ -94,6 +95,7 @@ export function reviewPrompt(t: Ticket, f: Flow, boardComments: string[], comman
     ...(boardComments.length
       ? ['', '# Comments from the developer', ...boardComments.map((c) => `- ${c}`)]
       : []),
+    ...failedChecksSection(f),
     '',
     '# Step 1: reviewers',
     'Start one subagent for each reviewer, in one turn, so they run together:',
@@ -142,32 +144,33 @@ export function applyReview(f: Flow, r: ReviewResult, at: string): Flow {
   return {
     ...f,
     codeReview: { at, summary: r.summary, findings, checks },
-    need: reviewNeed(findings, checks)
+    need: reviewNeed(findings)
   };
 }
 
-/** What the developer does after a review: review again, or go on. */
-function reviewNeed(findings: Finding[], checks: { name: string; ok: boolean }[]): Need {
+/**
+ * What the developer does after a review. The agent's own check results are not used: it can fail
+ * to run a check. The board runs the checks itself right after a clean review.
+ */
+function reviewNeed(findings: Finding[]): Need {
   const open = findings.filter((x) => x.state === 'open' && x.severity === 'blocking');
-  const failing = checks.filter((c) => !c.ok);
   const worktree = { id: 'openWorktree', label: 'Open worktree' };
-  if (open.length || failing.length) {
-    const parts = [
-      open.length && `${open.length} finding${open.length > 1 ? 's are' : ' is'} not fixed`,
-      failing.length &&
-        `${failing.map((c) => c.name).join(', ')} ${failing.length > 1 ? 'fail' : 'fails'}`
-    ].filter(Boolean);
+  if (open.length) {
     return {
       kind: 'problem',
-      ask: `${String(parts.join(' and ')).replace(/^./, (c) => c.toUpperCase())}.`,
+      ask: `${open.length} finding${open.length > 1 ? 's are' : ' is'} not fixed.`,
+      detail: open.map((x) => `${x.id} ${x.file}:${x.line}: ${x.problem}`).join('\n'),
       actions: [{ id: 'startCodeReview', label: 'Review again' }, worktree]
     };
   }
   const fixed = count(findings, (x) => x.state === 'fixed');
+  const dropped = count(findings, (x) => x.state === 'dropped');
   const style = count(findings, (x) => x.state !== 'dropped' && x.severity === 'style');
   return {
     kind: 'decision',
-    ask: `Reviewed: ${fixed} fixed, ${count(findings, (x) => x.state === 'dropped')} dropped, ${style} style note${style === 1 ? '' : 's'}. Every check passes.`,
+    ask: `Review done: ${fixed} fixed, ${dropped} dropped, ${style} style note${style === 1 ? '' : 's'}.`,
+    detail:
+      'Dropped: the code did not show the problem. Style notes stay as they are: they never block.',
     actions: [{ id: 'startCommitPlan', label: 'Plan the commits' }, worktree]
   };
 }

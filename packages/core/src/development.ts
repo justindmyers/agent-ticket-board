@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { mdSections } from './adf-md';
 import { loadFlow, saveFlow } from './agents';
 import { audit } from './audit';
+import { failedChecksSection } from './gate';
 import { runActive } from './look';
 import { mergeAnswers } from './planning';
 import type { Flow, Step, Ticket } from './types';
@@ -74,6 +75,9 @@ export function buildPrompt(t: Ticket, f: Flow, boardComments: string[], command
     'Rules:',
     '- Work only in this folder. It is the worktree of the ticket, on its own branch.',
     '- Do not commit, push or open a pull request. The developer tests first and approves.',
+    "- Before you write code, read the repository's CLAUDE.md and each skill that it names for this kind of change",
+    '  (code style, React patterns, accessibility, testing, shared library, file layout). Follow them in the first pass:',
+    '  the board runs the repository checks when you finish, and any failure sends you back to fix it.',
     '- Follow the code style of the repository: its CLAUDE.md, its skills, and the code next to your change.',
     ...REUSE_RULES,
     '- Do the steps in order. Before a step, call mcp__board__step with the step number and state "current".',
@@ -114,6 +118,7 @@ export function buildPrompt(t: Ticket, f: Flow, boardComments: string[], command
     ...(boardComments.length
       ? ['', '# Notes from the developer', '', ...boardComments.map((c) => `- ${c}`)]
       : []),
+    ...failedChecksSection(f),
     '',
     '# Ticket description',
     '',

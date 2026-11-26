@@ -15,6 +15,7 @@ import PQueue from 'p-queue';
 import { z } from 'zod';
 import {
   activityText,
+  acceptBuild,
   applyGate,
   commitsDone,
   shellQuote,
@@ -253,9 +254,10 @@ export class Runs {
    */
   private async job(
     key: string,
-    task: 'gate' | 'commit',
+    task: 'gate' | 'verify' | 'commit',
     refuse: (f: Flow | null) => string | null,
-    work: (f: Flow, cwd: string, ac: AbortController) => Promise<Flow>
+    work: (f: Flow, cwd: string, ac: AbortController) => Promise<Flow>,
+    stage: 'development' | 'code-review' = 'code-review'
   ) {
     if (this.active.has(key)) {
       throw new Error(`${key}: a run is active already.`);
@@ -275,11 +277,11 @@ export class Runs {
     await audit(key, 'service', `${task}.started`, { run: id });
     await this.write(key, {
       ...withoutNeed(base!),
-      stage: 'code-review',
+      stage,
       run: {
         id,
         state: 'running',
-        stage: 'code-review',
+        stage,
         task,
         started: this.now(),
         model: 'none'
@@ -306,7 +308,8 @@ export class Runs {
             key,
             {
               ...STAGE_SPECS['code-review'],
-              retry: task === 'gate' ? 'startGate' : 'approveCommits'
+              retry:
+                task === 'gate' ? 'startGate' : task === 'verify' ? 'startVerify' : 'approveCommits'
             },
             e instanceof Error ? e.message : String(e),
             undefined,
@@ -322,12 +325,23 @@ export class Runs {
 
   /** The pre-push gate: the checks of the repository, the merge of the base branch, the checks again. */
   gate(key: string) {
+    return this.checks(key, false);
+  }
+
+  /** The checks of the repository on the change as it is, before the commits. No merge. */
+  verify(key: string) {
+    return this.checks(key, true);
+  }
+
+  private checks(key: string, verify: boolean) {
+    // Before the review exists, "the checks" are the end of Development: they decide Testing.
+    const build = verify && !FLOWS[key]?.codeReview;
     return this.job(
       key,
-      'gate',
+      verify ? 'verify' : 'gate',
       (f) => {
-        if (!f?.codeReview || !f.worktree) {
-          return "the checks run after the review, in the ticket's worktree.";
+        if (!f?.worktree || (!f.codeReview && !(verify && f.steps?.length))) {
+          return "the checks run after a build or a review, in the ticket's worktree.";
         }
         return CONFIG.repo.checks.length
           ? null
@@ -338,6 +352,7 @@ export class Runs {
           checks: CONFIG.repo.checks,
           base: CONFIG.repo.baseBranch,
           testMock: CONFIG.repo.testMock,
+          verify,
           now: this.now,
           step: (name) => void this.patchRun(key, { activity: `Running ${name}` }),
           exec: (cmd, heavy) => this.heavyShell(key, cmd, cwd, ac, heavy)
@@ -347,8 +362,27 @@ export class Runs {
           merged: gate.merged,
           steps: gate.steps.map((s) => `${s.name}: ${s.ok ? 'ok' : 'failed'}`)
         });
-        return applyGate(f, gate);
-      }
+        if (!build) {
+          return applyGate(f, gate);
+        }
+        // The board's checks decide: the agent's own gate claims do not count.
+        const checked = { ...f, gate, checks: undefined };
+        return gate.ok
+          ? { ...acceptBuild(checked), gate }
+          : {
+              ...applyGate(checked, gate),
+              stage: 'development' as const,
+              need: {
+                ...applyGate(checked, gate).need!,
+                actions: [
+                  { id: 'startDevelopment', label: 'Fix and build again' },
+                  { id: 'startVerify', label: 'Run the checks again' },
+                  { id: 'openWorktree', label: 'Open worktree' }
+                ]
+              }
+            };
+      },
+      build ? 'development' : 'code-review'
     );
   }
 
@@ -477,6 +511,26 @@ export class Runs {
         this.active.delete(key);
         this.logs.delete(key);
         void pruneRuns(key);
+        // A clean review leads to the checks: the board runs them, not the agent. A failure goes
+        // back to the agent with the output.
+        const f = FLOWS[key];
+        // A build that says it is ready goes through the board's checks before Testing.
+        if (
+          stage === 'development' &&
+          f?.run?.state === 'done' &&
+          f.stage === 'testing' &&
+          CONFIG.repo.checks.length
+        ) {
+          void this.verify(key).catch(() => undefined);
+        }
+        if (
+          stage === 'code-review' &&
+          f?.run?.state === 'done' &&
+          f.need?.kind === 'decision' &&
+          CONFIG.repo.checks.length
+        ) {
+          void this.verify(key).catch(() => undefined);
+        }
       });
     return FLOWS[key]!.run!;
   }

@@ -77,7 +77,7 @@ export function runLine(
 type RunLike = {
   state: string;
   stage?: string;
-  task?: 'gate' | 'commit-plan' | 'commit';
+  task?: 'gate' | 'verify' | 'commit-plan' | 'commit';
   model: string;
   waiting?: string;
   app?: string;
@@ -130,6 +130,13 @@ export function runText(run: RunLike): {
       title: 'Making the commits',
       caption:
         'The board commits each group in order. The hooks of the repository run. No agent runs.',
+      accent
+    };
+  }
+  if (run.task === 'verify') {
+    return {
+      title: 'Running the checks',
+      caption: 'The board runs the checks of the repository on the change as it is. No agent runs.',
       accent
     };
   }

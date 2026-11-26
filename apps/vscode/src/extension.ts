@@ -356,6 +356,9 @@ async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext)
   if (id === 'approveCommits') {
     return startRun(key, 'commit').catch((e: unknown) => showError(key, e));
   }
+  if (id === 'startVerify') {
+    return startRun(key, 'verify').catch((e: unknown) => showError(key, e));
+  }
   if (id === 'startGate') {
     return startRun(key, 'gate').catch((e: unknown) => showError(key, e));
   }

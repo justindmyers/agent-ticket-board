@@ -43,17 +43,44 @@ export function expandCommand(
 export function applyGate(f: Flow, g: Gate): Flow {
   const open = { id: 'openWorktree', label: 'Open worktree' };
   const failed = g.steps.find((s) => !s.ok);
+  const again = g.verify ? 'startVerify' : 'startGate';
   const need: Need = failed
     ? {
         kind: 'problem',
         ask: `${failed.name} failed.`,
         ...(failed.note ? { detail: failed.note } : {}),
-        actions: [{ id: 'startGate', label: 'Run the checks again' }, open]
+        actions: g.verify
+          ? [
+              { id: 'startCodeReview', label: 'Fix and review again' },
+              { id: again, label: 'Run the checks again' },
+              open
+            ]
+          : [{ id: again, label: 'Run the checks again' }, open]
       }
-    : {
-        kind: 'decision',
-        ask: `Every check passes${g.merged ? ' after the merge' : ''}.`,
-        actions: [open]
-      };
+    : g.verify
+      ? {
+          kind: 'decision',
+          ask: 'Every check passes on the change.',
+          actions: [{ id: 'startCommitPlan', label: 'Plan the commits' }, open]
+        }
+      : {
+          kind: 'decision',
+          ask: `Every check passes${g.merged ? ' after the merge' : ''}.`,
+          actions: [open]
+        };
   return { ...f, gate: g, need };
+}
+
+/** The checks that the board ran after the last review and that failed: the agent fixes them first. */
+export function failedChecksSection(f: Flow) {
+  const failed = (f.gate?.steps ?? []).filter((s) => !s.ok);
+  return failed.length
+    ? [
+        '',
+        '# Checks that failed',
+        'The board ran the repository checks on your last change. These failed. Fix their cause before anything else,',
+        'then run the same check again to prove the fix.',
+        ...failed.map((s) => `- ${s.name}${s.note ? `\n${s.note}` : ''}`)
+      ]
+    : [];
 }

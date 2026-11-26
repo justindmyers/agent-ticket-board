@@ -97,4 +97,19 @@ describe('applyGate', () => {
     });
     expect(f.need?.actions[0]).toEqual({ id: 'startGate', label: 'Run the checks again' });
   });
+
+  it('sends a failure before the commits back to the agent with its output', () => {
+    const f = applyGate(base, {
+      at: 'now',
+      ok: false,
+      merged: false,
+      verify: true,
+      steps: [{ name: 'lint', ok: false, note: 'no-unused-vars' }]
+    });
+    expect(f.need?.actions.map((a) => a.id)).toEqual([
+      'startCodeReview',
+      'startVerify',
+      'openWorktree'
+    ]);
+  });
 });

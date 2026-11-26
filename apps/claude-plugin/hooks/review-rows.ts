@@ -4,7 +4,7 @@ import type { Flow } from './types';
 
 const MARK = { fixed: '✓ ', open: '✗ ', dropped: '○ ' } as const;
 
-/** The review round of the Code review tab: each finding with what became of it, then the checks. */
+/** The review round of the Code review tab: each finding with what became of it. */
 export function reviewRows(ctx: Ctx, f: Flow): RenderElement[] {
   const r = f.codeReview;
   if (!r) {
@@ -12,9 +12,7 @@ export function reviewRows(ctx: Ctx, f: Flow): RenderElement[] {
   }
   const { Box, Text } = ctx.els;
   const { sectionTitle, dim } = kit(ctx);
-  const bad =
-    r.findings.some((x) => x.state === 'open' && x.severity === 'blocking') ||
-    r.checks.some((c) => !c.ok);
+  const bad = r.findings.some((x) => x.state === 'open' && x.severity === 'blocking');
   return [
     sectionTitle(
       'review',
@@ -38,18 +36,6 @@ export function reviewRows(ctx: Ctx, f: Flow): RenderElement[] {
           ),
           dim('    Fix: ' + x.fix),
           ...(x.note ? [dim('    ' + x.note)] : [])
-        ]
-      })
-    ),
-    ...r.checks.map((c) =>
-      Box({
-        key: 'check-' + c.name,
-        children: [
-          Text({
-            color: hex(c.ok ? 'green' : 'red'),
-            wrap: 'wrap',
-            children: [(c.ok ? '✓ ' : '✗ ') + c.name + (c.note ? '  ' + c.note : '')]
-          })
         ]
       })
     )

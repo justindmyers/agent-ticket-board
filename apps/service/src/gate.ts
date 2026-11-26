@@ -10,6 +10,8 @@ export type GateInput = {
   checks: string[];
   base: string;
   testMock: string | null;
+  /** Check the working tree as it is: no clean tree, no fetch and no merge. For before the commits. */
+  verify?: boolean;
   exec: Exec;
   /** Called before each step starts, for the activity line. */
   step?: (name: string) => void;
@@ -26,6 +28,7 @@ export async function runGate(i: GateInput): Promise<Gate> {
     at: i.now(),
     ok: steps.every((s) => s.ok),
     merged,
+    ...(i.verify ? { verify: true as const } : {}),
     steps
   });
   const step = async (name: string, run: () => Promise<{ ok: boolean; note?: string }>) => {
@@ -38,6 +41,7 @@ export async function runGate(i: GateInput): Promise<Gate> {
 
   const dirty = await git('status --porcelain');
   if (
+    !i.verify &&
     !(await step('Clean worktree', async () =>
       dirty.out.trim()
         ? { ok: false, note: `Commit or discard these changes first:\n${tail(dirty.out)}` }
@@ -47,6 +51,7 @@ export async function runGate(i: GateInput): Promise<Gate> {
     return done(false);
   }
   if (
+    !i.verify &&
     !(await step(`Fetch ${base}`, async () => {
       const r = await git(`fetch origin ${i.base}`);
       return r.code ? { ok: false, note: tail(r.out) } : { ok: true };
@@ -58,6 +63,17 @@ export async function runGate(i: GateInput): Promise<Gate> {
   const files = async () => {
     const diff = await git(`diff --name-only --diff-filter=d ${base}...HEAD`);
     const changed = diff.out.split('\n').filter(Boolean);
+    if (i.verify) {
+      // The change is not committed yet: add the files that differ from HEAD, and the new ones.
+      const work = await git('diff --name-only --diff-filter=d HEAD');
+      const fresh = await git('ls-files --others --exclude-standard');
+      for (const p of [...work.out.split('\n'), ...fresh.out.split('\n')]) {
+        if (p && !changed.includes(p)) {
+          changed.push(p);
+        }
+      }
+      changed.sort();
+    }
     const tests = changed.filter(isTestFile);
     if (i.testMock) {
       const hit = await git(`grep -l -F -e ${JSON.stringify(i.testMock)} -- '*.test.*' '*.spec.*'`);
@@ -90,6 +106,9 @@ export async function runGate(i: GateInput): Promise<Gate> {
   };
 
   if (!(await runChecks(''))) {
+    return done(false);
+  }
+  if (i.verify) {
     return done(false);
   }
 

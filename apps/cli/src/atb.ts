@@ -85,6 +85,7 @@ const USAGE = `usage:
   atb commit-plan <KEY>                  an agent plans the commits of the change
   atb commit <KEY>                       make the planned commits
   atb diff-scope                         keep the findings on stdin that touch changed lines
+  atb verify <KEY>                       run the checks on the change before the commits
   atb gate <KEY>                         run the checks before a push, merge the base branch
   atb develop <KEY>                      start building the approved plan in the ticket's worktree
   atb plan <KEY>                         start a planning run (starts the service if it does not run)
@@ -218,6 +219,7 @@ async function main() {
       cmd === 'test' ||
       cmd === 'review' ||
       cmd === 'gate' ||
+      cmd === 'verify' ||
       cmd === 'commit-plan' ||
       cmd === 'commit' ||
       cmd === 'stop') &&

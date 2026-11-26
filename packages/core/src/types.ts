@@ -88,6 +88,8 @@ export type Gate = {
   ok: boolean;
   /** True when the merge of the base branch brought changes. */
   merged: boolean;
+  /** True when the checks ran on the change before the commits: nothing was merged. */
+  verify?: true;
   steps: { name: string; ok: boolean; note?: string }[];
 };
 
@@ -117,7 +119,7 @@ export type AgentRun = {
   state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
   stage: Stage;
   /** `gate`: the pre-push checks. The board runs them, with no agent. */
-  task?: 'gate' | 'commit-plan' | 'commit';
+  task?: 'gate' | 'verify' | 'commit-plan' | 'commit';
   started: string;
   model: string;
   ended?: string;

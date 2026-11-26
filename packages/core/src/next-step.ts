@@ -37,6 +37,7 @@ export function restingNeed(f: Flow): Need | null {
   if (f.stage === 'code-review' && !f.pr && f.run?.task && f.run.state === 'stopped') {
     const again = {
       gate: ['The checks were stopped.', 'startGate', 'Run the checks again'],
+      verify: ['The checks were stopped.', 'startVerify', 'Run the checks again'],
       'commit-plan': ['Planning the commits was stopped.', 'startCommitPlan', 'Plan the commits'],
       commit: ['Making the commits was stopped.', 'startCommitPlan', 'Plan the commits again']
     }[f.run.task];

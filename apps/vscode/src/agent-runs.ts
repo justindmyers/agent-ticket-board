@@ -23,6 +23,7 @@ export async function startRun(
     | 'test'
     | 'review'
     | 'gate'
+    | 'verify'
     | 'commit-plan'
     | 'commit'
     | 'approve-testing'

@@ -30,7 +30,7 @@ export type Flow = {
   run?: {
     state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
     stage?: string;
-    task?: 'gate' | 'commit-plan' | 'commit';
+    task?: 'gate' | 'verify' | 'commit-plan' | 'commit';
     model: string;
     cost?: number;
     waiting?: 'login';
@@ -82,6 +82,7 @@ export type Flow = {
     at: string;
     ok: boolean;
     merged: boolean;
+    verify?: true;
     steps: { name: string; ok: boolean; note?: string }[];
   };
   evidence?: Record<
