@@ -15,6 +15,9 @@ export { GIT_PUSH, JIRA_WRITE, SELF_APPROVE } from './guards';
 
 const PANE = 'board';
 
+/** The longest that a process call may run is ten minutes. The lock wait (8 minutes) fits in 9. */
+export const HEAVY_CALL_MS = 9 * 60_000;
+
 async function openIfApp($: EngineInterface) {
   const surfaces = await $.session.surfaces();
   if (!surfaces.includes('desktop') && !surfaces.includes('terminal')) {
@@ -61,10 +64,11 @@ export const register: Register = (on) => {
     if (!r && isHeavy(cmd)) {
       // One heavy command at a time on this computer, across every agent session.
       const owner = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const got = await atb<{ ok: boolean }>($, ['heavy', 'acquire', owner], 31 * 60_000);
+      // The engine allows ten minutes for a process call at most: wait less, and say so.
+      const got = await atb<{ ok: boolean }>($, ['heavy', 'acquire', owner], HEAVY_CALL_MS);
       if (!got.ok) {
         return {
-          deny: 'The computer ran other type checks, lint or tests for 30 minutes. Try this command again later.'
+          deny: 'The computer ran other type checks, lint or tests for 8 minutes. Try this command again later.'
         };
       }
       try {

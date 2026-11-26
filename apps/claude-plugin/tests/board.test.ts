@@ -130,6 +130,25 @@ function stubAtb(on: On, calls: string[][]) {
 declare const setTimeout: (fn: () => void, ms: number) => unknown;
 const tick = () => new Promise<void>((r) => setTimeout(r, 20));
 
+test('a heavy command waits for the lock within the engine limit of ten minutes, then runs and releases', async ($, on) => {
+  const calls: { args: string[]; timeoutMs?: number }[] = [];
+  on('process.run', ($$, e) => {
+    calls.push({ args: e.argv.slice(2), timeoutMs: e.init?.timeoutMs });
+    return printed({ ok: true });
+  });
+  on('tool.call', () => ({ result: 'ran' }));
+  const r = await $.tool.call({ tool: 'Bash', command: 'pnpm --filter nq check:types' });
+  expect(r.result).toBe('ran');
+  expect(r.deny).toBeUndefined();
+  expect(calls.map((c) => c.args.slice(0, 2).join(' '))).toEqual([
+    'heavy acquire',
+    'heavy release'
+  ]);
+  const wait = calls[0]!.timeoutMs;
+  expect(wait).toBeLessThanOrEqual(10 * 60_000);
+  expect(wait).toBeGreaterThan(0);
+});
+
 test('git push is refused and never reaches the tool', async ($, on) => {
   let ran = 0;
   on('tool.call', () => {

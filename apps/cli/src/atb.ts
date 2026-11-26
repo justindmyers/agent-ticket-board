@@ -261,7 +261,8 @@ async function main() {
       releaseHeavy(lock, args[1]);
       return out({ ok: true });
     }
-    return out({ ok: await acquireHeavy(lock, args[1]) });
+    // The hook that calls this may wait ten minutes at most.
+    return out({ ok: await acquireHeavy(lock, args[1], { waitMs: 8 * 60_000 }) });
   }
   if (cmd === 'handoff' && key) {
     const info = await ensureService(process.argv[1]!);
