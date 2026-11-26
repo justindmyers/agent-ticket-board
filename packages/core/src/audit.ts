@@ -79,14 +79,38 @@ const brief = (v: unknown) => {
   return s.length > 80 ? `${s.slice(0, 77)}...` : s;
 };
 
+type Change = { field: string; before?: unknown; after?: unknown };
+
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** What one record change did, in words: `run.activity="Reading a.ts"`, `run.state=running → done`. */
+function describeChange(c: Change) {
+  if (isObject(c.after) || isObject(c.before)) {
+    const before = isObject(c.before) ? c.before : {};
+    const after = isObject(c.after) ? c.after : {};
+    const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+      (k) => !isEqual(before[k], after[k])
+    );
+    if (keys.length) {
+      return keys.map((k) => `${c.field}.${k}=${brief(after[k] ?? '(removed)')}`);
+    }
+  }
+  return [`${c.field}=${brief(c.after ?? '(removed)')}`];
+}
+
 /** The timeline as text: one line for each event, with the short details. */
 export function timelineText(events: AuditEvent[]) {
   return events
     .map((e) => {
-      const details = Object.entries(omit(e, ['at', 'source', 'type']))
-        .filter(([k]) => !LONG.has(k))
-        .map(([k, v]) => `${k}=${brief(v)}`)
-        .join(' ');
+      const changes =
+        e.type === 'record' && Array.isArray(e.changes) ? (e.changes as Change[]) : null;
+      const details = changes
+        ? changes.flatMap(describeChange).join(' ')
+        : Object.entries(omit(e, ['at', 'source', 'type']))
+            .filter(([k]) => !LONG.has(k))
+            .map(([k, v]) => `${k}=${brief(v)}`)
+            .join(' ');
       const at = e.at.replace('T', ' ').slice(0, 19);
       return `${at}  ${e.source.padEnd(9)}  ${e.type}${details ? `  ${details}` : ''}`;
     })

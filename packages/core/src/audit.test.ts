@@ -103,6 +103,30 @@ describe('timelineText', () => {
       '2026-01-01 10:01:00  service    run.failed  error=Boom'
     ]);
   });
+
+  it('says what a record change did, not only which field changed', () => {
+    const run = { state: 'running', model: 'opus', activity: 'Reading a.ts' };
+    const rec = (changes: unknown[]) => ({
+      at: '2026-01-01T10:00:00.000Z',
+      source: 'service' as const,
+      type: 'record',
+      fields: changes.map((c) => (c as { field: string }).field),
+      changes
+    });
+    const text = a.timelineText([
+      rec([{ field: 'run', before: run, after: { ...run, activity: 'Running pnpm test' } }]),
+      rec([{ field: 'run', before: run, after: { ...run, state: 'done' } }]),
+      rec([{ field: 'stage', before: 'testing', after: 'code-review' }]),
+      rec([{ field: 'need', before: { ask: 'A' }, after: undefined }])
+    ]);
+    expect(text.split('\n').map((l) => l.slice(32))).toEqual([
+      'record  run.activity=Running pnpm test',
+      'record  run.state=done',
+      'record  stage=code-review',
+      'record  need.ask=(removed)'
+    ]);
+    expect(text).not.toContain('fields=');
+  });
 });
 
 describe('redact', () => {
