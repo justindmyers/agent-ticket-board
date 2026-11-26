@@ -63,6 +63,24 @@ export function restingNeed(f: Flow): Need | null {
 
 /** The record with its next step filled in, when it had none. */
 export function withNextStep(f: Flow): Flow {
+  // An approval from before the review stage existed has only "Open worktree". Offer the review.
+  if (
+    f.stage === 'testing' &&
+    f.approved &&
+    !f.codeReview &&
+    !f.closed &&
+    !runActive(f) &&
+    f.need?.kind === 'decision' &&
+    !f.need.actions.some((a) => a.id === 'startCodeReview')
+  ) {
+    return {
+      ...f,
+      need: {
+        ...f.need,
+        actions: [{ id: 'startCodeReview', label: 'Start code review' }, ...f.need.actions]
+      }
+    };
+  }
   const need = restingNeed(f);
   return need ? { ...f, need } : f;
 }

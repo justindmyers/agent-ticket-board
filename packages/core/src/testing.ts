@@ -241,7 +241,10 @@ export function approveTestingFlow(f: Flow, at: string): Flow {
     need: {
       kind: 'decision',
       ask: 'Approved for code review.',
-      actions: [{ id: 'openWorktree', label: 'Open worktree' }]
+      actions: [
+        { id: 'startCodeReview', label: 'Start code review' },
+        { id: 'openWorktree', label: 'Open worktree' }
+      ]
     }
   };
 }
