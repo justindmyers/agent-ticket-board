@@ -291,7 +291,7 @@ The project follows these standards. The repository states them in `CLAUDE.md`, 
 **Git**
 
 - Commit, push and open a pull request only when the owner asks.
-- Pull request titles: `<type>(<scope>): <description>`. Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `style`, `chore`, `spike`, `infra`, `revert`. The description is lowercase, 72 characters at most, with no period at the end.
+- Pull request titles: `<type>(<scope>): <description>`. Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `style`, `chore`, `spike`, `infra`, `revert`. The description is lowercase, 72 characters at most, with no period at the end. The type, the scope and the ticket key do not count toward the 72.
 - Screenshots and other scratch output go to an ignored folder, never into the working tree.
 
 ## 14. Milestones

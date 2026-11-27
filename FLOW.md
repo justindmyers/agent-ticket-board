@@ -170,8 +170,9 @@ flowchart TD
   LOGIN -->|"no"| YOU["You log in once<br/>the run waits"]:::human
   YOU --> LOGIN
   LOGIN -->|"yes"| CHECK["Agent checks each requirement:<br/>its test, or the live app<br/>3 sizes, light and dark screenshots"]:::agent
-  CHECK --> LOOK["Agent views every screenshot,<br/>fixes what looks wrong, shoots again"]:::agent
-  LOOK --> EVID["Evidence for each requirement<br/>passes, or a note why not"]
+  CHECK --> GUARD["Test browser guard<br/>reads and GraphQL queries pass<br/>a write passes only if you approved it"]:::board
+  GUARD --> LOOK["Agent views every screenshot,<br/>fixes what looks wrong, shoots again"]:::agent
+  LOOK --> EVID["Evidence for each requirement<br/>passes, or a note why not<br/>tagged: real data, fake data, test only<br/>each approved write: made, or not made"]
   EVID -->|"any fails"| RETRY["You: Test again, or comment and re-plan"]:::human
   EVID -->|"all pass"| APPROVE{"You: Approve for code review"}:::human
   APPROVE --> CLOSE["Browser and app close"]:::board
@@ -181,7 +182,7 @@ flowchart TD
   classDef board fill:#0f2f4a,stroke:#4aa3e8,color:#fff
 ```
 
-Check it: `steps` in the record show each step as todo, current or done. `gate` shows the board's own check result, step by step. `evidence` has one entry for each requirement, with its screenshot paths. Screenshots are in `tickets/KEY/shots/`.
+Check it: `steps` in the record show each step as todo, current or done. `gate` shows the board's own check result, step by step. `evidence` has one entry for each requirement, with its screenshot paths. Screenshots are in `tickets/KEY/shots/`. Each entry also has `data`: `real`, `fake` or `none`. `writeRuns` lists each approved write with `made` and its result. A pass on fake data still lets you approve. The decision text names the fake data and the writes that were not made.
 
 ## 6. Code review, commits and the pre-push gate
 
@@ -196,6 +197,9 @@ flowchart TD
   OPEN -->|"yes"| RA["Review again"]:::human
   RA --> R
   OPEN -->|"no"| CHK
+  V -.-> CHOOSE["You choose on any finding:<br/>Fix, Dismiss, or Fix anyway for a dropped one"]:::human
+  CHOOSE --> FIXCH["FIX RUN: agent fixes only the chosen findings<br/>no new review, no commit"]:::agent
+  FIXCH --> CHK
 
   CHK["BOARD CHECKS on the uncommitted change<br/>contracts, type checks, eslint, prettier,<br/>changed tests, comment and import checks<br/>only on lines the ticket changed"]:::board
   CHK -->|"fail"| FIXRV["Fix and review again<br/>the failing output goes to the agent"]:::agent
@@ -230,9 +234,9 @@ flowchart TD
   classDef planned fill:#222,stroke:#777,stroke-dasharray:5 4,color:#aaa
 ```
 
-Not built yet (grey): the push, the draft pull request, and the pull request tracking. Today the flow ends after the pre-push gate. The findings have no Fix or Dismiss buttons yet.
+Not built yet (grey): the push, the draft pull request, and the pull request tracking. Today the flow ends after the pre-push gate.
 
-Check it: `codeReview.findings` lists each finding as `fixed`, `open` or `dropped`, with the reviewer, file and line. `gate.steps` lists each check and its output. `commits.done` lists each commit and its short hash. Audit events: `verify.started`, `gate.done`, `before-commit`, `commit.made`, `commit.failed`.
+Check it: `codeReview.findings` lists each finding as `fixed`, `open` or `dropped`, with the reviewer, file and line. A finding that you chose has `decision`: `fix` or `dismiss`. A dismissed finding never blocks. Audit event: `finding`. `gate.steps` lists each check and its output. `commits.done` lists each commit and its short hash. Audit events: `verify.started`, `gate.done`, `before-commit`, `commit.made`, `commit.failed`.
 
 ## 7. What the board may write
 
