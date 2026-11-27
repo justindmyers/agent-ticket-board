@@ -456,6 +456,25 @@ describe('where the evidence came from', () => {
     );
   });
 
+  it('names the button for an approval with writes that were not made', () => {
+    const f = applyTest(withWrites, result('real', []));
+    expect(f.need?.actions[0]).toEqual({
+      id: 'approveTesting',
+      label: 'Approve with untested writes'
+    });
+  });
+
+  it('keeps the plain button when every approved write was made', () => {
+    const f = applyTest(
+      withWrites,
+      result('real', [
+        { method: 'PUT', path: '/api/edges/:id/update-settings', made: true, result: '200' },
+        { method: 'POST', path: '/api/edges/:id/upgrade-request', made: true, result: '200' }
+      ])
+    );
+    expect(f.need?.actions[0]?.label).toBe('Approve for code review');
+  });
+
   it('adds no note when everything ran against the real backend', () => {
     const f = applyTest(
       withWrites,

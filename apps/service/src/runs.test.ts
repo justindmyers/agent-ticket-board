@@ -14,6 +14,7 @@ vi.hoisted(() => {
 });
 
 import {
+  approveTesting,
   CONFIG,
   FLOWS,
   listComments,
@@ -1482,5 +1483,37 @@ describe('Runs.reviewFix', () => {
     expect(by('F2')?.decision).toBeUndefined();
     expect(by('F3')?.decision).toBe('dismiss');
     expect(f?.need?.kind).toBe('decision');
+  });
+});
+
+describe('approving the tested change', () => {
+  const tested = {
+    stage: 'testing' as const,
+    worktree: '/wt',
+    requirements: [{ id: 'R1', text: 'x', check: 'y' }],
+    writes: [{ method: 'PUT', path: '/api/e/:id', why: 'R1' }],
+    evidence: { R1: { ok: true, data: 'fake' as const } },
+    writeRuns: [{ method: 'PUT', path: '/api/e/:id', made: false, result: 'No real edge.' }],
+    need: { kind: 'decision' as const, ask: 'Tested.', actions: [] }
+  };
+
+  it('records the fake data and the writes that were not made in the audit log', async () => {
+    await saveFlow('PROJ-88', tested as never);
+    await approveTesting('PROJ-88');
+    const ev = (await readTimeline('PROJ-88')).find((e) => e.type === 'testing.approved');
+    expect(ev).toMatchObject({ untestedWrites: ['PUT /api/e/:id'], fakeData: ['R1'] });
+  });
+
+  it('records nothing extra when every write was made on real data', async () => {
+    await saveFlow('PROJ-89', {
+      ...tested,
+      evidence: { R1: { ok: true, data: 'real' as const } },
+      writeRuns: [{ method: 'PUT', path: '/api/e/:id', made: true, result: '200' }]
+    } as never);
+    await approveTesting('PROJ-89');
+    const ev = (await readTimeline('PROJ-89')).find((e) => e.type === 'testing.approved');
+    expect(ev).toBeDefined();
+    expect(ev).not.toHaveProperty('untestedWrites');
+    expect(ev).not.toHaveProperty('fakeData');
   });
 });

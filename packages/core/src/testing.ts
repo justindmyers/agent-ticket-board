@@ -237,6 +237,13 @@ export function applyTest(
  * A pass that rests on fake data, or on an approved write that was not made, is not the same as a
  * pass on the real backend. The note stays in the decision text, so the developer can follow up.
  */
+/** The approved writes that no test run made against the real backend. */
+export function untestedWrites(f: Flow, runs: WriteRun[] = f.writeRuns ?? []) {
+  return (f.writes ?? []).filter(
+    (w) => !runs.some((r) => r.made && r.method === w.method && r.path === w.path)
+  );
+}
+
 function withDataNote(
   need: Need,
   evidence: Record<string, Evidence>,
@@ -249,17 +256,23 @@ function withDataNote(
   const fake = Object.entries(evidence)
     .filter(([, e]) => e.data === 'fake')
     .map(([id]) => id);
-  const unmade = runs.filter((w) => !w.made);
-  const approved = (f.writes ?? []).filter(
-    (w) => !runs.some((r) => r.method === w.method && r.path === w.path)
-  );
+  const untested = untestedWrites(f, runs);
   const lines = [
     fake.length ? `Fake data: ${listIds(fake)}.` : '',
-    unmade.length || approved.length
-      ? `Approved writes not made against the backend: ${[...unmade, ...approved].map((w) => `${w.method} ${w.path}`).join(', ')}.`
+    untested.length
+      ? `Approved writes not made against the backend: ${untested.map((w) => `${w.method} ${w.path}`).join(', ')}.`
       : ''
   ].filter(Boolean);
-  return lines.length ? { ...need, detail: lines.join(' ') } : need;
+  if (!lines.length) {
+    return need;
+  }
+  // Approving with a write that was never made is a choice: the button says so.
+  const actions = untested.length
+    ? need.actions.map((x) =>
+        x.id === 'approveTesting' ? { ...x, label: 'Approve with untested writes' } : x
+      )
+    : need.actions;
+  return { ...need, detail: lines.join(' '), actions };
 }
 
 /** What the developer does after a test run: test again, or approve. */
@@ -360,7 +373,14 @@ export async function approveTesting(key: string) {
   }
   const next = approveTestingFlow(f, new Date().toISOString());
   await saveFlow(key, next, 'developer');
-  await audit(key, 'developer', 'testing.approved', {});
+  const untested = untestedWrites(f).map((w) => `${w.method} ${w.path}`);
+  const fake = Object.entries(f.evidence ?? {})
+    .filter(([, e]) => e.data === 'fake')
+    .map(([id]) => id);
+  await audit(key, 'developer', 'testing.approved', {
+    ...(untested.length ? { untestedWrites: untested } : {}),
+    ...(fake.length ? { fakeData: fake } : {})
+  });
   return next;
 }
 
