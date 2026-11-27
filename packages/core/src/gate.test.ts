@@ -95,7 +95,7 @@ describe('applyGate', () => {
       ask: 'pnpm check:types failed.',
       detail: 'TS2322'
     });
-    expect(f.need?.actions[0]).toEqual({ id: 'startGate', label: 'Run the checks again' });
+    expect(f.need?.actions[0]).toEqual({ id: 'startGate', label: 'Prepare the push again' });
   });
 
   it('sends a failure before the commits back to the agent with its output', () => {

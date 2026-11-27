@@ -152,3 +152,87 @@ describe('runGate', () => {
     );
   });
 });
+
+describe('runGate after the checks passed before the commits', () => {
+  /** An uncommitted change: an edited file and a new file. */
+  function uncommitted() {
+    const r = repo();
+    writeFileSync(join(r.wt, 'a.ts'), 'edited\n');
+    writeFileSync(join(r.wt, 'b.ts'), 'new\n');
+    return r;
+  }
+  const commitAll = (wt: string) => {
+    git(wt, 'add', 'a.ts');
+    git(wt, 'commit', '-m', 'one');
+    git(wt, 'add', 'b.ts');
+    git(wt, 'commit', '-m', 'two');
+  };
+
+  it('records a fingerprint of the content that the checks passed on, with new files in it', async () => {
+    const { wt } = uncommitted();
+    const g = await runGate(input(wt, [], { verify: true }));
+    expect(g).toMatchObject({ ok: true, verify: true });
+    expect(g.tree).toMatch(/^[0-9a-f]{40}$/);
+    const withoutNew = await runGate(input(wt, [], { verify: true }));
+    writeFileSync(join(wt, 'b.ts'), 'changed again\n');
+    const again = await runGate(input(wt, [], { verify: true }));
+    expect(withoutNew.tree).toBe(g.tree);
+    expect(again.tree).not.toBe(g.tree);
+  });
+
+  it('skips the repeat pass when the commits hold the same content, whatever way they split it', async () => {
+    const { wt } = uncommitted();
+    const verified = await runGate(input(wt, [], { verify: true }));
+    commitAll(wt);
+    const ran: string[] = [];
+    const g = await runGate(input(wt, ran, { verifiedTree: verified.tree }));
+    expect(g.ok).toBe(true);
+    expect(ran.some((c) => c.startsWith('echo'))).toBe(false);
+    expect(g.steps.map((s) => s.name)).toEqual([
+      'Clean worktree',
+      'Fetch origin/main',
+      'Checks before the merge',
+      'Merge origin/main'
+    ]);
+    expect(g.steps[2]!.note).toMatch(/Skipped: they passed on this exact content/);
+  });
+
+  it('runs the checks when the code changed after they passed', async () => {
+    const { wt } = uncommitted();
+    const verified = await runGate(input(wt, [], { verify: true }));
+    writeFileSync(join(wt, 'b.ts'), 'a late edit\n');
+    commitAll(wt);
+    const ran: string[] = [];
+    const g = await runGate(input(wt, ran, { verifiedTree: verified.tree }));
+    expect(ran.filter((c) => c.startsWith('echo'))).toHaveLength(3);
+    expect(g.steps.map((s) => s.name)).not.toContain('Checks before the merge');
+  });
+
+  it('runs the checks when nothing passed before', async () => {
+    const { wt } = uncommitted();
+    commitAll(wt);
+    const ran: string[] = [];
+    await runGate(input(wt, ran, { verifiedTree: null }));
+    expect(ran.filter((c) => c.startsWith('echo'))).toHaveLength(3);
+  });
+
+  it('still runs the checks after a merge that brings changes, and only then', async () => {
+    const { wt, advance } = uncommitted();
+    const verified = await runGate(input(wt, [], { verify: true }));
+    commitAll(wt);
+    advance('other.txt', 'x\n');
+    const ran: string[] = [];
+    const g = await runGate(input(wt, ran, { verifiedTree: verified.tree }));
+    expect(g.merged).toBe(true);
+    expect(ran.filter((c) => c.startsWith('echo'))).toHaveLength(3);
+    expect(g.steps.map((s) => s.name)).toEqual([
+      'Clean worktree',
+      'Fetch origin/main',
+      'Checks before the merge',
+      'Merge origin/main',
+      'echo types (after the merge)',
+      'echo lint {changed} (after the merge)',
+      'echo test {tests} (after the merge)'
+    ]);
+  });
+});

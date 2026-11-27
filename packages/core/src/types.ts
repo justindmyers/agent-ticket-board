@@ -104,6 +104,8 @@ export type Gate = {
   merged: boolean;
   /** True when the checks ran on the change before the commits: nothing was merged. */
   verify?: true;
+  /** A fingerprint of the content that the checks passed on. The pre-push gate skips a repeat pass on it. */
+  tree?: string;
   steps: { name: string; ok: boolean; note?: string }[];
 };
 

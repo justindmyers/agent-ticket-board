@@ -443,6 +443,7 @@ export class Runs {
           base: CONFIG.repo.baseBranch,
           testMock: CONFIG.repo.testMock,
           verify,
+          verifiedTree: f.gate?.verify && f.gate.ok ? f.gate.tree : null,
           now: this.now,
           step: (name) => void this.patchRun(key, { activity: `Running ${name}` }),
           exec: (cmd, heavy) => this.heavyShell(key, cmd, cwd, ac, heavy)

@@ -12,6 +12,8 @@ export type GateInput = {
   testMock: string | null;
   /** Check the working tree as it is: no clean tree, no fetch and no merge. For before the commits. */
   verify?: boolean;
+  /** The fingerprint of the content that the board's checks passed on before the commits, if they did. */
+  verifiedTree?: string | null;
   exec: Exec;
   /** Called before each step starts, for the activity line. */
   step?: (name: string) => void;
@@ -24,11 +26,13 @@ const tail = (out: string, n = 12) => out.trim().split('\n').slice(-n).join('\n'
 export async function runGate(i: GateInput): Promise<Gate> {
   const steps: Gate['steps'] = [];
   const git = (cmd: string) => i.exec(`git ${cmd}`, false);
+  let tree: string | undefined;
   const done = (merged: boolean): Gate => ({
     at: i.now(),
     ok: steps.every((s) => s.ok),
     merged,
     ...(i.verify ? { verify: true as const } : {}),
+    ...(tree ? { tree } : {}),
     steps
   });
   const step = async (name: string, run: () => Promise<{ ok: boolean; note?: string }>) => {
@@ -105,10 +109,30 @@ export async function runGate(i: GateInput): Promise<Gate> {
     return true;
   };
 
-  if (!(await runChecks(''))) {
+  // The content as a git tree. Before the commits it is the working tree, new files included, read
+  // through a temporary index. After the commits it is the tree of HEAD. Same content, same tree.
+  const contentTree = async () => {
+    const r = await i.exec(
+      i.verify
+        ? 'idx=$(mktemp) && GIT_INDEX_FILE=$idx git read-tree HEAD && GIT_INDEX_FILE=$idx git add -A && GIT_INDEX_FILE=$idx git write-tree; rc=$?; rm -f "$idx"; exit $rc'
+        : 'git rev-parse HEAD^{tree}',
+      false
+    );
+    return r.code ? undefined : r.out.trim().split('\n').pop();
+  };
+
+  if (!i.verify && i.verifiedTree && (await contentTree()) === i.verifiedTree) {
+    // The checks passed on this exact content before the commits: a second pass proves nothing.
+    steps.push({
+      name: 'Checks before the merge',
+      ok: true,
+      note: 'Skipped: they passed on this exact content before the commits.'
+    });
+  } else if (!(await runChecks(''))) {
     return done(false);
   }
   if (i.verify) {
+    tree = await contentTree();
     return done(false);
   }
 

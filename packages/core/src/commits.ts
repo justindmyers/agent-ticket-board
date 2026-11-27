@@ -161,7 +161,7 @@ export function applyCommitPlan(f: Flow, plan: CommitPlan, changed: string[], ke
       need: {
         kind: 'decision',
         ask: 'Nothing is left to commit.',
-        actions: [{ id: 'startGate', label: 'Run the checks' }, open]
+        actions: [{ id: 'startGate', label: 'Prepare the push' }, open]
       }
     };
   }
@@ -192,8 +192,10 @@ export function commitsDone(f: Flow): Flow {
   const need: Need = {
     kind: 'decision',
     ask: `${n} commit${n === 1 ? '' : 's'} made.`,
+    detail:
+      'Next: merge the base branch and check the result. The checks that passed before the commits run again only if the code changed or the merge brings changes.',
     actions: [
-      { id: 'startGate', label: 'Run the checks' },
+      { id: 'startGate', label: 'Prepare the push' },
       { id: 'openWorktree', label: 'Open worktree' }
     ]
   };

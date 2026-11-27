@@ -220,7 +220,7 @@ flowchart TD
   COMMIT -->|"a hook refuses"| HOOKFAIL["Stops there, keeps earlier commits,<br/>shows the hook output"]:::human
   COMMIT --> GATE
 
-  GATE["PRE-PUSH GATE<br/>1 worktree is clean<br/>2 fetch origin/main<br/>3 run the checks<br/>4 merge origin/main, never rebase<br/>5 run the checks again if the merge changed anything"]:::board
+  GATE["PRE-PUSH GATE<br/>1 worktree is clean<br/>2 fetch origin/main<br/>3 run the checks, unless they passed on this exact content before the commits<br/>4 merge origin/main, never rebase<br/>5 run the checks again if the merge changed anything"]:::board
   GATE -->|"merge conflict"| UNDO["Merge is undone, tree stays clean"]:::human
   GATE -->|"pass"| PUSH
 
@@ -236,7 +236,7 @@ flowchart TD
 
 Not built yet (grey): the push, the draft pull request, and the pull request tracking. Today the flow ends after the pre-push gate.
 
-Check it: `codeReview.findings` lists each finding as `fixed`, `open` or `dropped`, with the reviewer, file and line. A finding that you chose has `decision`: `fix` or `dismiss`. A dismissed finding never blocks. Audit event: `finding`. `gate.steps` lists each check and its output. `commits.done` lists each commit and its short hash. Audit events: `verify.started`, `gate.done`, `before-commit`, `commit.made`, `commit.failed`.
+Check it: `codeReview.findings` lists each finding as `fixed`, `open` or `dropped`, with the reviewer, file and line. A finding that you chose has `decision`: `fix` or `dismiss`. A dismissed finding never blocks. Audit event: `finding`. `gate.steps` lists each check and its output. `gate.tree` is the fingerprint of the content that the checks passed on. The step "Checks before the merge" says when the gate skipped the repeat pass. `commits.done` lists each commit and its short hash. Audit events: `verify.started`, `gate.done`, `before-commit`, `commit.made`, `commit.failed`.
 
 ## 7. What the board may write
 

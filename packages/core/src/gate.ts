@@ -53,10 +53,19 @@ export function applyGate(f: Flow, g: Gate): Flow {
         actions: g.verify
           ? [
               { id: 'startCodeReview', label: 'Fix and review again' },
-              { id: again, label: 'Run the checks again' },
+              {
+                id: again,
+                label: again === 'startGate' ? 'Prepare the push again' : 'Run the checks again'
+              },
               open
             ]
-          : [{ id: again, label: 'Run the checks again' }, open]
+          : [
+              {
+                id: again,
+                label: again === 'startGate' ? 'Prepare the push again' : 'Run the checks again'
+              },
+              open
+            ]
       }
     : g.verify
       ? {
