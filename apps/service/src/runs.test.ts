@@ -1384,3 +1384,103 @@ describe('a build goes through the board checks before Testing', () => {
     CONFIG.repo.checks = [];
   });
 });
+
+describe('Runs.reviewFix', () => {
+  const finding = (id: string, o: Record<string, unknown>) => ({
+    id,
+    reviewer: 'correctness',
+    file: 'a.ts',
+    line: 3,
+    problem: `Problem ${id}.`,
+    fix: 'Fix it.',
+    severity: 'blocking' as const,
+    state: 'fixed' as const,
+    note: '',
+    ...o
+  });
+  const reviewedFlow = (wt: string) => ({
+    stage: 'code-review' as const,
+    worktree: wt,
+    codeReview: {
+      at: 'n',
+      summary: 'Done.',
+      checks: [],
+      findings: [
+        finding('F1', {}),
+        finding('F2', { state: 'dropped', note: 'The code does not show it.', decision: 'fix' }),
+        finding('F3', { severity: 'style', state: 'open', decision: 'dismiss' })
+      ]
+    }
+  });
+
+  it('refuses when no finding is chosen', async () => {
+    const wt = mkdtempSync(join(tmpdir(), 'atb-wt-'));
+    const f = reviewedFlow(wt);
+    f.codeReview.findings[1] = finding('F2', { state: 'dropped' }) as never;
+    await saveFlow('PROJ-85', f);
+    const { r } = runs(fakeQuery([]).query);
+    await expect(r.reviewFix('PROJ-85')).rejects.toThrow(/Choose the findings/);
+  });
+
+  it('runs the board checks by itself after the fixes, on the new code', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'atb-fixchain-'));
+    const git = (cwd: string, ...a: string[]) =>
+      execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+        cwd,
+        encoding: 'utf8',
+        stdio: 'pipe'
+      });
+    git(root, 'init', '--bare', '-b', 'main', 'origin.git');
+    git(root, 'clone', join(root, 'origin.git'), 'wt');
+    const wt = join(root, 'wt');
+    writeFileSync(join(wt, 'a.txt'), 'a\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    git(wt, 'push', 'origin', 'HEAD:main');
+    git(wt, 'fetch', 'origin');
+    writeFileSync(join(wt, 'a.txt'), 'changed\n');
+    CONFIG.repo.checks = ['true'];
+    await saveFlow('PROJ-87', reviewedFlow(wt));
+    const answer = { findings: [{ id: 'F2', fixed: true, note: 'Done.' }], summary: 'One fixed.' };
+    const { r } = runs(fakeQuery([init, success(answer)]).query);
+    await r.reviewFix('PROJ-87');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-87'))?.gate?.ok).toBe(true), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-87');
+    expect(f?.gate?.verify).toBe(true);
+    expect(f?.need?.actions[0]?.id).toBe('startCommitPlan');
+    CONFIG.repo.checks = [];
+  });
+
+  it('fixes only the chosen findings in the worktree, then records them fixed', async () => {
+    CONFIG.repo.checks = [];
+    const wt = mkdtempSync(join(tmpdir(), 'atb-wt-'));
+    await saveFlow('PROJ-86', reviewedFlow(wt));
+    const answer = {
+      findings: [{ id: 'F2', fixed: true, note: 'Guarded the empty list.' }],
+      summary: 'One fixed.'
+    };
+    const { query, calls } = fakeQuery([init, success(answer)]);
+    const { r } = runs(query);
+    await r.reviewFix('PROJ-86');
+    await idle(r);
+
+    const o = calls[0]!.options!;
+    expect(o).toMatchObject({ cwd: wt, permissionMode: 'dontAsk', strictMcpConfig: true });
+    expect(o.tools).toContain('Edit');
+    expect(calls[0]!.prompt).toContain('- F2 (correctness) a.ts:3: Problem F2.');
+    expect(calls[0]!.prompt).toContain(
+      'The checker dropped it because: The code does not show it.'
+    );
+    expect(calls[0]!.prompt).not.toContain('Problem F3');
+
+    const f = await loadFlow('PROJ-86');
+    expect(f?.run).toMatchObject({ task: 'review-fix', state: 'done', stage: 'code-review' });
+    const by = (id: string) => f?.codeReview?.findings.find((x) => x.id === id);
+    expect(by('F2')).toMatchObject({ state: 'fixed', note: 'Guarded the empty list.' });
+    expect(by('F2')?.decision).toBeUndefined();
+    expect(by('F3')?.decision).toBe('dismiss');
+    expect(f?.need?.kind).toBe('decision');
+  });
+});

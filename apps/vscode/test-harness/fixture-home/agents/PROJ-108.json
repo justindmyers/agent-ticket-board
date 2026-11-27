@@ -34,9 +34,32 @@
         "line": 12,
         "problem": "The handler name does not match the repository naming.",
         "fix": "Rename it.",
-        "severity": "style",
+        "severity": "blocking",
         "state": "dropped",
         "note": "The source already uses the repository naming."
+      },
+      {
+        "id": "F4",
+        "reviewer": "code-style",
+        "file": "src/SignIn.tsx",
+        "line": 12,
+        "problem": "Two forms of the same conditional are used.",
+        "fix": "Use one form.",
+        "severity": "style",
+        "state": "open",
+        "note": ""
+      },
+      {
+        "id": "F5",
+        "reviewer": "correctness",
+        "file": "src/SignIn.tsx",
+        "line": 70,
+        "problem": "The retry count can go below zero.",
+        "fix": "Clamp it at zero.",
+        "severity": "blocking",
+        "state": "dropped",
+        "note": "The code clamps it on line 66.",
+        "decision": "fix"
       }
     ],
     "checks": [
@@ -93,5 +116,24 @@
       }
     ],
     "summary": "One topic is left."
+  },
+  "need": {
+    "kind": "decision",
+    "ask": "Review done: 2 fixed, 2 dropped, 1 style note.",
+    "detail": "Dropped means the checker did not find the problem in the code. Style notes never block. Choose any finding to fix it.",
+    "actions": [
+      {
+        "id": "startReviewFix",
+        "label": "Fix 1 chosen finding"
+      },
+      {
+        "id": "startCommitPlan",
+        "label": "Plan the commits"
+      },
+      {
+        "id": "openWorktree",
+        "label": "Open worktree"
+      }
+    ]
   }
 }

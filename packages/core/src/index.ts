@@ -30,6 +30,7 @@ export * from './development';
 export * from './next-step';
 export * from './commits';
 export * from './diff-scope';
+export * from './findings';
 export * from './gate';
 export * from './restart';
 export * from './review';

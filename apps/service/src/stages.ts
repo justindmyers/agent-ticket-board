@@ -3,6 +3,11 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   applyCommitPlan,
+  applyFix,
+  canFixFindings,
+  FIX_SCHEMA,
+  fixPrompt,
+  parseFix,
   applyReview,
   canPlanCommits,
   changedFiles,
@@ -44,7 +49,8 @@ import type { AppEnv } from './runs';
 // What differs between the stages that an agent runs: the checks before a run, the model and the
 // cost cap, the tools, the prompt, the answer shape and how the answer goes into the record.
 
-export type StageId = 'planning' | 'development' | 'testing' | 'code-review' | 'commit-plan';
+export type StageId =
+  'planning' | 'development' | 'testing' | 'code-review' | 'review-fix' | 'commit-plan';
 
 export const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
 
@@ -114,7 +120,7 @@ export const COMMIT_PLAN_ALLOWED = [
 export type StageSpec = {
   stage: Stage;
   /** The part of a stage that is not its main run, like the commit plan of Code review. */
-  task?: 'commit-plan';
+  task?: 'commit-plan' | 'review-fix';
   model: string;
   budgetUsd: number;
   /** The action that runs the stage again after a failure. */
@@ -211,9 +217,12 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
     // The agent names its screenshot sets; the evidence gets every file of each set.
     apply: (f, output, key) => {
       const out = applyTest(f, parseTest(output), shotFilesOf(key));
-      return f.worktree ? markStaleShots(out, shotTimes(out), lastChange(f.worktree)) : out;
+      return f.worktree ? markStaleShots(out, shotTimes(out), lastChangedFile(f.worktree)) : out;
     },
     counts: (f) => ({
+      real: Object.values(f.evidence ?? {}).filter((e) => e.data === 'real').length,
+      fake: Object.values(f.evidence ?? {}).filter((e) => e.data === 'fake').length,
+      writesMade: `${f.writeRuns?.filter((w) => w.made).length ?? 0} of ${f.writeRuns?.length ?? 0}`,
       passing: Object.values(f.evidence ?? {}).filter((e) => e.ok).length,
       requirements: f.requirements?.length,
       shots: Object.values(f.evidence ?? {}).reduce((n, e) => n + (e.shots?.length ?? 0), 0)
@@ -239,6 +248,24 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
       fixed: f.codeReview?.findings.filter((x) => x.state === 'fixed').length,
       dropped: f.codeReview?.findings.filter((x) => x.state === 'dropped').length,
       checks: f.codeReview?.checks.map((c) => `${c.name}: ${c.ok ? 'ok' : 'failed'}`)
+    })
+  },
+  'review-fix': {
+    stage: 'code-review',
+    task: 'review-fix',
+    model: 'opus',
+    budgetUsd: 4,
+    retry: 'startReviewFix',
+    refuse: canFixFindings,
+    begin: (f) => withoutNeed(f!),
+    prompt: (t, f) => fixPrompt(t, f, commandsOf(BUILD_ALLOWED)),
+    tools: BUILD_TOOLS,
+    allowed: BUILD_ALLOWED,
+    schema: () => FIX_SCHEMA,
+    apply: (f, output) => applyFix(f, parseFix(output)),
+    counts: (f) => ({
+      fixed: f.codeReview?.findings.filter((x) => x.state === 'fixed').length,
+      stillOpen: f.codeReview?.findings.filter((x) => x.state === 'open').length
     })
   },
   'commit-plan': {

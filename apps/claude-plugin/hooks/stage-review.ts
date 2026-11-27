@@ -13,7 +13,7 @@ export function stageReview($: EngineInterface, ctx: Ctx, f: Flow) {
   const pr = f.pr;
   const head = [
     ...runBox($, ctx, store.open ?? '', f, 'code-review'),
-    ...reviewRows(ctx, f),
+    ...reviewRows($, ctx, store.open ?? '', f),
     ...commitRows(ctx, f),
     ...gateRows(ctx, f)
   ];

@@ -84,6 +84,8 @@ export type Finding = {
   severity: 'blocking' | 'style';
   state: 'fixed' | 'open' | 'dropped';
   note: string;
+  /** The developer's choice: fix it, also a dropped one, or let it be. */
+  decision?: 'fix' | 'dismiss';
 };
 
 /** The result of the review round: the findings, the repository checks and a summary. */
@@ -131,7 +133,7 @@ export type AgentRun = {
   state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
   stage: Stage;
   /** `gate`: the pre-push checks. The board runs them, with no agent. */
-  task?: 'gate' | 'verify' | 'commit-plan' | 'commit';
+  task?: 'gate' | 'verify' | 'review-fix' | 'commit-plan' | 'commit';
   started: string;
   model: string;
   ended?: string;

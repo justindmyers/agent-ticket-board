@@ -375,6 +375,9 @@ function page(theme, mode) {
     commitRows: document.querySelectorAll('[aria-label="Commits"] li').length,
     gateRows: document.querySelectorAll('[aria-label="Checks before a push"] li').length
   }));
+  kb.findingButtons = await rh.evaluate(() =>
+    [...document.querySelectorAll('[aria-label="Review"] button')].map((b) => b.textContent.trim())
+  );
   await axe(rh, 'dark/ticket-code-review');
   await rh.screenshot({ path: path.join(OUT, 'ticket-code-review.png') });
   await rh.click('[role=option][data-key="PROJ-112"]');

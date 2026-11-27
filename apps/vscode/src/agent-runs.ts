@@ -24,6 +24,7 @@ export async function startRun(
     | 'review'
     | 'gate'
     | 'verify'
+    | 'review-fix'
     | 'restart'
     | 'commit-plan'
     | 'commit'

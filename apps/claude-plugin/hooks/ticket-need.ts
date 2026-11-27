@@ -46,6 +46,8 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
                 void agentRun($, t.key, 'commit-plan');
               } else if (x.id === 'approveCommits') {
                 void agentRun($, t.key, 'commit');
+              } else if (x.id === 'startReviewFix') {
+                void agentRun($, t.key, 'review-fix');
               } else if (x.id === 'startVerify') {
                 void agentRun($, t.key, 'verify');
               } else if (x.id === 'startGate') {

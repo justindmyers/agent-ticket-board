@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   acquireHeavy,
+  setFindingDecision,
   changedRanges,
   scopeFindings,
   HOME,
@@ -84,6 +85,8 @@ const USAGE = `usage:
   atb review <KEY>                       run the code review again
   atb commit-plan <KEY>                  an agent plans the commits of the change
   atb commit <KEY>                       make the planned commits
+  atb finding <KEY> <ID> fix|dismiss|clear  choose what happens to a finding of the review
+  atb review-fix <KEY>                   fix the findings that you chose
   atb restart <KEY> --yes                archive the work, remove the worktree and branch, return to Planning
   atb diff-scope                         keep the findings on stdin that touch changed lines
   atb verify <KEY>                       run the checks on the change before the commits
@@ -210,6 +213,14 @@ async function main() {
     }
     return;
   }
+  if (cmd === 'finding' && key && args[1] && ['fix', 'dismiss', 'clear'].includes(args[2] ?? '')) {
+    await setFindingDecision(
+      key,
+      args[1],
+      args[2] === 'clear' ? null : (args[2] as 'fix' | 'dismiss')
+    );
+    return out({ ok: true });
+  }
   if (cmd === 'restart' && key) {
     if (!flags.has('--yes')) {
       throw new Error(
@@ -231,6 +242,7 @@ async function main() {
       cmd === 'gate' ||
       cmd === 'verify' ||
       cmd === 'commit-plan' ||
+      cmd === 'review-fix' ||
       cmd === 'commit' ||
       cmd === 'stop') &&
     key

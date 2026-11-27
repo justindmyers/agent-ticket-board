@@ -1,3 +1,4 @@
+import { withFixAction } from './review';
 import type { Flow, Gate, Need } from './types';
 
 // The pre-push gate: the checks of the repository, in the order of its config, then a merge of the
@@ -68,7 +69,7 @@ export function applyGate(f: Flow, g: Gate): Flow {
           ask: `Every check passes${g.merged ? ' after the merge' : ''}.`,
           actions: [open]
         };
-  return { ...f, gate: g, need };
+  return { ...f, gate: g, need: withFixAction(need, f.codeReview?.findings) };
 }
 
 /** The checks that the board ran after the last review and that failed: the agent fixes them first. */

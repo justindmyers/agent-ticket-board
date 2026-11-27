@@ -107,7 +107,7 @@ describe('applyReview', () => {
       at
     );
     expect(f.need?.kind).toBe('decision');
-    expect(f.need?.detail).not.toMatch(/check/i);
+    expect(f.need?.detail).not.toMatch(/could not confirm|check:types|Not run/);
   });
 });
 

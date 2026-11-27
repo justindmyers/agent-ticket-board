@@ -80,7 +80,16 @@ export async function agentRun(
   $: EngineInterface,
   key: string,
   verb:
-    'plan' | 'develop' | 'test' | 'review' | 'gate' | 'verify' | 'commit-plan' | 'commit' | 'stop'
+    | 'plan'
+    | 'develop'
+    | 'test'
+    | 'review'
+    | 'gate'
+    | 'verify'
+    | 'review-fix'
+    | 'commit-plan'
+    | 'commit'
+    | 'stop'
 ) {
   try {
     await atb($, [verb, key], 30000);

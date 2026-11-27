@@ -250,6 +250,10 @@ export class Runs {
     return this.start(key, 'code-review');
   }
 
+  reviewFix(key: string) {
+    return this.start(key, 'review-fix');
+  }
+
   commitPlan(key: string) {
     return this.start(key, 'commit-plan');
   }
@@ -642,7 +646,7 @@ export class Runs {
           void this.verify(key).catch(() => undefined);
         }
         if (
-          stage === 'code-review' &&
+          (stage === 'code-review' || stage === 'review-fix') &&
           f?.run?.state === 'done' &&
           f.need?.kind === 'decision' &&
           CONFIG.repo.checks.length

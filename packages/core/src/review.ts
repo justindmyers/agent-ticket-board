@@ -152,8 +152,25 @@ export function applyReview(f: Flow, r: ReviewResult, at: string): Flow {
  * What the developer does after a review. The agent's own check results are not used: it can fail
  * to run a check. The board runs the checks itself right after a clean review.
  */
-function reviewNeed(findings: Finding[]): Need {
-  const open = findings.filter((x) => x.state === 'open' && x.severity === 'blocking');
+/**
+ * The next step, plus a first button to fix the findings that the developer chose. Every place that
+ * sets the next step of a reviewed ticket goes through this, so the button never gets lost.
+ */
+export function withFixAction(need: Need, findings: Finding[] | undefined): Need {
+  const n = (findings ?? []).filter((x) => x.decision === 'fix' && x.state !== 'fixed').length;
+  const rest = need.actions.filter((a) => a.id !== 'startReviewFix');
+  return {
+    ...need,
+    actions: n
+      ? [{ id: 'startReviewFix', label: `Fix ${n} chosen finding${n === 1 ? '' : 's'}` }, ...rest]
+      : rest
+  };
+}
+
+export function reviewNeed(findings: Finding[]): Need {
+  const open = findings.filter(
+    (x) => x.state === 'open' && x.severity === 'blocking' && x.decision !== 'dismiss'
+  );
   const worktree = { id: 'openWorktree', label: 'Open worktree' };
   if (open.length) {
     return {
@@ -170,7 +187,7 @@ function reviewNeed(findings: Finding[]): Need {
     kind: 'decision',
     ask: `Review done: ${fixed} fixed, ${dropped} dropped, ${style} style note${style === 1 ? '' : 's'}.`,
     detail:
-      'Dropped: the code did not show the problem. Style notes stay as they are: they never block.',
+      'Dropped means the checker did not find the problem in the code. Style notes never block. Choose any finding to fix it.',
     actions: [{ id: 'startCommitPlan', label: 'Plan the commits' }, worktree]
   };
 }

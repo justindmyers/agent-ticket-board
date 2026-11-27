@@ -20,7 +20,7 @@ export function CodeReviewStage({ f, act, theme }: Props) {
       {f.run?.stage === 'code-review' && runActive(f) && (
         <RunSection run={f.run} act={act} theme={theme} />
       )}
-      {f.codeReview && <ReviewSection review={f.codeReview} theme={theme} />}
+      {f.codeReview && <ReviewSection review={f.codeReview} act={act} theme={theme} />}
       {f.commits && <CommitsSection commits={f.commits} theme={theme} />}
       {f.gate && <GateSection gate={f.gate} theme={theme} />}
     </>

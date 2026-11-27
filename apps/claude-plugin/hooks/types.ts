@@ -30,7 +30,7 @@ export type Flow = {
   run?: {
     state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
     stage?: string;
-    task?: 'gate' | 'verify' | 'commit-plan' | 'commit';
+    task?: 'gate' | 'verify' | 'review-fix' | 'commit-plan' | 'commit';
     model: string;
     cost?: number;
     waiting?: 'login';
@@ -70,6 +70,7 @@ export type Flow = {
       severity: 'blocking' | 'style';
       state: 'fixed' | 'open' | 'dropped';
       note: string;
+      decision?: 'fix' | 'dismiss';
     }[];
     checks: { name: string; ok: boolean; note?: string }[];
   };

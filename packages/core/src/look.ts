@@ -77,7 +77,7 @@ export function runLine(
 type RunLike = {
   state: string;
   stage?: string;
-  task?: 'gate' | 'verify' | 'commit-plan' | 'commit';
+  task?: 'gate' | 'verify' | 'review-fix' | 'commit-plan' | 'commit';
   model: string;
   waiting?: string;
   app?: string;
@@ -117,6 +117,13 @@ export function runText(run: RunLike): {
           caption: `The agent checks each requirement in the live app${run.app ? ` at ${run.app}` : ''} with ${run.model}, and fixes what looks wrong.`,
           accent
         };
+  }
+  if (run.task === 'review-fix') {
+    return {
+      title: 'Fixing the chosen findings',
+      caption: `The agent fixes the findings that you chose, with ${run.model}. It does not commit or push.`,
+      accent
+    };
   }
   if (run.task === 'commit-plan') {
     return {

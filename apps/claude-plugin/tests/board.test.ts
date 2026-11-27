@@ -707,6 +707,58 @@ for (const surface of ['desktop', 'terminal'] as const) {
 }
 
 for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: a dropped finding can be chosen for a fix, and an open one can be dismissed`, async ($, on) => {
+    const calls: string[][] = [];
+    const finding = (id: string, state: string) => ({
+      id,
+      reviewer: 'correctness',
+      file: 'a.ts',
+      line: 3,
+      problem: `Problem ${id}.`,
+      fix: 'Fix it.',
+      severity: 'blocking',
+      state,
+      note: state === 'dropped' ? 'The code does not show it.' : ''
+    });
+    const flow = {
+      stage: 'code-review',
+      codeReview: {
+        at: 'n',
+        summary: 'Done.',
+        checks: [],
+        findings: [finding('F1', 'dropped'), finding('F2', 'open')]
+      }
+    };
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      return printed(
+        a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : { ok: true }
+      );
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(
+      await ui.find({ type: 'Text', text: /Dropped because: The code does not show it/ })
+    ).toBeDefined();
+    await ui.press({ key: 'fix-F1' });
+    await tick();
+    expect(calls).toContainEqual(['finding', 'PROJ-102', 'F1', 'fix']);
+    await ui.press({ key: 'dismiss-F2' });
+    await tick();
+    expect(calls).toContainEqual(['finding', 'PROJ-102', 'F2', 'dismiss']);
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
   test(`${surface}: Start over asks first, and only the confirmation archives and removes the work`, async ($, on) => {
     const calls: string[][] = [];
     on('process.run', ($, e) => {

@@ -1,16 +1,17 @@
-import type { RenderElement } from 'claude-code';
+import type { EngineInterface, RenderElement } from 'claude-code';
+import { atb, errorText, reloadTicket } from './cli';
 import { hex, kit, type Ctx } from './kit';
 import type { Flow } from './types';
 
 const MARK = { fixed: '✓ ', open: '✗ ', dropped: '○ ' } as const;
 
 /** The review round of the Code review tab: each finding with what became of it. */
-export function reviewRows(ctx: Ctx, f: Flow): RenderElement[] {
+export function reviewRows($: EngineInterface, ctx: Ctx, key: string, f: Flow): RenderElement[] {
   const r = f.codeReview;
   if (!r) {
     return [];
   }
-  const { Box, Text } = ctx.els;
+  const { Box, Text, Button } = ctx.els;
   const { sectionTitle, dim } = kit(ctx);
   const bad = r.findings.some((x) => x.state === 'open' && x.severity === 'blocking');
   return [
@@ -35,7 +36,44 @@ export function reviewRows(ctx: Ctx, f: Flow): RenderElement[] {
             `    ${x.line ? x.file + ':' + x.line : x.file} · ${x.reviewer}${x.severity === 'style' ? ' · style' : ''}`
           ),
           dim('    Fix: ' + x.fix),
-          ...(x.note ? [dim('    ' + x.note)] : [])
+          ...(x.note
+            ? [
+                dim(
+                  `    ${{ fixed: 'Note', open: 'Not fixed because', dropped: 'Dropped because' }[x.state]}: ${x.note}`
+                )
+              ]
+            : []),
+          ...(x.decision ? [dim(`    ${x.decision === 'fix' ? 'Will fix' : 'Dismissed'}`)] : []),
+          ...(x.state === 'fixed'
+            ? []
+            : [
+                Box({
+                  key: 'choose-' + x.id,
+                  flexDirection: 'row',
+                  columnGap: 1,
+                  paddingLeft: 4,
+                  children: (x.decision
+                    ? [['clear', 'Undo']]
+                    : [
+                        ['fix', x.state === 'dropped' ? 'Fix anyway' : 'Fix'],
+                        ...(x.state === 'open' ? [['dismiss', 'Dismiss']] : [])
+                      ]
+                  ).map(([choice, label]) =>
+                    Button({
+                      key: `${choice}-${x.id}`,
+                      label: label!,
+                      onPress: async () => {
+                        try {
+                          await atb($, ['finding', key, x.id, choice!]);
+                        } catch (e) {
+                          $.ui.toast(`${key}: ${errorText(e)}`);
+                        }
+                        await reloadTicket($, key);
+                      }
+                    })
+                  )
+                })
+              ])
         ]
       })
     )

@@ -48,7 +48,9 @@ import {
   type Stage,
   type Snapshot,
   type Ticket,
-  moveToTesting
+  loadFlow,
+  moveToTesting,
+  setFindingDecision
 } from '@agent-ticket-board/core';
 
 // Jira writes: a status change only, after the developer confirms it here, or by the agent on a
@@ -367,6 +369,24 @@ async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext)
       'Start over'
     );
     return sure ? startRun(key, 'restart').catch((e: unknown) => showError(key, e)) : undefined;
+  }
+  if (id.startsWith('finding:')) {
+    const [, fid, choice] = id.split(':');
+    try {
+      await setFindingDecision(
+        key,
+        fid!,
+        choice === 'clear' ? null : (choice as 'fix' | 'dismiss')
+      );
+      await loadFlow(key);
+      broadcast();
+      return sendTicket(key, true);
+    } catch (e) {
+      return showError(key, e);
+    }
+  }
+  if (id === 'startReviewFix') {
+    return startRun(key, 'review-fix').catch((e: unknown) => showError(key, e));
   }
   if (id === 'startVerify') {
     return startRun(key, 'verify').catch((e: unknown) => showError(key, e));

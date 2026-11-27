@@ -176,6 +176,7 @@ export async function serve() {
     'POST /tickets/:key/gate': async ({ key }) => runs.gate(key!),
     'POST /tickets/:key/restart': async ({ key }) => runs.startOver(key!),
     'POST /tickets/:key/verify': async ({ key }) => runs.verify(key!),
+    'POST /tickets/:key/review-fix': async ({ key }) => runs.reviewFix(key!),
     'POST /tickets/:key/commit-plan': async ({ key }) => runs.commitPlan(key!),
     'POST /tickets/:key/commit': async ({ key }) => runs.commit(key!),
     'POST /tickets/:key/stop': async ({ key }) => ({ stopped: await runs.stop(key!) }),
