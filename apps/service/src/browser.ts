@@ -35,17 +35,37 @@ export function loginState(
 
 /**
  * Whether the test browser lets a request through: reads always; writes only when the developer
- * approved them in the plan. It runs inside the browser sandbox as well, so it uses no imports.
+ * approved them in the plan. A GraphQL query is a POST but reads data: it counts as a read. Any
+ * body that is not plainly a query counts as a write. It runs inside the browser sandbox as well,
+ * so it uses no imports.
  */
 export function writeDecision(
   method: string,
   url: string,
-  rules: { method: string; re: string }[]
+  rules: { method: string; re: string }[],
+  body?: string | null
 ) {
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
     return 'read';
   }
   const path = url.replace(/^[a-z]+:\/\/[^/]+/i, '');
+  if (method === 'POST' && /\/graphql\/?$/.test(path.split(/[?#]/)[0]!)) {
+    let queries: boolean;
+    try {
+      const parsed = JSON.parse(body || 'null');
+      const list = Array.isArray(parsed) ? parsed : [parsed];
+      queries =
+        list.length > 0 &&
+        list.every(
+          (x) => x && typeof x.query === 'string' && !/\b(mutation|subscription)\b/i.test(x.query)
+        );
+    } catch {
+      queries = false;
+    }
+    if (queries) {
+      return 'read';
+    }
+  }
   return rules.some((r) => r.method === method && new RegExp(r.re).test(path)) ? 'allow' : 'block';
 }
 
@@ -80,7 +100,7 @@ export function routesCode(appOrigin: string, keep: number[], writes: Write[]) {
   });
   await ctx.route(/^${origin}\\//, async (route) => {
     try {
-      const d = writeDecision(route.request().method(), route.request().url(), rules);
+      const d = writeDecision(route.request().method(), route.request().url(), rules, route.request().postData());
       if (d === 'read') {
         await route.fallback();
       } else if (d === 'allow') {

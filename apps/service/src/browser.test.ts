@@ -141,6 +141,66 @@ describe('the write guard of the test browser', () => {
     );
     expect(writeDecision('DELETE', 'http://localhost:3002/api/edges/e1', rules)).toBe('block');
   });
+
+  describe('GraphQL, which is a POST', () => {
+    const url = 'http://localhost:3002/api/graphql';
+    const q = (query: string) => JSON.stringify({ query });
+
+    it('lets a query through as a read, also a batch of queries', () => {
+      expect(writeDecision('POST', url, rules, q('query Total { events { total } }'))).toBe('read');
+      expect(writeDecision('POST', url, rules, q('{ activityChronicleSummary { total } }'))).toBe(
+        'read'
+      );
+      expect(
+        writeDecision('POST', url, rules, JSON.stringify([{ query: '{ a }' }, { query: '{ b }' }]))
+      ).toBe('read');
+    });
+
+    it('blocks a mutation, a subscription, a batch with one mutation, and a body that is not a query', () => {
+      expect(
+        writeDecision('POST', url, rules, q('mutation Del { deleteEdge(id: 1) { ok } }'))
+      ).toBe('block');
+      expect(writeDecision('POST', url, rules, q('subscription S { events { id } }'))).toBe(
+        'block'
+      );
+      expect(
+        writeDecision(
+          'POST',
+          url,
+          rules,
+          JSON.stringify([{ query: '{ a }' }, { query: 'mutation M { x }' }])
+        )
+      ).toBe('block');
+      expect(writeDecision('POST', url, rules, 'not json')).toBe('block');
+      expect(
+        writeDecision('POST', url, rules, JSON.stringify({ extensions: { persistedQuery: {} } }))
+      ).toBe('block');
+      expect(writeDecision('POST', url, rules, null)).toBe('block');
+      expect(writeDecision('POST', url, rules, '[]')).toBe('block');
+    });
+
+    it('does not let another path pass as GraphQL', () => {
+      expect(
+        writeDecision('POST', 'http://localhost:3002/api/graphql-export', rules, q('{ a }'))
+      ).toBe('block');
+      expect(
+        writeDecision(
+          'POST',
+          'http://localhost:3002/api/edges/e1/x?next=/graphql',
+          rules,
+          q('{ a }')
+        )
+      ).toBe('block');
+    });
+
+    it('runs from its source text inside the sandbox: no imports, the same answer', () => {
+      const inBrowser = new Function(
+        `return (${writeDecision.toString()})`
+      )() as typeof writeDecision;
+      expect(inBrowser('POST', url, rules, q('{ a }'))).toBe('read');
+      expect(inBrowser('POST', url, rules, q('mutation M { x }'))).toBe('block');
+    });
+  });
   it('is installed for the app origin only, after the Referer fix, with the same decision code', () => {
     const code = routesCode(
       'http://localhost:3002',
