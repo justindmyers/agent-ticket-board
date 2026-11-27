@@ -480,3 +480,28 @@ describe('where the evidence came from', () => {
     expect(p).toContain('Set `data` to fake');
   });
 });
+
+describe('the stale screenshot note and the data note', () => {
+  it('keeps the fake data and unmade writes lines when the screenshots are also older', () => {
+    const f: Flow = {
+      ...built,
+      writes: [{ method: 'PUT', path: '/api/e/:id', why: 'R2' }],
+      requirements: [{ id: 'R2', text: 'x', check: 'y' }] as Flow['requirements'],
+      evidence: { R2: { ok: true, data: 'fake', shots: ['/shots/PROJ-7/R2-light-1400x900.png'] } },
+      need: {
+        kind: 'decision',
+        ask: 'Tested: 1 of 1 requirements pass, with evidence.',
+        detail: 'Fake data: R2. Approved writes not made against the backend: PUT /api/e/:id.',
+        actions: [{ id: 'approveTesting', label: 'Approve for code review' }]
+      }
+    };
+    const out = markStaleShots(
+      f,
+      { '/shots/PROJ-7/R2-light-1400x900.png': 100 },
+      { file: 'A.tsx', at: 200 }
+    );
+    expect(out.need?.detail).toBe(
+      'Fake data: R2. Approved writes not made against the backend: PUT /api/e/:id. The screenshots of R2 are older than the last change, in A.tsx. If that change can affect them, test again. Otherwise approve.'
+    );
+  });
+});

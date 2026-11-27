@@ -318,7 +318,13 @@ export function markStaleShots(
     ...f,
     need: {
       ...f.need,
-      detail: `The screenshots of ${listIds(older)} are older than the last change, in ${changed.file}. If that change can affect them, test again. Otherwise approve.`,
+      // Keep what the note already says, for example the fake data and the writes not made.
+      detail: [
+        f.need.detail,
+        `The screenshots of ${listIds(older)} are older than the last change, in ${changed.file}. If that change can affect them, test again. Otherwise approve.`
+      ]
+        .filter(Boolean)
+        .join(' '),
       actions: [
         ...f.need.actions.slice(0, 1),
         { id: 'startTesting', label: 'Test again' },
