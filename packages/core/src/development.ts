@@ -63,6 +63,28 @@ export function canDevelop(f: Flow | null): string | null {
   return null;
 }
 
+/** The requirements that Testing found failing: the build fixes their cause, also in steps marked done. */
+export function failedRequirementsSection(f: Flow) {
+  const failed = (f.requirements ?? []).filter((r) => f.evidence?.[r.id] && !f.evidence[r.id]!.ok);
+  return failed.length
+    ? [
+        '',
+        '# Requirements that failed in Testing',
+        'The tester ran the app and found these failing. Fix the cause in the code, also in steps that are done.',
+        'Then run the targeted check for the change.',
+        ...failed.map((r) => {
+          const e = f.evidence![r.id]!;
+          const result = [
+            e.expected && `Expected: ${e.expected}`,
+            e.found && `Found: ${e.found}`,
+            e.note && `Tester's note: ${e.note}`
+          ].filter(Boolean);
+          return `- ${r.id}: ${r.text}\n  Result: ${result.join(' ') || 'It did not pass.'}`;
+        })
+      ]
+    : [];
+}
+
 /** The prompt for a build session. The session runs in the ticket's worktree. */
 export function buildPrompt(t: Ticket, f: Flow, boardComments: string[], commands: string[] = []) {
   const answers = mergeAnswers(f.answered ?? [], f.questions ?? []);
@@ -119,6 +141,7 @@ export function buildPrompt(t: Ticket, f: Flow, boardComments: string[], command
       ? ['', '# Notes from the developer', '', ...boardComments.map((c) => `- ${c}`)]
       : []),
     ...failedChecksSection(f),
+    ...failedRequirementsSection(f),
     '',
     '# Ticket description',
     '',

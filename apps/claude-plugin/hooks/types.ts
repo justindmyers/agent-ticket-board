@@ -73,6 +73,7 @@ export type Flow = {
     }[];
     checks: { name: string; ok: boolean; note?: string }[];
   };
+  writeRuns?: { method: string; path: string; made: boolean; result: string }[];
   commits?: {
     plan: { title: string; files: string[] }[];
     done: { title: string; sha: string }[];
@@ -87,7 +88,16 @@ export type Flow = {
   };
   evidence?: Record<
     string,
-    { ok: boolean; test?: string; shots?: string[]; seen?: string; note?: string }
+    {
+      ok: boolean;
+      test?: string;
+      shots?: string[];
+      seen?: string;
+      data?: 'real' | 'fake' | 'none';
+      expected?: string;
+      found?: string;
+      note?: string;
+    }
   >;
   approved?: string;
   spent?: number;

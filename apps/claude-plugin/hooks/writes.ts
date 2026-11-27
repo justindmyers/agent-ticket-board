@@ -18,6 +18,25 @@ export function writeRows(
   return [
     sectionTitle(`writes-${stage}`, 'Writes to the backend', hex('red'), String(list.length)),
     dim(writesText(stage, list.length)),
-    ...list.map((w) => Text({ wrap: 'wrap', children: [`${w.method} ${w.path}  ·  ${w.why}`] }))
+    ...list.flatMap((w) => {
+      const run =
+        stage === 'testing' && f.writeRuns
+          ? f.writeRuns.find((r) => r.method === w.method && r.path === w.path)
+          : undefined;
+      return [
+        Text({ wrap: 'wrap', children: [`${w.method} ${w.path}  ·  ${w.why}`] }),
+        ...(stage === 'testing' && f.writeRuns
+          ? [
+              Text({
+                color: hex(run?.made ? 'green' : 'amber'),
+                wrap: 'wrap',
+                children: [
+                  `    ${run?.made ? 'Made' : 'Not made'}: ${run ? run.result : 'the agent did not report this write'}`
+                ]
+              })
+            ]
+          : [])
+      ];
+    })
   ];
 }

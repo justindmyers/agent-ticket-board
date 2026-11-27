@@ -345,6 +345,21 @@ function page(theme, mode) {
   }));
   await axe(rh, 'dark/ticket-testing');
   await rh.screenshot({ path: path.join(OUT, 'ticket-testing.png') });
+  await rh.locator('[aria-label="Writes to the backend"]').screenshot({
+    path: path.join(OUT, 'ticket-testing-writes.png')
+  });
+  kb.dataLabels = await rh.evaluate(() =>
+    [...document.querySelectorAll('[aria-label="Evidence"] li')].map((li) =>
+      ['Real data', 'Fake data', 'Test only'].filter((t) => li.textContent.includes(t))
+    )
+  );
+  kb.failureBlock = await rh.evaluate(() => {
+    const dl = document.querySelector('[aria-label="Evidence"] dl');
+    return dl ? [...dl.querySelectorAll('dt')].map((t) => t.textContent) : null;
+  });
+  const failing = rh.locator('[aria-label="Evidence"] li', { hasText: 'Does not pass' });
+  await failing.scrollIntoViewIfNeeded();
+  await failing.screenshot({ path: path.join(OUT, 'ticket-testing-failure.png') });
   await rh.evaluate(() => (window.__sent.length = 0));
   await rh
     .getByRole('button', { name: 'Open the R2-forward dark 1400×900 screenshot of R2' })

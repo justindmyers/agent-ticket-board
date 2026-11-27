@@ -32,9 +32,25 @@ export function stageTesting($: EngineInterface, ctx: Ctx, f: Flow) {
             wrap: 'wrap',
             children: [mark + r.id + '  ' + r.text]
           }),
+          ...(ev?.data
+            ? [dim('    ' + { real: 'Real data', fake: 'Fake data', none: 'Test only' }[ev.data])]
+            : []),
           dim('    ' + r.check + (ev ? '' : '  ·  not tested')),
+          ...(ev && !ev.ok
+            ? (
+                [
+                  ['Expected', ev.expected],
+                  ['Found', ev.found],
+                  ['Tried', ev.note]
+                ] as const
+              )
+                .filter(([, text]) => text)
+                .map(([label, text]) =>
+                  Text({ color: hex('red'), wrap: 'wrap', children: [`    ${label}: ${text}`] })
+                )
+            : []),
           ...(ev?.seen ? [Text({ wrap: 'wrap', children: ['    ' + ev.seen] })] : []),
-          ...(ev?.note ? [dim('    ' + ev.note)] : []),
+          ...(ev?.note && ev.ok ? [dim('    ' + ev.note)] : []),
           ...(ev?.test ? [dim('    ' + ev.test)] : []),
           // Each screenshot set: every size in light and dark, named when there is more than one.
           ...shotGroups(ev?.shots ?? []).flatMap((g, gi, all) => [

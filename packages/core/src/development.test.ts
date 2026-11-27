@@ -229,3 +229,43 @@ describe('applyBuild after a change', () => {
     expect(out.need?.ask).toMatch(/Ready to test: 2 of 2 steps done/);
   });
 });
+
+describe('the build prompt after a failed Testing', () => {
+  it("gives the failed requirements with the tester's note, and nothing for passing ones", () => {
+    const f: Flow = {
+      stage: 'development',
+      requirements: [
+        { id: 'R1', text: 'Sorts', check: 'x' },
+        { id: 'R6', text: 'Upgrade only when Ready', check: 'y' }
+      ],
+      evidence: {
+        R1: { ok: true },
+        R6: {
+          ok: false,
+          expected: 'Upgrade only when Ready.',
+          found: 'Edge E (Update Failed) can upgrade.',
+          note: 'The helper allows a retry.'
+        }
+      }
+    };
+    const p = buildPrompt(
+      {
+        key: 'PROJ-1',
+        summary: 's',
+        status: 'x',
+        type: 'Story',
+        priority: 'x',
+        labels: [],
+        points: null,
+        updated: null
+      },
+      f,
+      []
+    );
+    expect(p).toContain('# Requirements that failed in Testing');
+    expect(p).toContain(
+      "- R6: Upgrade only when Ready\n  Result: Expected: Upgrade only when Ready. Found: Edge E (Update Failed) can upgrade. Tester's note: The helper allows a retry."
+    );
+    expect(p.split('# Requirements that failed in Testing')[1]).not.toContain('- R1');
+  });
+});

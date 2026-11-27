@@ -449,9 +449,13 @@ describe('Runs.test', () => {
         test: '',
         shots: ['/shots/R1-light.png'],
         seen: 'The list works.',
+        data: 'real',
+        expected: '',
+        found: '',
         note: ''
       }
     ],
+    writes: [],
     fixes: [],
     summary: 'R1 passes.'
   };
@@ -552,6 +556,10 @@ describe('Runs.test', () => {
     ]);
     const f = await loadFlow('PROJ-30');
     expect(f?.evidence?.R1?.ok).toBe(true);
+    expect(f?.evidence?.R1?.data).toBe('real');
+    expect(f?.writeRuns).toEqual([]);
+    const done = (await readTimeline('PROJ-30')).find((e) => e.type === 'run.done');
+    expect(done).toMatchObject({ real: 1, fake: 0, writesMade: '0 of 0' });
     expect(f?.need?.actions[0]?.id).toBe('approveTesting');
     expect(f?.spent).toBeCloseTo(0.12);
     expect(f?.run?.waiting).toBeUndefined();
@@ -1328,6 +1336,28 @@ describe('a build goes through the board checks before Testing', () => {
     expect(f?.stage).toBe('testing');
     expect(f?.need?.actions[0]?.id).toBe('startTesting');
     CONFIG.repo.checks = [];
+  });
+
+  it('sends a requirement that failed in Testing back to the build, with the tester note in the prompt', async () => {
+    CONFIG.repo.checks = [];
+    const wt = repo();
+    await saveFlow('PROJ-94', {
+      ...approved,
+      stage: 'testing',
+      steps: [{ n: 1, text: 'Do it', covers: ['R1'], state: 'done' as const }],
+      evidence: { R1: { ok: false, note: 'Upgrade is enabled for a Failed edge.' } }
+    });
+    const { query, calls } = fakeQuery([init, success(built)]);
+    const { r } = runs(query, {
+      worktree: async (a) => ({ path: wt, branch: a.branch, made: false })
+    });
+    await r.develop('PROJ-94');
+    await idle(r);
+    expect(calls[0]!.prompt).toContain('# Requirements that failed in Testing');
+    expect(calls[0]!.prompt).toContain(
+      "Result: Tester's note: Upgrade is enabled for a Failed edge."
+    );
+    expect((await loadFlow('PROJ-94'))?.stage).toBe('testing');
   });
 
   it('stays in Development with the output when a check fails, and the next build gets it', async () => {

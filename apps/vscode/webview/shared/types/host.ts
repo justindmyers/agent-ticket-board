@@ -22,7 +22,8 @@ import type {
   Commits,
   Finding,
   Gate,
-  Question
+  Question,
+  WriteRun
 } from '@agent-ticket-board/core/types';
 
 export type {
@@ -34,7 +35,8 @@ export type {
   Finding,
   Gate,
   Question,
-  TrackerState
+  TrackerState,
+  WriteRun
 };
 
 export type LocalWork = { branch: string; worktree: string | null; changed: number; label: string };
@@ -89,6 +91,7 @@ export type Flow = {
   evidence?: Record<string, Evidence>;
   codeReview?: CodeReview;
   gate?: Gate;
+  writeRuns?: WriteRun[];
   commits?: Commits;
   approved?: string;
   spent?: number;

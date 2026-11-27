@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { loadFlow, saveFlow } from './agents';
 import { audit } from './audit';
 import { runActive } from './look';
-import type { Evidence, Flow, Need, Ticket } from './types';
+import type { WriteRun, Evidence, Flow, Need, Ticket } from './types';
 
 // The Testing stage: the agent checks each requirement in the live app or with its test, views its own
 // screenshots, fixes what looks wrong and shoots again. The developer sees only evidence that passes.
@@ -21,9 +21,36 @@ const TestSchema = z.object({
       seen: z
         .string()
         .describe('What the screenshots show, compared with the requirement; empty without shots'),
-      note: z.string().describe('When not ok: what is wrong and what you tried')
+      data: z
+        .enum(['real', 'fake', 'none'])
+        .describe(
+          'real: the evidence used data of the real backend only. fake: any faked API answer (mock.js) took part, also for one state or one write. none: a test alone proves it and the app showed no data'
+        ),
+      expected: z
+        .string()
+        .describe('When not ok: what should be true, in one plain sentence. Empty when ok'),
+      found: z
+        .string()
+        .describe(
+          'When not ok: what you found instead, in one plain sentence that names the case (the edge, the state, the page). Empty when ok'
+        ),
+      note: z.string().describe('When not ok: what you tried, and what a fix could be')
     })
   ),
+  writes: z
+    .array(
+      z.object({
+        method: z.string(),
+        path: z.string().describe('The approved path, as in the list of approved writes'),
+        made: z.boolean().describe('True only when the request reached the real backend'),
+        result: z
+          .string()
+          .describe(
+            'When made: the status and one line of the answer. When not made: why, for example that no real record exists'
+          )
+      })
+    )
+    .describe('One entry for each approved write. Empty when none are approved'),
   fixes: z.array(z.string()).describe('The code changes you made while testing, one line each'),
   summary: z.string().describe('Two or three sentences for the developer')
 });
@@ -90,6 +117,9 @@ export function testPrompt(t: Ticket, f: Flow, boardComments: string[], env: Tes
           ...f.writes.map((w) => `- ${w.method} ${w.path}: ${w.why}`)
         ]
       : ['No writes to the backend are approved. Fake every write in .playwright-cli/mock.js.']),
+    'Report each approved write in `writes`: made = true only when the request reached the real backend, with the',
+    'status in `result`. When you cannot make it for real (for example no real record exists to write to), set made',
+    'to false and say why. Never count a faked answer as made.',
     'Any other write gets 403 "not approved" from the test browser. Do not work around it: set ok to false for the',
     'requirement, and name the method and path in `note`, so the developer can add it with a comment.',
     ...(f.assumptions?.length
@@ -134,7 +164,8 @@ export function testPrompt(t: Ticket, f: Flow, boardComments: string[], env: Tes
       : []),
     '- When the account has no data for a state, fake the API answers in this browser only: write a',
     `  route file with the Write tool to .playwright-cli/mock.js, then run \`pnpm exec playwright-cli -s=${env.session} run-code --filename .playwright-cli/mock.js\`.`,
-    '  Do not put data in shell variables or heredocs: those commands are refused. Say in `seen` that the data is faked.',
+    '  Do not put data in shell variables or heredocs: those commands are refused. Set `data` to fake for every requirement',
+    '  that a faked answer took part in, and say in `seen` which data was faked. Use real data first, where the account has it.',
     '- run-code files run in a sandbox: no require, import, URL, setTimeout or globalThis. Keep state in',
     '  variables inside the function, and read URL paths with a regex. Every route handler must call',
     '  fulfill or continue, also after an error: a handler that throws leaves the page loading.',
@@ -143,7 +174,10 @@ export function testPrompt(t: Ticket, f: Flow, boardComments: string[], env: Tes
     ...REUSE_RULES,
     '- View every screenshot with Read. Write in `seen` what it shows. If it does not show the requirement working,',
     '  or it looks wrong (overlap, cut-off text, a blank or loading page), fix the code and take the shots again.',
-    '  Try at most 3 times for each requirement. Then set ok to false and say why in `note`.',
+    '  Try at most 3 times for each requirement. Then set ok to false and fill three fields:',
+    '  `expected` (what should be true, one plain sentence), `found` (what you found instead, one plain sentence that',
+    '  names the case: the edge, the state, the page) and `note` (what you tried, and what a fix could be).',
+    '  Write `expected` and `found` for a developer who has not read the code: no function or file names.',
     `- Shell commands that you may run, one for each call: ${env.commands.join('; ')}. Anything else is refused.`,
     '- Check every data state that a check lists: with real data where it exists, else in .playwright-cli/mock.js.',
     '  Name the state in the shot name (R2-empty, R2-many).',
@@ -173,15 +207,59 @@ export function applyTest(
   for (const x of r.requirements) {
     evidence[x.id] = {
       ok: x.ok,
+      data: x.data,
       ...(x.test ? { test: x.test } : {}),
       ...(x.shots.length
         ? { shots: shotFiles ? expandShots(x.shots, shotFiles.files, shotFiles.sizes) : x.shots }
         : {}),
       ...(x.seen ? { seen: x.seen } : {}),
+      ...(!x.ok && x.expected ? { expected: x.expected } : {}),
+      ...(!x.ok && x.found ? { found: x.found } : {}),
       ...(x.note && !x.ok ? { note: x.note } : {})
     };
   }
-  return { ...f, evidence, review: r.summary, need: testNeed(f, evidence) };
+  const writeRuns = r.writes.map((w) => ({
+    method: w.method,
+    path: w.path,
+    made: w.made,
+    result: w.result
+  }));
+  return {
+    ...f,
+    evidence,
+    writeRuns,
+    review: r.summary,
+    need: withDataNote(testNeed(f, evidence), evidence, f, writeRuns)
+  };
+}
+
+/**
+ * A pass that rests on fake data, or on an approved write that was not made, is not the same as a
+ * pass on the real backend. The note stays in the decision text, so the developer can follow up.
+ */
+function withDataNote(
+  need: Need,
+  evidence: Record<string, Evidence>,
+  f: Flow,
+  runs: WriteRun[]
+): Need {
+  if (need.kind !== 'decision') {
+    return need;
+  }
+  const fake = Object.entries(evidence)
+    .filter(([, e]) => e.data === 'fake')
+    .map(([id]) => id);
+  const unmade = runs.filter((w) => !w.made);
+  const approved = (f.writes ?? []).filter(
+    (w) => !runs.some((r) => r.method === w.method && r.path === w.path)
+  );
+  const lines = [
+    fake.length ? `Fake data: ${listIds(fake)}.` : '',
+    unmade.length || approved.length
+      ? `Approved writes not made against the backend: ${[...unmade, ...approved].map((w) => `${w.method} ${w.path}`).join(', ')}.`
+      : ''
+  ].filter(Boolean);
+  return lines.length ? { ...need, detail: lines.join(' ') } : need;
 }
 
 /** What the developer does after a test run: test again, or approve. */
@@ -194,9 +272,23 @@ function testNeed(f: Flow, evidence: Record<string, Evidence>): Need {
         kind: 'problem',
         ask: `${listIds(failing)} ${failing.length > 1 ? 'do' : 'does'} not pass.`,
         detail: failing
-          .map((id) => `${id}: ${(evidence[id]?.note || 'No evidence.').replace(/\.?$/, '.')}`)
+          .map((id) => {
+            const e = evidence[id];
+            if (e?.found) {
+              return `${id}: ${e.expected ? `Expected: ${e.expected.replace(/\.?$/, '.')} ` : ''}Found: ${e.found.replace(/\.?$/, '.')}`;
+            }
+            return `${id}: ${(e?.note || 'No evidence.').replace(/\.?$/, '.')}`;
+          })
           .join(' '),
-        actions: [{ id: 'startTesting', label: 'Test again' }, open]
+        // A requirement that was tested and failed needs a code fix: testing again cannot pass it.
+        // A requirement with no evidence was not tested: that needs a test run.
+        actions: failing.some((id) => evidence[id])
+          ? [
+              { id: 'startDevelopment', label: 'Fix and build again' },
+              { id: 'startTesting', label: 'Test again' },
+              open
+            ]
+          : [{ id: 'startTesting', label: 'Test again' }, open]
       }
     : {
         kind: 'decision',
@@ -206,28 +298,34 @@ function testNeed(f: Flow, evidence: Record<string, Evidence>): Need {
 }
 
 /**
- * Evidence from screenshots that are older than the last code change does not pass: the fix can
- * change what they show. `shotTimes` has the time of each shot; `lastChange` of the newest changed file.
+ * Screenshots that are older than the last code change may not show the final code. That is a
+ * reason to look, not a failure: the requirement keeps its result, the ticket says which shots are
+ * older and what changed, and you decide. A rerun is offered only through the usual buttons.
+ * `shotTimes` has the time of each shot; `changed` is the newest changed file and its time.
  */
 export function markStaleShots(
   f: Flow,
   shotTimes: Record<string, number>,
-  lastChange: number
+  changed: { file: string; at: number }
 ): Flow {
-  let stale = false;
-  const evidence: Record<string, Evidence> = {};
-  for (const [id, e] of Object.entries(f.evidence ?? {})) {
-    const old = e.ok && (e.shots ?? []).some((p) => (shotTimes[p] ?? Infinity) < lastChange);
-    stale ||= old;
-    evidence[id] = old
-      ? {
-          ...e,
-          ok: false,
-          note: 'The screenshots were taken before the last code change. Test again.'
-        }
-      : e;
+  const older = Object.entries(f.evidence ?? {})
+    .filter(([, e]) => e.ok && (e.shots ?? []).some((p) => (shotTimes[p] ?? Infinity) < changed.at))
+    .map(([id]) => id);
+  if (!older.length || !f.need || f.need.kind !== 'decision') {
+    return f;
   }
-  return stale ? { ...f, evidence, need: testNeed(f, evidence) } : f;
+  return {
+    ...f,
+    need: {
+      ...f.need,
+      detail: `The screenshots of ${listIds(older)} are older than the last change, in ${changed.file}. If that change can affect them, test again. Otherwise approve.`,
+      actions: [
+        ...f.need.actions.slice(0, 1),
+        { id: 'startTesting', label: 'Test again' },
+        ...f.need.actions.slice(1)
+      ]
+    }
+  };
 }
 
 const listIds = (ids: string[]) =>

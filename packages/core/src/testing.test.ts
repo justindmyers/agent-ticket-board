@@ -46,16 +46,30 @@ const built: Flow = {
 
 const pass: TestResult = {
   requirements: [
-    { id: 'R1', ok: true, test: 'pnpm vitest sort', shots: [], seen: '', note: '' },
+    {
+      id: 'R1',
+      ok: true,
+      test: 'pnpm vitest sort',
+      shots: [],
+      seen: '',
+      data: 'none',
+      expected: '',
+      found: '',
+      note: ''
+    },
     {
       id: 'R2',
       ok: true,
       test: '',
       shots: ['/shots/PROJ-7/R2-light-1400x900.png'],
       seen: 'The list sorted by zones, highest first.',
+      data: 'real',
+      expected: '',
+      found: '',
       note: ''
     }
   ],
+  writes: [],
   fixes: [],
   summary: 'Both pass.'
 };
@@ -125,7 +139,17 @@ describe('testPrompt', () => {
 describe('the test answer', () => {
   it('requires evidence fields for each requirement', () => {
     const item = TEST_SCHEMA.properties.requirements.items;
-    expect(item?.required).toEqual(['id', 'ok', 'test', 'shots', 'seen', 'note']);
+    expect(item?.required).toEqual([
+      'id',
+      'ok',
+      'test',
+      'shots',
+      'seen',
+      'data',
+      'expected',
+      'found',
+      'note'
+    ]);
     expect(() => parseTest({ requirements: [{ id: 'R1' }] })).toThrow(/unexpected shape/);
   });
 
@@ -133,10 +157,11 @@ describe('the test answer', () => {
     const f = applyTest(built, parseTest(pass));
     expect(f.evidence?.R2).toEqual({
       ok: true,
+      data: 'real',
       shots: ['/shots/PROJ-7/R2-light-1400x900.png'],
       seen: 'The list sorted by zones, highest first.'
     });
-    expect(f.evidence?.R1).toEqual({ ok: true, test: 'pnpm vitest sort' });
+    expect(f.evidence?.R1).toEqual({ ok: true, data: 'none', test: 'pnpm vitest sort' });
     expect(f.need).toEqual({
       kind: 'decision',
       ask: 'Tested: 2 of 2 requirements pass, with evidence.',
@@ -161,6 +186,7 @@ describe('the test answer', () => {
       ask: 'R2 does not pass.',
       detail: 'R2: Sorted ascending.',
       actions: [
+        { id: 'startDevelopment', label: 'Fix and build again' },
         { id: 'startTesting', label: 'Test again' },
         { id: 'openWorktree', label: 'Open worktree' }
       ]
@@ -221,7 +247,20 @@ describe('screenshot sets', () => {
     const f = applyTest(
       { stage: 'testing', requirements: [{ id: 'R2', text: 'x', check: 'y' }] },
       {
-        requirements: [{ id: 'R2', ok: true, test: '', shots: ['R2-list'], seen: 'ok', note: '' }],
+        requirements: [
+          {
+            id: 'R2',
+            ok: true,
+            test: '',
+            shots: ['R2-list'],
+            seen: 'ok',
+            data: 'real',
+            expected: '',
+            found: '',
+            note: ''
+          }
+        ],
+        writes: [],
         fixes: [],
         summary: 's'
       },
@@ -243,25 +282,201 @@ describe('markStaleShots', () => {
       R2: { ok: true, shots: ['/s/R2-b-light-1400x900.png'], seen: 'ok' }
     }
   };
-  it('fails a requirement whose shots are older than the last code change', () => {
+  const passing = {
+    ...f,
+    need: {
+      kind: 'decision' as const,
+      ask: 'Tested: 2 of 2 requirements pass, with evidence.',
+      actions: [
+        { id: 'approveTesting', label: 'Approve for code review' },
+        { id: 'openWorktree', label: 'Open worktree' }
+      ]
+    }
+  };
+  it('keeps every pass, says which shots are older and what changed, and still offers Approve first', () => {
     const out = markStaleShots(
-      f,
+      passing,
       { '/s/R1-a-light-1400x900.png': 100, '/s/R2-b-light-1400x900.png': 300 },
-      200
+      { file: 'EdgeUpgradeButton.tsx', at: 200 }
     );
-    expect(out.evidence?.R1).toMatchObject({
-      ok: false,
-      note: expect.stringMatching(/taken before the last code change/)
-    });
-    expect(out.evidence?.R2?.ok).toBe(true);
-    expect(out.need?.ask).toMatch(/R1 does not pass/);
+    expect(out.evidence).toBe(passing.evidence);
+    expect(out.need?.kind).toBe('decision');
+    expect(out.need?.detail).toBe(
+      'The screenshots of R1 are older than the last change, in EdgeUpgradeButton.tsx. If that change can affect them, test again. Otherwise approve.'
+    );
+    expect(out.need?.actions.map((a) => a.id)).toEqual([
+      'approveTesting',
+      'startTesting',
+      'openWorktree'
+    ]);
+  });
+  it('leaves a ticket that has failing requirements alone: it already offers Test again', () => {
+    const failing = { ...passing, need: { ...passing.need, kind: 'problem' as const } };
+    expect(
+      markStaleShots(failing, { '/s/R1-a-light-1400x900.png': 1 }, { file: 'x.ts', at: 9 })
+    ).toBe(failing);
   });
   it('changes nothing when every shot is newer', () => {
     const out = markStaleShots(
-      f,
+      passing,
       { '/s/R1-a-light-1400x900.png': 300, '/s/R2-b-light-1400x900.png': 300 },
-      200
+      { file: 'x.ts', at: 200 }
     );
-    expect(out).toBe(f);
+    expect(out).toBe(passing);
+  });
+});
+
+describe('what to do about a failing requirement', () => {
+  const miss = { ...pass, requirements: [pass.requirements[0]!] };
+
+  it('sends a requirement that was tested and failed back to the code, with Test again second', () => {
+    const f = applyTest(built, {
+      ...pass,
+      requirements: [
+        pass.requirements[0]!,
+        { ...pass.requirements[1]!, ok: false, note: 'Upgrade is enabled for a Failed edge.' }
+      ]
+    });
+    expect(f.need?.actions.map((a) => a.label)).toEqual([
+      'Fix and build again',
+      'Test again',
+      'Open worktree'
+    ]);
+  });
+
+  it('offers only a test run when a requirement has no evidence at all', () => {
+    const f = applyTest(built, miss);
+    expect(f.need?.actions.map((a) => a.label)).toEqual(['Test again', 'Open worktree']);
+  });
+});
+
+describe('a failing requirement says what, in plain words', () => {
+  const failing = {
+    ...pass,
+    requirements: [
+      pass.requirements[0]!,
+      {
+        ...pass.requirements[1]!,
+        ok: false,
+        expected: 'Upgrade is enabled only when the edge state is Ready.',
+        found: 'Edge E (state Update Failed) has an enabled Upgrade button.',
+        note: 'The helper allows a retry.'
+      }
+    ]
+  };
+
+  it('keeps expected and found in the evidence, only for a failing requirement', () => {
+    const f = applyTest(built, failing);
+    expect(f.evidence?.R2).toMatchObject({
+      expected: 'Upgrade is enabled only when the edge state is Ready.',
+      found: 'Edge E (state Update Failed) has an enabled Upgrade button.'
+    });
+    expect(f.evidence?.R1).not.toHaveProperty('expected');
+  });
+
+  it('puts expected and found in the banner, not the code note', () => {
+    const f = applyTest(built, failing);
+    expect(f.need?.detail).toBe(
+      'R2: Expected: Upgrade is enabled only when the edge state is Ready. Found: Edge E (state Update Failed) has an enabled Upgrade button.'
+    );
+  });
+
+  it('asks the agent for plain words, with no function names', () => {
+    const p = testPrompt(ticket, built, [], {
+      url: 'http://localhost:3001',
+      session: 's',
+      shots: 'atb shots',
+      mocked: false,
+      commands: ['pnpm']
+    });
+    expect(p).toContain('`expected`');
+    expect(p).toContain('`found`');
+    expect(p).toContain('no function or file names');
+  });
+});
+
+describe('where the evidence came from', () => {
+  const withWrites: Flow = {
+    ...built,
+    writes: [
+      { method: 'PUT', path: '/api/edges/:id/update-settings', why: 'R2' },
+      { method: 'POST', path: '/api/edges/:id/upgrade-request', why: 'R2' }
+    ]
+  };
+  const result = (data: 'real' | 'fake' | 'none', writes: TestResult['writes']): TestResult => ({
+    ...pass,
+    requirements: [
+      { ...pass.requirements[0]!, data: 'none' },
+      { ...pass.requirements[1]!, data }
+    ],
+    writes
+  });
+
+  it('keeps the data source of each requirement in the evidence', () => {
+    const f = applyTest(withWrites, result('fake', []));
+    expect(f.evidence?.R1?.data).toBe('none');
+    expect(f.evidence?.R2?.data).toBe('fake');
+  });
+
+  it('records the result of each approved write', () => {
+    const f = applyTest(
+      withWrites,
+      result('real', [
+        { method: 'PUT', path: '/api/edges/:id/update-settings', made: true, result: '200 saved' },
+        {
+          method: 'POST',
+          path: '/api/edges/:id/upgrade-request',
+          made: false,
+          result: 'No real edge exists.'
+        }
+      ])
+    );
+    expect(f.writeRuns).toEqual([
+      { method: 'PUT', path: '/api/edges/:id/update-settings', made: true, result: '200 saved' },
+      {
+        method: 'POST',
+        path: '/api/edges/:id/upgrade-request',
+        made: false,
+        result: 'No real edge exists.'
+      }
+    ]);
+  });
+
+  it('keeps the pass, and says in the decision which requirements used fake data and which writes were not made', () => {
+    const f = applyTest(
+      withWrites,
+      result('fake', [
+        { method: 'PUT', path: '/api/edges/:id/update-settings', made: false, result: 'Faked.' }
+      ])
+    );
+    expect(f.need?.kind).toBe('decision');
+    expect(f.need?.actions[0]?.id).toBe('approveTesting');
+    expect(f.need?.detail).toBe(
+      'Fake data: R2. Approved writes not made against the backend: PUT /api/edges/:id/update-settings, POST /api/edges/:id/upgrade-request.'
+    );
+  });
+
+  it('adds no note when everything ran against the real backend', () => {
+    const f = applyTest(
+      withWrites,
+      result('real', [
+        { method: 'PUT', path: '/api/edges/:id/update-settings', made: true, result: '200' },
+        { method: 'POST', path: '/api/edges/:id/upgrade-request', made: true, result: '200' }
+      ])
+    );
+    expect(f.need?.detail).toBeUndefined();
+  });
+
+  it('asks for the data source and the write results in the prompt', () => {
+    const p = testPrompt(ticket, withWrites, [], {
+      url: 'http://localhost:3001',
+      session: 's',
+      shots: 'atb shots',
+      mocked: false,
+      commands: ['pnpm']
+    });
+    expect(p).toContain('Report each approved write in `writes`');
+    expect(p).toContain('Never count a faked answer as made.');
+    expect(p).toContain('Set `data` to fake');
   });
 });

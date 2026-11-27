@@ -1,12 +1,17 @@
 {
   "stage": "testing",
   "need": {
-    "kind": "decision",
-    "ask": "Tested: 3 of 3 requirements pass, with evidence.",
+    "kind": "problem",
+    "ask": "R3 does not pass.",
+    "detail": "R3: Expected: A small drag adds exactly one history entry. Found: A 3 px drag on the map adds two entries: one at the start and one at the end of the drag.",
     "actions": [
       {
-        "id": "approveTesting",
-        "label": "Approve for code review"
+        "id": "startDevelopment",
+        "label": "Fix and build again"
+      },
+      {
+        "id": "startTesting",
+        "label": "Test again"
       },
       {
         "id": "openWorktree",
@@ -71,7 +76,8 @@
   "evidence": {
     "R1": {
       "ok": true,
-      "test": "pnpm vitest run src/map/useViewHistory.test.ts"
+      "test": "pnpm vitest run src/map/useViewHistory.test.ts",
+      "data": "none"
     },
     "R2": {
       "ok": true,
@@ -89,19 +95,43 @@
         "/shots/PROJ-102/R2-forward-phone-menu-light-390x844.png",
         "/shots/PROJ-102/R2-forward-phone-menu-dark-390x844.png"
       ],
-      "seen": "After Back and Forward the map shows the panned view again, at the same zoom."
+      "seen": "After Back and Forward the map shows the panned view again, at the same zoom.",
+      "data": "fake"
     },
     "R3": {
-      "ok": true,
-      "test": "pnpm vitest run src/map/useViewHistory.test.ts -t debounce"
+      "ok": false,
+      "test": "pnpm vitest run src/map/useViewHistory.test.ts -t debounce",
+      "expected": "A small drag adds exactly one history entry.",
+      "found": "A 3 px drag on the map adds two entries: one at the start and one at the end of the drag.",
+      "note": "Tried the 250 ms debounce. The second entry comes from the moveend handler. A fix is to ignore moveend while a drag is active.",
+      "data": "real"
     }
   },
   "spent": 6.67,
   "writes": [
     {
       "method": "PUT",
-      "path": "/api/maps/:id/view",
-      "why": "R2 saves the map zoom so Back restores it"
+      "path": "/api/views/:id",
+      "why": "R2: Back and Forward save the view."
+    },
+    {
+      "method": "POST",
+      "path": "/api/views/:id/share",
+      "why": "R2: the share button."
+    }
+  ],
+  "writeRuns": [
+    {
+      "method": "PUT",
+      "path": "/api/views/:id",
+      "made": true,
+      "result": "200: the view was saved on the dev backend."
+    },
+    {
+      "method": "POST",
+      "path": "/api/views/:id/share",
+      "made": false,
+      "result": "Not made: no real view exists in this account, so the answer was faked."
     }
   ]
 }

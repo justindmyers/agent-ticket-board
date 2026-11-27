@@ -49,8 +49,20 @@ export type Evidence = {
   test?: string;
   shots?: string[];
   seen?: string;
+  /**
+   * Where the evidence came from. real: data of the real backend. fake: any faked API answer
+   * (mock.js) took part. none: a test alone proves it, with no app data.
+   */
+  data?: 'real' | 'fake' | 'none';
+  /** A failing requirement: what should be true, in one plain sentence. */
+  expected?: string;
+  /** A failing requirement: what the test found instead, naming the case. */
+  found?: string;
   note?: string;
 };
+
+/** What Testing did with an approved write: made against the backend, or not made, and why. */
+export type WriteRun = { method: string; path: string; made: boolean; result: string };
 
 export type Step = {
   n: number;
@@ -156,6 +168,8 @@ export type Flow = {
   review?: string;
   /** Testing: the evidence for each requirement id. */
   evidence?: Record<string, Evidence>;
+  /** The result of each approved write, from the last test run. */
+  writeRuns?: WriteRun[];
   /** Code review: what the reviewers found and what the agent fixed. */
   codeReview?: CodeReview;
   /** Code review: the last run of the pre-push checks. */

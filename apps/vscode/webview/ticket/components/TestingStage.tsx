@@ -21,7 +21,7 @@ export function TestingStage({ f, act, theme }: Props) {
         <RunSection run={f.run} act={act} theme={theme} />
       )}
 
-      <WritesSection writes={f.writes ?? []} stage="testing" theme={theme} />
+      <WritesSection writes={f.writes ?? []} runs={f.writeRuns} stage="testing" theme={theme} />
 
       <Section
         icon={mdiFormatListChecks}

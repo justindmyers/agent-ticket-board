@@ -298,8 +298,8 @@ function shotTimes(f: Flow) {
   return times;
 }
 
-/** The time of the newest changed file in a worktree that can change the page: not tests or docs. */
-export function lastChange(worktree: string) {
+/** The newest changed file in a worktree that can change the page: not tests or docs. */
+export function lastChangedFile(worktree: string) {
   const git = (args: string[]) => {
     try {
       return execFileSync('git', args, { cwd: worktree, encoding: 'utf8' }).split('\n');
@@ -311,13 +311,19 @@ export function lastChange(worktree: string) {
     ...git(['diff', '--name-only', 'HEAD']),
     ...git(['ls-files', '--others', '--exclude-standard'])
   ].filter((p) => p && !/\.(test|spec|stories)\.|\.md$|(^|\/)__tests__\//.test(p));
-  let newest = 0;
+  let newest = { file: '', at: 0 };
   for (const p of files) {
     try {
-      newest = Math.max(newest, statSync(join(worktree, p)).mtimeMs);
+      const at = statSync(join(worktree, p)).mtimeMs;
+      if (at > newest.at) {
+        newest = { file: p.split('/').pop()!, at };
+      }
     } catch {
       // A deleted file has no time.
     }
   }
   return newest;
 }
+
+/** The time of the newest changed file in a worktree that can change the page. */
+export const lastChange = (worktree: string) => lastChangedFile(worktree).at;
