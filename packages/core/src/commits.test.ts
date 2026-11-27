@@ -65,11 +65,21 @@ describe('planProblem', () => {
 
   it.each([
     ['an upper case title', plan(commit({ description: 'Add a sort option' })), 'lowercase'],
-    ['a title over 72 characters', plan(commit({ description: 'x'.repeat(70) })), '72'],
+    [
+      'a description over 72 characters',
+      plan(commit({ description: 'x'.repeat(73) })),
+      '72, without'
+    ],
     ['a period at the end', plan(commit({ description: 'add a sort option.' })), 'period'],
     ['a commit with no files', plan(commit({ files: [] })), 'no files']
   ])('refuses %s', (_n, p, text) => {
     expect(planProblem(p, ['a.ts'], 'PROJ-1')).toMatch(text);
+  });
+
+  it('does not count the type, the scope and the key: only the description has the limit', () => {
+    const long = plan(commit({ scope: 'edge-update-controls', description: 'x'.repeat(72) }));
+    expect(commitTitle(long.commits[0]!, 'PROJ-1').length).toBeGreaterThan(87);
+    expect(planProblem(long, ['a.ts'], 'PROJ-1')).toBeNull();
   });
 
   it('refuses a file in two commits, a file in none, and a file that did not change', () => {

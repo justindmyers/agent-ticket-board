@@ -4,6 +4,9 @@ import type { Flow, Need, Ticket } from './types';
 // Atomic commits by topic. An agent reads the change and proposes the groups. The developer sees the
 // plan first. Then the board commits each group, in order, and the repository's hooks run.
 
+/** The longest description of a commit or a pull request title, without the ticket key. */
+export const DESCRIPTION_MAX = 72;
+
 export const COMMIT_TYPES = [
   'feat',
   'fix',
@@ -49,7 +52,7 @@ export function parseCommitPlan(output: unknown): CommitPlan {
   return r.data;
 }
 
-/** `type(scope): description (KEY)`. Lowercase, 72 characters at most, no period. */
+/** `type(scope): description (KEY)`. Lowercase, no period. The description has 72 characters at most. */
 export const commitTitle = (c: { type: string; scope: string; description: string }, key: string) =>
   `${c.type}(${c.scope}): ${c.description} (${key})`;
 
@@ -78,8 +81,9 @@ export function planProblem(plan: CommitPlan, changed: string[], key: string): s
     if (head !== head.toLowerCase()) {
       return `The title must be lowercase: ${title}`;
     }
-    if (title.length > 72) {
-      return `The title is ${title.length} characters. The limit is 72: ${title}`;
+    // The repository's rule is for the description alone: the type, the scope and the key do not count.
+    if (c.description.length > DESCRIPTION_MAX) {
+      return `The description is ${c.description.length} characters. The limit is ${DESCRIPTION_MAX}, without the type, the scope and the key: ${title}`;
     }
     if (c.description.trim().endsWith('.')) {
       return `The title must not end with a period: ${title}`;
@@ -125,7 +129,7 @@ export function commitPrompt(t: Ticket, f: Flow, changed: string[], commands: st
     '# Rules',
     '- One commit for each topic. A commit builds and tests on its own. Put a new helper before the code that uses it.',
     '- The title is `type(scope): description (KEY)`: the type is one of the list, the scope is the area of the code,',
-    `  the key is ${t.key}. Lowercase, 72 characters at most, no period. Never copy the Jira summary.`,
+    `  the key is ${t.key}. Lowercase, no period. The description has ${DESCRIPTION_MAX} characters at most: the type, the scope and the key do not count. Never copy the Jira summary.`,
     `- Types: ${COMMIT_TYPES.join(', ')}.`,
     '- Give every changed file to exactly one commit. List the files as they are in the list above.',
     '- A test goes with the code that it tests. Docs for a feature go with the feature.',
