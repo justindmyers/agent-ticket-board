@@ -35,6 +35,8 @@ export type Config = {
     beforeCommit: string[];
     /** Test files that contain this text count as changed tests: they mock a shared package whole. */
     testMock: string | null;
+    /** The commit and pull request types that the repository accepts. Empty: the common list. */
+    commitTypes: string[];
   };
   app: {
     devCommand: string | null;
@@ -72,7 +74,8 @@ export const DEFAULTS: Config = {
     baseBranch: 'main',
     checks: [],
     beforeCommit: [],
-    testMock: null
+    testMock: null,
+    commitTypes: []
   },
   app: {
     devCommand: null,

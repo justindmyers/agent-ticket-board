@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONFIG } from './config';
 import {
   applyCommitPlan,
   canPlanCommits,
@@ -64,7 +65,12 @@ describe('planProblem', () => {
   });
 
   it.each([
-    ['an upper case title', plan(commit({ description: 'Add a sort option' })), 'lowercase'],
+    [
+      'a description that starts with a capital',
+      plan(commit({ description: 'Add a sort option' })),
+      'lowercase'
+    ],
+    ['a scope with a capital', plan(commit({ scope: 'Edge' })), 'lowercase'],
     [
       'a description over 72 characters',
       plan(commit({ description: 'x'.repeat(73) })),
@@ -80,6 +86,33 @@ describe('planProblem', () => {
     const long = plan(commit({ scope: 'edge-update-controls', description: 'x'.repeat(72) }));
     expect(commitTitle(long.commits[0]!, 'PROJ-1').length).toBeGreaterThan(87);
     expect(planProblem(long, ['a.ts'], 'PROJ-1')).toBeNull();
+  });
+
+  it('accepts a code name with capitals inside the description, and the ticket key', () => {
+    const p = plan(
+      commit({
+        scope: 'form-text-input',
+        description: 'add errorClassName prop for the error line'
+      })
+    );
+    expect(commitTitle(p.commits[0]!, 'PROJ-1')).toBe(
+      'feat(form-text-input): add errorClassName prop for the error line (PROJ-1)'
+    );
+    expect(planProblem(p, ['a.ts'], 'PROJ-1')).toBeNull();
+  });
+
+  it('accepts only the types that the repository lists, when the config lists them', () => {
+    const before = CONFIG.repo.commitTypes;
+    CONFIG.repo.commitTypes = ['feat', 'fix', 'chore'];
+    try {
+      expect(planProblem(plan(commit({ type: 'ci' })), ['a.ts'], 'PROJ-1')).toMatch(
+        /not accepted here. Use one of: feat, fix, chore/
+      );
+      expect(planProblem(plan(commit({ type: 'chore' })), ['a.ts'], 'PROJ-1')).toBeNull();
+      expect(commitPrompt(ticket, flow, ['a.ts'], [])).toContain('- Types: feat, fix, chore.');
+    } finally {
+      CONFIG.repo.commitTypes = before;
+    }
   });
 
   it('refuses a file in two commits, a file in none, and a file that did not change', () => {

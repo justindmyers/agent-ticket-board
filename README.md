@@ -37,7 +37,7 @@ The board runs the commands in `repo.checks` of `~/.agent-ticket-board/config.js
 - `{tests:apps/web/}` is only the test files in that folder, without the folder in the path.
 - `{atb}` is the command of the board CLI. `{atb} diff-scope` keeps the findings of a check on the lines that the ticket changed.
 
-The commands in `repo.beforeCommit` run before the commit plan. Use them for generators. `repo.baseBranch` is the branch that the board merges.
+The commands in `repo.beforeCommit` run before the commit plan. Use them for generators. `repo.baseBranch` is the branch that the board merges. `repo.commitTypes` lists the commit types that your repository accepts.
 
 ## Requirements
 

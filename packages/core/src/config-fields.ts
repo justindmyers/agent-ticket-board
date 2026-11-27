@@ -135,6 +135,12 @@ export const CONFIG_SECTIONS: ConfigSection[] = [
         label: 'Whole-package mock',
         help: 'Test files with this text always run, for example the name of a shared package that tests mock whole.',
         kind: 'optionalText'
+      },
+      {
+        key: 'repo.commitTypes',
+        label: 'Commit types',
+        help: 'The types that the repository accepts in a commit or pull request title. Empty: feat, fix, refactor, test, docs, chore, style, perf, build, ci.',
+        kind: 'list'
       }
     ]
   },

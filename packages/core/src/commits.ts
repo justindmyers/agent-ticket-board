@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CONFIG } from './config';
 import type { Flow, Need, Ticket } from './types';
 
 // Atomic commits by topic. An agent reads the change and proposes the groups. The developer sees the
@@ -23,12 +24,12 @@ export const COMMIT_TYPES = [
 const CommitPlanSchema = z.object({
   commits: z.array(
     z.object({
-      type: z.enum(COMMIT_TYPES),
+      type: z.string().describe('One type of the list in the prompt'),
       scope: z.string().describe('The area of the code, lowercase, like edge-controls'),
       description: z
         .string()
         .describe(
-          'What the commit does, in the imperative, lowercase, no period, like add a sort option'
+          'What the commit does, in the imperative, starting with a lowercase letter, no period, like add a sort option. A code name such as errorClassName keeps its case'
         ),
       files: z.array(z.string()).describe('Every file of this commit, as in git status')
     })
@@ -52,7 +53,11 @@ export function parseCommitPlan(output: unknown): CommitPlan {
   return r.data;
 }
 
-/** `type(scope): description (KEY)`. Lowercase, no period. The description has 72 characters at most. */
+/** The types that the repository accepts: its own list from the local config, else the common one. */
+export const commitTypes = (): string[] =>
+  CONFIG.repo.commitTypes.length ? CONFIG.repo.commitTypes : [...COMMIT_TYPES];
+
+/** `type(scope): description (KEY)`. The description starts lowercase, has no period and has 72 characters at most. */
 export const commitTitle = (c: { type: string; scope: string; description: string }, key: string) =>
   `${c.type}(${c.scope}): ${c.description} (${key})`;
 
@@ -77,9 +82,17 @@ export function planProblem(plan: CommitPlan, changed: string[], key: string): s
   }
   for (const c of plan.commits) {
     const title = commitTitle(c, key);
-    const head = `${c.type}(${c.scope}): ${c.description}`;
-    if (head !== head.toLowerCase()) {
-      return `The title must be lowercase: ${title}`;
+    if (!commitTypes().includes(c.type)) {
+      return `The type ${c.type} is not accepted here. Use one of: ${commitTypes().join(', ')}.`;
+    }
+    // The repository's rule: a lowercase type and scope, and a description that starts with a lowercase
+    // letter, a digit, a backtick, @ or (. The rest keeps its case: the ticket key, a name like errorClassName.
+    if (
+      c.type !== c.type.toLowerCase() ||
+      !/^[a-z0-9-]+$/.test(c.scope) ||
+      !/^[a-z0-9`@(]/.test(c.description)
+    ) {
+      return `The type and the scope must be lowercase, and the description must start with a lowercase letter: ${title}`;
     }
     // The repository's rule is for the description alone: the type, the scope and the key do not count.
     if (c.description.length > DESCRIPTION_MAX) {
@@ -129,8 +142,8 @@ export function commitPrompt(t: Ticket, f: Flow, changed: string[], commands: st
     '# Rules',
     '- One commit for each topic. A commit builds and tests on its own. Put a new helper before the code that uses it.',
     '- The title is `type(scope): description (KEY)`: the type is one of the list, the scope is the area of the code,',
-    `  the key is ${t.key}. Lowercase, no period. The description has ${DESCRIPTION_MAX} characters at most: the type, the scope and the key do not count. Never copy the Jira summary.`,
-    `- Types: ${COMMIT_TYPES.join(', ')}.`,
+    `  the key is ${t.key}. The type and the scope are lowercase. The description starts with a lowercase letter and keeps the case of code names such as errorClassName. No period. The description has ${DESCRIPTION_MAX} characters at most: the type, the scope and the key do not count. Never copy the Jira summary.`,
+    `- Types: ${commitTypes().join(', ')}.`,
     '- Give every changed file to exactly one commit. List the files as they are in the list above.',
     '- A test goes with the code that it tests. Docs for a feature go with the feature.',
     '- Read the change with `git diff` and `git status`. Do not edit files. Do not commit, push or stage.',
