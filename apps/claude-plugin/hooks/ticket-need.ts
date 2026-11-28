@@ -1,4 +1,5 @@
 import type { EngineInterface } from 'claude-code';
+import { actionHelp } from './look.gen';
 import { agentRun, approveTested, pushStep, toTesting } from './cli';
 import { hex, notBuilt, type Ctx } from './kit';
 import { store } from './store';
@@ -7,6 +8,7 @@ import type { Flow, Row } from './types';
 /** What the agent or the sync needs from the developer, with its actions. */
 export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullable<Flow['need']>) {
   const { Box, Text, Button } = ctx.els;
+  const flow = store.detail?.flow;
   const color = hex(need.kind === 'problem' ? 'red' : 'violet');
   const who =
     need.kind === 'problem'
@@ -56,6 +58,8 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
                 void agentRun($, t.key, 'review');
               } else if (x.id === 'showPush' || x.id === 'approvePush') {
                 void pushStep($, t.key, x.id === 'showPush' ? 'push-plan' : 'push');
+              } else if (x.id === 'showPr' || x.id === 'createPr') {
+                void pushStep($, t.key, x.id === 'showPr' ? 'pr-plan' : 'pr');
               } else if (x.id === 'approveTesting') {
                 void approveTested($, t.key);
               } else if (x.id === 'toTesting') {
@@ -73,6 +77,20 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
             }
           })
         )
+      }),
+      // A terminal has no hover. The text that VS Code shows as a tooltip sits here, dim.
+      ...need.actions.flatMap((x) => {
+        const help = actionHelp(x.id, flow);
+        return help
+          ? [
+              Box({
+                key: 'help-' + x.id,
+                children: [
+                  Text({ dimColor: true, wrap: 'wrap', children: [x.label + ': ' + help] })
+                ]
+              })
+            ]
+          : [];
       })
     ]
   });

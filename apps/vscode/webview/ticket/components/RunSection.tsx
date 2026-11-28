@@ -1,5 +1,5 @@
 import { mdiProgressClock } from '@mdi/js';
-import { runText } from '@agent-ticket-board/core/look';
+import { actionHelp, runText } from '@agent-ticket-board/core/look';
 import { Button } from '../../shared/components/Button';
 import { Section } from '../../shared/components/Section';
 import type { AgentRun } from '../../shared/types/host';
@@ -21,7 +21,12 @@ export function RunSection({ run, act, theme }: Props) {
       theme={theme}
       running={run.state !== 'queued'}
       aside={
-        <Button variant="default" className="-my-1" onPress={() => act('stopRun')}>
+        <Button
+          variant="default"
+          className="-my-1"
+          onPress={() => act('stopRun')}
+          help={actionHelp('stopRun')}
+        >
           Stop
         </Button>
       }

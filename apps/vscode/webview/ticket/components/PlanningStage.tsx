@@ -4,7 +4,7 @@ import { Dot } from '../../shared/components/Dot';
 import { Section } from '../../shared/components/Section';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
-import { PALETTE, runActive } from '@agent-ticket-board/core/look';
+import { actionHelp, PALETTE, runActive } from '@agent-ticket-board/core/look';
 import type { Act } from '../types/ticket';
 import { canStartPlanning } from '../utils/ticket';
 import { AssumptionsSection } from './AssumptionsSection';
@@ -37,7 +37,12 @@ export function PlanningStage({ d, act, theme }: Props) {
           theme={theme}
         >
           <div className="pt-1">
-            <Button variant="primary" tone={PALETTE.blue.hex} onPress={() => act('startPlanning')}>
+            <Button
+              variant="primary"
+              tone={PALETTE.blue.hex}
+              onPress={() => act('startPlanning')}
+              help={actionHelp('startPlanning')}
+            >
               Start planning
             </Button>
           </div>

@@ -1,6 +1,9 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   accentOf,
+  actionHelp,
   activityText,
   checkLabel,
   dryRunText,
@@ -262,5 +265,64 @@ describe('stepView', () => {
   it('leaves a step that is not a command as it is', () => {
     expect(stepView({ name: 'Clean worktree' })).toEqual({ label: 'Clean worktree' });
     expect(stepView({ name: 'make verify' })).toEqual({ label: 'make verify' });
+  });
+});
+
+describe('actionHelp', () => {
+  // Every button that the board makes in a banner has an id and a label in the source.
+  const ids = (() => {
+    const dirs = [join(__dirname), join(__dirname, '../../../apps/service/src')];
+    const found = new Set<string>();
+    for (const dir of dirs) {
+      for (const f of readdirSync(dir).filter((n) => n.endsWith('.ts') && !n.includes('.test.'))) {
+        for (const m of readFileSync(join(dir, f), 'utf8').matchAll(
+          /\{ id: '([A-Za-z:]+)',\s*label:/g
+        )) {
+          found.add(m[1]!);
+        }
+      }
+    }
+    // The stage tabs have an id and a label too. They are not buttons that run something.
+    for (const s of STAGES) {
+      found.delete(s.id);
+    }
+    // No client handles this id yet: a press does nothing, so there is nothing to describe.
+    found.delete('fix');
+    return [...found].sort();
+  })();
+
+  it('finds the ids of the banner buttons in the source', () => {
+    expect(ids).toEqual(expect.arrayContaining(['startGate', 'approvePush', 'createPr', 'showPr']));
+  });
+  it.each(ids)('describes the button %s', (id) => {
+    expect(actionHelp(id)).toBeTruthy();
+  });
+  it('writes sentences of 25 words at most, and says what runs', () => {
+    for (const id of [...ids, 'openJira', 'openChat', 'stopRun', 'choose:fix', 'move:Done']) {
+      for (const sentence of actionHelp(id, { prPlan: { update: true } })!.split(/(?<=\.)\s+/)) {
+        expect(sentence.split(/\s+/).length, `${id}: ${sentence}`).toBeLessThanOrEqual(25);
+      }
+    }
+  });
+  it('names the command that a write runs', () => {
+    expect(actionHelp('approvePush', { push: { branch: 'feature/X-1' } })).toContain(
+      'git push origin HEAD:feature/X-1'
+    );
+    expect(actionHelp('showPush')).toContain('git push --dry-run');
+    expect(actionHelp('createPr')).toContain('gh pr create --draft');
+    expect(actionHelp('createPr', { prPlan: { update: true } })).toContain('gh pr edit');
+    expect(actionHelp('startGate')).toContain('never rebases');
+  });
+  it('tells a new pull request from an update, and a first preview from a rebuild', () => {
+    expect(actionHelp('showPr')).toContain('whether it has a pull request');
+    expect(actionHelp('showPr', { prPlan: { createdAt: 'x' } })).toContain('again');
+  });
+  it('says that a Jira move is the only write to Jira, and uses the status', () => {
+    const h = actionHelp('move:Verifying')!;
+    expect(h).toContain('Verifying');
+    expect(h).toContain('only write to Jira');
+  });
+  it('has nothing for an id that it does not know', () => {
+    expect(actionHelp('nope')).toBeUndefined();
   });
 });

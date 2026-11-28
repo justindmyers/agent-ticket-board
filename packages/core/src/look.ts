@@ -79,7 +79,16 @@ export function runLine(
 type RunLike = {
   state: string;
   stage?: string;
-  task?: 'gate' | 'verify' | 'review-fix' | 'commit-plan' | 'commit';
+  task?:
+    | 'gate'
+    | 'verify'
+    | 'review-fix'
+    | 'commit-plan'
+    | 'commit'
+    | 'push-plan'
+    | 'push'
+    | 'pr-plan'
+    | 'pr';
   model: string;
   waiting?: string;
   app?: string;
@@ -141,6 +150,37 @@ export function runText(run: RunLike): {
       title: 'Making the commits',
       caption:
         'The board commits each group in order. The hooks of the repository run. No agent runs.',
+      accent
+    };
+  }
+  if (run.task === 'push-plan') {
+    return {
+      title: 'Showing the push',
+      caption: 'The board runs git push --dry-run and reads the branch. Nothing is pushed.',
+      accent
+    };
+  }
+  if (run.task === 'push') {
+    return {
+      title: 'Pushing the branch',
+      caption:
+        'The board runs git push to origin. The hooks of the repository run, and they can take a while. Then it builds the pull request.',
+      accent
+    };
+  }
+  if (run.task === 'pr-plan') {
+    return {
+      title: 'Building the pull request',
+      caption:
+        'The board builds the title and the body, and asks GitHub whether the branch has a pull request. Nothing is made.',
+      accent
+    };
+  }
+  if (run.task === 'pr') {
+    return {
+      title: 'Opening the draft pull request',
+      caption:
+        'The board runs gh pr create --draft with the screenshots. It stays a draft. No agent runs.',
       accent
     };
   }
@@ -360,3 +400,86 @@ export function stepView(s: { name: string; command?: string }): {
 /** The mark of a file in a list, as in a diff: M changed, + new, − deleted. */
 export const outsideMark = (kind: 'changed' | 'new' | 'deleted') =>
   kind === 'new' ? '+' : kind === 'deleted' ? '−' : 'M';
+
+// What each button does, in plain words. A tooltip in VS Code and a line in the pane show it.
+// The board's buttons hide the commands and calls behind them. This text says which, so that a
+// press is never a guess. Each sentence has 25 words at most.
+
+type HelpFacts =
+  | {
+      push?: { branch?: string };
+      prPlan?: { update?: boolean; createdAt?: string };
+    }
+  | null
+  | undefined;
+
+const HELP: Record<string, string | ((f: HelpFacts) => string)> = {
+  startPlanning:
+    'Starts an agent session that reads the ticket and the code, asks questions and writes the plan. It uses agent time. It changes no files.',
+  replan:
+    'Starts an agent session that writes the plan again, with your answers and comments. It changes no files.',
+  approve:
+    'Approves the plan and starts the build agent in the worktree. The agent changes code there. It does not commit or push.',
+  approvePlan:
+    'Approves the plan and starts the build agent in the worktree. The agent changes code there. It does not commit or push.',
+  startDevelopment:
+    'Starts the build agent in the worktree. It changes code, but it does not commit or push. The board then runs your checks.',
+  toTesting:
+    'Moves the ticket to Testing. No agent runs yet. The writes that you approved become allowed in the test.',
+  startTesting:
+    'Starts the test agent. It starts the app, drives a browser, takes screenshots and may make the writes that you approved.',
+  approveTesting:
+    'Approves the tested change. It closes the test browser and starts the code review.',
+  startCodeReview:
+    'Starts the reviewers. They read the diff and your uncommitted changes. A checker drops findings that it cannot confirm in the code.',
+  startReviewFix:
+    'Starts an agent that fixes the findings that you marked Fix. It does not commit or push. The board then runs your checks.',
+  startVerify:
+    'Runs the checks of your repository on the change as it is, in the worktree. No agent runs. Nothing is merged.',
+  startCommitPlan:
+    'Starts an agent that groups the change into commits by topic. It changes no files. You read the plan before anything is committed.',
+  approveCommits:
+    'Makes the planned commits in order with git. The commit hooks of your repository run. The board never uses --no-verify.',
+  startGate:
+    'Runs your checks. It fetches origin, merges the base branch (never rebases), and runs the checks again if the merge changed anything. Then it shows the push. No agent runs.',
+  showPush:
+    'Runs git push --dry-run to origin and reads the branch. It shows the commits that a push would send. Nothing is pushed.',
+  approvePush: (f) =>
+    `Runs git push origin HEAD:${f?.push?.branch ?? '<branch>'}. The pre-push hooks of your repository run and can take a while. Never a force. Then it builds the pull request.`,
+  showPr: (f) =>
+    f?.prPlan?.createdAt
+      ? 'Builds the title and the body again from the commits and the current screenshots, and shows them. Nothing changes on GitHub.'
+      : 'Reads the branch, and asks GitHub with gh whether it has a pull request. It builds the title and the body. Nothing changes on GitHub.',
+  createPr: (f) =>
+    f?.prPlan?.update
+      ? 'Runs gh pr edit on the open pull request. It replaces the title and the body with the preview, and uploads the screenshots. It stays a draft.'
+      : 'Runs gh pr create --draft with the title, the body and the screenshots of the preview. It makes a draft. It never marks it ready. It never writes to Jira.',
+  openWorktree: "Opens the ticket's worktree folder in a new VS Code window.",
+  openPr: 'Opens the pull request on GitHub in your browser.',
+  openPlannedPr: 'Opens the pull request on GitHub in your browser.',
+  openJira: 'Opens the ticket in Jira in your browser.',
+  openChat:
+    'Writes a handoff file in the worktree, and opens a Claude Code chat with a prompt that points to it. The prompt is typed in. It is not sent.',
+  openApp: "Opens the ticket's test app in your browser.",
+  stopRun:
+    'Stops the running job and its processes. A push or a pull request step that already started can still finish. Check GitHub then.',
+  comment: 'Moves the cursor to the comment box. Nothing is sent yet.',
+  'openPush:branch': 'Opens the pushed branch on GitHub in your browser.',
+  'openPush:pr':
+    "Opens GitHub's own page to make a pull request by hand. The board's button makes one with a title, a body and screenshots.",
+  'openPush:commit': 'Opens this commit on GitHub in your browser.',
+  'choose:fix':
+    'Marks this finding to be fixed. Nothing changes in the code until you run the fix. You can undo it.',
+  'choose:dismiss':
+    'Dismisses this finding. It stays in the list, and no code changes. You can undo it.',
+  'choose:clear': 'Takes back your choice for this finding. It goes back to open.'
+};
+
+/** What a button does, or undefined for an id that has no help text. A move to a Jira status is by id. */
+export function actionHelp(id: string, f?: HelpFacts): string | undefined {
+  if (id.startsWith('move:')) {
+    return `Moves the Jira ticket to ${id.slice(5)} with acli. This is the only write to Jira, and it happens only when you press it.`;
+  }
+  const h = HELP[id];
+  return typeof h === 'function' ? h(f) : h;
+}

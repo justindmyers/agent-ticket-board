@@ -35,12 +35,10 @@ export function pushRows(ctx: Ctx, f: Flow): RenderElement[] {
       pushed
         ? 'The branch is on origin.'
         : p.stale
-          ? 'The branch changed after this preview. Prepare the push again to see it as it is now.'
+          ? 'The branch changed after this preview. Follow the banner to see the push as it is now.'
           : 'This is a dry run. Nothing is pushed until you approve.'
     ),
-    fact('Branch', p.branch),
-    ...(pushed ? [] : [fact('Dry run', dryRunText(p.dryRun, p.branch))]),
-    fact('Command', p.command),
+    // The commits that the push sends come first. The branch, the dry run and the command follow.
     ...p.commits.map((c) => {
       const url = links && c.sha ? links.commit(c.sha) : null;
       return Box({
@@ -55,14 +53,17 @@ export function pushRows(ctx: Ctx, f: Flow): RenderElement[] {
         ]
       });
     }),
+    fact('Branch', p.branch),
+    ...(pushed ? [] : [fact('Dry run', dryRunText(p.dryRun, p.branch))]),
+    fact('Command', p.command),
     ...(links
       ? [
           Box({
             key: 'push-links',
             columnGap: 2,
             children: [
-              Link({ href: links.branch, label: 'Open the branch' }),
-              Link({ href: links.pullRequest, label: 'Open a pull request' })
+              Link({ href: links.branch, label: 'View the branch' }),
+              Link({ href: links.pullRequest, label: 'Create it on GitHub' })
             ]
           })
         ]

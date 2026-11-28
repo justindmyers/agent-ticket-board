@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react';
-import { Button as AriaButton, type ButtonProps } from 'react-aria-components';
+import { Button as AriaButton, TooltipTrigger, type ButtonProps } from 'react-aria-components';
 import { FOCUS_RING_CLASS } from '../utils/classes';
 import { cx } from '../utils/cx';
+import { Hint } from './Hint';
 
 // Hover styles use data-hovered, which react-aria never sets on a disabled button.
 const VARIANTS = {
@@ -17,6 +18,8 @@ type Props = ButtonProps & {
   tone?: string;
   className?: string;
   style?: CSSProperties;
+  /** What pressing the button runs, in plain words. It shows as a tooltip. */
+  help?: string;
 };
 
 const toneStyle = (variant: Props['variant'], tone?: string): CSSProperties | undefined => {
@@ -36,8 +39,8 @@ const toneStyle = (variant: Props['variant'], tone?: string): CSSProperties | un
   };
 };
 
-export function Button({ variant = 'default', tone, className, style, ...p }: Props) {
-  return (
+export function Button({ variant = 'default', tone, className, style, help, ...p }: Props) {
+  const button = (
     <AriaButton
       {...p}
       style={{ ...toneStyle(variant, tone), ...style }}
@@ -49,5 +52,13 @@ export function Button({ variant = 'default', tone, className, style, ...p }: Pr
         className
       )}
     />
+  );
+  return help ? (
+    <TooltipTrigger delay={350} closeDelay={0}>
+      {button}
+      <Hint>{help}</Hint>
+    </TooltipTrigger>
+  ) : (
+    button
   );
 }

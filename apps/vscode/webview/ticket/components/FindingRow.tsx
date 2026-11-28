@@ -1,3 +1,4 @@
+import { actionHelp } from '@agent-ticket-board/core/look';
 import { Button } from '../../shared/components/Button';
 import { Pill } from '../../shared/components/Pill';
 import type { Finding } from '../../shared/types/host';
@@ -54,16 +55,31 @@ export function FindingRow({ finding: x, act, theme }: Props) {
       {x.state !== 'fixed' && (
         <span className="mt-2 flex flex-wrap gap-2">
           {x.decision ? (
-            <Button variant="ghost" className="h-7 px-2" onPress={choose('clear')}>
+            <Button
+              variant="ghost"
+              className="h-7 px-2"
+              onPress={choose('clear')}
+              help={actionHelp('choose:clear')}
+            >
               Undo
             </Button>
           ) : (
             <>
-              <Button variant="default" className="h-7 px-2" onPress={choose('fix')}>
+              <Button
+                variant="default"
+                className="h-7 px-2"
+                onPress={choose('fix')}
+                help={actionHelp('choose:fix')}
+              >
                 {x.state === 'dropped' ? 'Fix anyway' : 'Fix'}
               </Button>
               {x.state === 'open' && (
-                <Button variant="ghost" className="h-7 px-2" onPress={choose('dismiss')}>
+                <Button
+                  variant="ghost"
+                  className="h-7 px-2"
+                  onPress={choose('dismiss')}
+                  help={actionHelp('choose:dismiss')}
+                >
                   Dismiss
                 </Button>
               )}

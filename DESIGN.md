@@ -205,3 +205,15 @@ The views draw from the local cache at once. A refresh shows a small "updating" 
 - Don't glow, animate or color anything that does not need the developer.
 - Don't copy Linear's look. Match its speed and finish.
 - Don't name a company or a product in tokens, classes or text.
+
+### Tooltips
+
+A button hides the commands that it runs. Each button that runs something shows what it runs.
+
+- VS Code shows a tooltip on hover and on keyboard focus. The `Button` takes a `help` text.
+- The pane has no hover. It shows the same text as a dim line under the buttons of the banner.
+- The text is one function, `actionHelp`, in `look.ts`. Both surfaces read it, so they say the same.
+- The text names the real command: `git push origin HEAD:<branch>`, `gh pr create --draft`, `gh pr edit`.
+- A test fails when a button id has no text. A new button cannot ship without one.
+- A word has one meaning. "Create" makes a thing on GitHub. "View" opens it in the browser.
+

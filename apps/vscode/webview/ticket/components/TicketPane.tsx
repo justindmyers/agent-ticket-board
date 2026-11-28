@@ -68,7 +68,7 @@ export function TicketPane({ d, tab, setTab, draft, setDraft, onBack, theme }: P
             {d.adopt && <AdoptNotice ticketKey={d.ticket.key} offer={d.adopt} theme={theme} />}
           </Collapse>
           <Collapse isOpen={!!need}>
-            {need && <NeedBanner need={need} act={act} theme={theme} />}
+            {need && <NeedBanner need={need} act={act} theme={theme} flow={d.flow} />}
           </Collapse>
 
           <StageTabList current={si} theme={theme} />

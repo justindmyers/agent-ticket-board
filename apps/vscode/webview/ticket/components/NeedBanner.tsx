@@ -1,15 +1,15 @@
 import { Button } from '../../shared/components/Button';
 import { Kbd } from '../../shared/components/Kbd';
-import type { Need } from '../../shared/types/host';
+import type { Flow, Need } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
 import { focusDraft } from '../../shared/utils/focus';
-import { PALETTE } from '@agent-ticket-board/core/look';
+import { actionHelp, PALETTE } from '@agent-ticket-board/core/look';
 import { ink } from '../../shared/utils/surfaces';
 import type { Act } from '../types/ticket';
 
-type Props = { need: Need; act: Act; theme: Theme };
+type Props = { need: Need; act: Act; theme: Theme; flow?: Flow | null };
 
-export function NeedBanner({ need, act, theme }: Props) {
+export function NeedBanner({ need, act, theme, flow }: Props) {
   const problem = need.kind === 'problem';
   const label = problem
     ? 'Problem'
@@ -49,6 +49,7 @@ export function NeedBanner({ need, act, theme }: Props) {
             key={a.id}
             variant={i === 0 ? 'primary' : 'default'}
             tone={problem ? PALETTE.red.hex : PALETTE.violet.hex}
+            help={actionHelp(a.id, flow)}
             onPress={() => (a.id === 'comment' ? focusDraft() : act(a.id))}
           >
             {a.label}

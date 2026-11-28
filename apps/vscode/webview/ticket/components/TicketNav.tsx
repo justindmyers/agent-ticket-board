@@ -3,7 +3,7 @@ import { Button } from '../../shared/components/Button';
 import { Icon } from '../../shared/components/Icon';
 import type { Detail } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
-import { accentOf, runActive } from '@agent-ticket-board/core/look';
+import { accentOf, actionHelp, runActive } from '@agent-ticket-board/core/look';
 import { type stageOf } from '../../shared/utils/stages';
 import { ink } from '../../shared/utils/surfaces';
 import type { Act } from '../types/ticket';
@@ -48,7 +48,12 @@ export function TicketNav({ d, stage, act, onBack, theme }: Props) {
       <span style={{ color: stageColor }}>{label}</span>
       {!d.fresh && <span className="ml-2 text-muted">Updating…</span>}
       <div className="ml-auto flex items-center gap-0.5">
-        <Button variant="ghost" className="h-7 px-2" onPress={() => act('openJira')}>
+        <Button
+          variant="ghost"
+          className="h-7 px-2"
+          onPress={() => act('openJira')}
+          help={actionHelp('openJira')}
+        >
           Jira
           <Icon path={mdiOpenInNew} size={13} />
         </Button>
@@ -56,6 +61,7 @@ export function TicketNav({ d, stage, act, onBack, theme }: Props) {
           variant="ghost"
           className="h-7 px-2"
           onPress={() => act('openChat')}
+          help={actionHelp('openChat')}
           isDisabled={!f || runActive(f)}
           aria-label={
             f && runActive(f)

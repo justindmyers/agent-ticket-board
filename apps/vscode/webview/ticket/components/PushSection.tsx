@@ -1,5 +1,5 @@
 import { mdiCloudUploadOutline } from '@mdi/js';
-import { dryRunText, pushLinks } from '@agent-ticket-board/core/look';
+import { actionHelp, dryRunText, pushLinks } from '@agent-ticket-board/core/look';
 import { Pill } from '../../shared/components/Pill';
 import { Section } from '../../shared/components/Section';
 import type { Push } from '../../shared/types/host';
@@ -38,13 +38,17 @@ export function PushSection({ push, act, theme }: Props) {
         pushed
           ? 'The branch is on origin.'
           : push.stale
-            ? 'The branch changed after this preview. Prepare the push again to see it as it is now.'
+            ? 'The branch changed after this preview. Follow the banner to see the push as it is now.'
             : 'This is a dry run. Nothing is pushed until you approve.'
       }
       aside={
         <span className="flex items-center gap-2">
           {links && (
-            <OpenLinkButton label="Open a pull request" onPress={() => act('openPush:pr')} />
+            <OpenLinkButton
+              label="Create it on GitHub"
+              help={actionHelp('openPush:pr')}
+              onPress={() => act('openPush:pr')}
+            />
           )}
           <Pill accent={pushed ? 'green' : push.stale ? 'amber' : 'rose'} theme={theme}>
             {pushed ? 'Pushed' : push.stale ? 'Out of date' : 'Dry run'}
@@ -54,6 +58,29 @@ export function PushSection({ push, act, theme }: Props) {
       accent={pushed ? 'green' : push.stale ? 'amber' : 'rose'}
       theme={theme}
     >
+      {/* The commits that the push sends come first. The branch, the dry run and the command follow. */}
+      <TicketRows>
+        {push.commits.map((c) => (
+          <TicketRow
+            key={c.sha || c.short}
+            state={pushed ? 'done' : 'todo'}
+            theme={theme}
+            end={
+              links && c.sha ? (
+                <OpenLinkButton
+                  label={c.short}
+                  help={actionHelp('openPush:commit')}
+                  onPress={() => act(`openPush:commit:${c.sha}`)}
+                />
+              ) : (
+                <span className="font-mono text-[11px] text-muted">{c.short}</span>
+              )
+            }
+          >
+            <span className="font-mono text-[12px]">{c.title}</span>
+          </TicketRow>
+        ))}
+      </TicketRows>
       <div className="grid grid-cols-1 gap-2 pt-1">
         {facts.map((x) => (
           <div
@@ -65,27 +92,13 @@ export function PushSection({ push, act, theme }: Props) {
           </div>
         ))}
       </div>
-      <TicketRows>
-        {push.commits.map((c) => (
-          <TicketRow
-            key={c.sha || c.short}
-            state={pushed ? 'done' : 'todo'}
-            theme={theme}
-            end={
-              links && c.sha ? (
-                <OpenLinkButton label={c.short} onPress={() => act(`openPush:commit:${c.sha}`)} />
-              ) : (
-                <span className="font-mono text-[11px] text-muted">{c.short}</span>
-              )
-            }
-          >
-            <span className="font-mono text-[12px]">{c.title}</span>
-          </TicketRow>
-        ))}
-      </TicketRows>
       {links && (
         <div className="pt-1">
-          <OpenLinkButton label="Open the branch" onPress={() => act('openPush:branch')} />
+          <OpenLinkButton
+            label="View the branch"
+            help={actionHelp('openPush:branch')}
+            onPress={() => act('openPush:branch')}
+          />
         </div>
       )}
     </Section>
