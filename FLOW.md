@@ -256,6 +256,19 @@ Not built yet (grey): the draft pull request and the pull request tracking. Toda
 
 Check it: `stage` is `ship` from the commit plan on. A record from before this stage moves to Ship by itself once it has commits, a gate, a push or a pull request. `gate.steps` lists each check: `name` is its description in plain words, `command` is what ran, and `note` is its output. An older result, with only the command as its name, gets a description when it is shown. `push` holds the branch, the commits, the command and the dry run that you saw, and `pushedAt` after the push. Audit events: `push.planned`, `push.done`, `push.failed`. The push refuses the base branch, a dirty tree, and a commit that the checks did not pass. `gate.head` is that commit. `gate.tree` is the fingerprint of the content that the checks passed on. The step "Checks before the merge" says when the gate skipped the repeat pass. `commits.done` lists each commit and its short hash. Audit events: `before-commit`, `commit.made`, `commit.failed`, `gate.done`.
 
+### Work done outside the board
+
+You can change the worktree yourself, with a terminal or a chat. The board does not hide this. Each time a ticket opens, the board reads git and shows what it did not do.
+
+- **What counts.** A file is outside work when it differs from the worktree as the last board run left it. A commit is outside work when the board did not make it and it came after that run.
+- **The baseline.** `seen` holds the commit and a hash for each changed file. A run that writes code takes it when the run ends: Development and "Fix the chosen findings". The board's own jobs take it too. A run that only reads takes it when the run starts, so an edit made during that run still shows.
+- **The section.** "Changes outside the board" lists one line for each commit and file. It is on every stage from Development on, and it is empty when there is nothing to show.
+- **Results that came before.** In Testing and Code review, the banner says that the result does not include the changes. It offers "Test again" or "Review again". The ticket does not move back to an earlier stage.
+- **The push.** A push preview is saved with its commit count. The banner is built from the branch as it is now, so it shows the real count. "Approve the push" is hidden while the preview is out of date. "Prepare the push again" runs the checks on the branch as it is now.
+- **Uncommitted files.** The push sends commits only. The banner says to commit or discard the files first.
+
+Check it: `outside` is in the ticket detail from `atb ticket <KEY>`. It has `files`, `commits`, `head` and `ahead`. The record is not changed: `withOutside` edits only the copy that is shown.
+
 ## 8. What the board may write
 
 ```mermaid

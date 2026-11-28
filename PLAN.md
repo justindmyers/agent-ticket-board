@@ -116,7 +116,7 @@ Each stage is a row in the workflow config. A row names the skills, the helper a
   3. The developer iterates in the chat with the normal setup.
   4. The chat runs `atb handback <KEY> "<summary>"`. The ticket then shows "Changed in chat" and offers the next step of its stage, for example Test again. With `--replan`, the ticket goes back to Planning for the change.
 - **Exact session.** "Continue in terminal" runs `claude --resume <id>` in the worktree, with the same settings as the agent.
-- **Outside work.** If the worktree changes outside the board, the ticket page shows the changed files and the new commits. The developer can use them and continue. The next agent run starts a new session from the handback and the current diff.
+- **Outside work.** If the worktree changes outside the board, the ticket page shows the changed files and the new commits. The developer can use them and continue. The next agent run starts a new session from the handback and the current diff. A Testing result or a review that came before the outside work says so, and offers to run again.
 - **Guards.** A plugin hook refuses these commands and tells the agent why:
   - `git push` and `gh pr create`, until the ticket has the developer's approval.
   - Any tracker write.
