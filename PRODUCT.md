@@ -20,7 +20,7 @@ React, Tailwind CSS and react-aria in the VS Code webviews. A Claude Code plugin
 
 ## Product Purpose
 
-The board moves tickets through a queue quickly: Planning, Development, Testing and Code review. The developer approves at each checkpoint and the agent does the work between them. Sometimes a problem occurs: a failed check, a blocked agent, a question or a changed ticket. The developer then sees it at once and can react in one or two actions.
+The board moves tickets through a queue quickly: Planning, Development, Testing, Code review and Ship. The developer approves at each checkpoint and the agent does the work between them. Sometimes a problem occurs: a failed check, a blocked agent, a question or a changed ticket. The developer then sees it at once and can react in one or two actions.
 
 Success: the developer spends little time on the board and never misses an item that waits for them. The developer never needs to open the tracker to move a ticket.
 
@@ -40,7 +40,7 @@ Success: the developer spends little time on the board and never misses an item 
 
 ## Capabilities and Constraints
 
-- Stages: Planning, Development, Testing, Code review. These names are fixed product terms.
+- Stages: Planning, Development, Testing, Code review, Ship. These names are fixed product terms.
 - The views show no agent chat. When the agent needs something from the developer, the view shows the request in one line with the action for it. The full chat stays in Claude Code.
 - Board columns are the tracker statuses. A drag on the board runs a tracker transition after a confirmation.
 - Public open-source repository (MIT). It contains no organization data and no personal data.

@@ -8,7 +8,7 @@ A developer works on tracker tickets with a coding agent. Agent Ticket Board doe
 
 - It shows the developer's sprint tickets on a board.
 - It runs one agent session for each ticket.
-- It moves each ticket through four stages: Planning, Development, Testing and Code review.
+- It moves each ticket through five stages: Planning, Development, Testing, Code review and Ship.
 - It stops for the developer at each checkpoint.
 
 The developer works in VS Code or in Claude Code (the desktop app or the terminal). Both clients show the same data and offer the same actions.
@@ -85,7 +85,8 @@ Each stage is a row in the workflow config. A row names the skills, the helper a
 | Planning | The agent reads the ticket and the code. It looks up linked tickets and pull requests with read-only commands. It writes numbered requirements. Each requirement gets a check: a test or a click path. The agent asks at most 3 questions, and only questions that block the build. It decides the rest and lists each decision as an assumption. After the developer answers, the next plan is final: it cannot ask more questions. Then it writes small steps, and each step names the requirements that it covers. | Yes: "Approve plan and start" |
 | Development | The steps are code changes and commands only. Browser, device and manual checks go to Testing. Worker agents do one step each and run the targeted check for that step. Then reviewer agents check the diff (correctness, reuse, style, UI), and a verifier removes false findings. The review runs 3 rounds at most. One final gate follows: type check, then lint and tests for the changed files. | No |
 | Testing | The service starts the app of the worktree on a free build port, and opens a browser for the ticket. The developer logs in once. The agent checks each requirement in the live app or with its test. It views every screenshot, fixes what looks wrong and takes the shots again. The Testing tab shows each requirement with its evidence. Storybook is only for a new shared component or a large new component. | Yes: "Approve for code review" |
-| Code review | The approval starts one review round. Reviewers report only: correctness, code style and the reviewers of the repository. A checker reads the source and drops each finding that it cannot find in the code. The agent fixes the others, except style notes, and runs the repository tests again. Then an agent plans atomic commits by topic, and the board makes them after the developer reads the plan. Then the board runs the checks of the repository config, merges the base branch and runs them again. Then: commit, push, CI, then a draft pull request with screenshots. Another person reviews the pull request on the git host. The tab shows the pull request, its checks and its review comments. The stage ends when the pull request merges. | Waits for the reviewer |
+| Code review | The approval starts one review round. Reviewers report only: correctness, code style and the reviewers of the repository. A checker reads the source and drops each finding that it cannot find in the code. The agent fixes the others, except style notes, and runs the repository tests again. The developer can choose to fix or dismiss any finding. Then the board runs the checks of the repository config. | Waits for the developer |
+| Ship | The button "Plan the commits" starts it. An agent plans atomic commits by topic, and the board makes them after the developer reads the plan. "Prepare the push" merges the base branch and runs the checks again when the merge brings changes. "Preview the push" is a dry run. After approval: push, CI, then a draft pull request with screenshots. Another person reviews the pull request on the git host. The tab shows the pull request, its checks and its review comments. The stage ends when the pull request merges. | Waits for the reviewer |
 
 **Fast path.** A clear ticket has acceptance criteria and no open questions. For a clear ticket, the agent shows the requirements and the plan in one message and stops once.
 
@@ -162,7 +163,7 @@ Each ticket keeps a full record of what happened, so that the developer can audi
 - **Ticket page.** It opens in its own tab and has these parts:
   - A header with status, points, lane, the main action for the current stage and an overflow menu (Pause, Re-plan, Open plan file).
   - One tab for each stage. The tab of the current stage opens by default. The header and the comment thread show on every tab.
-  - Planning tab: requirements with their checks, the questions and the plan. Testing tab: the requirements as a checklist with evidence. Code review tab: the pull request, its checks and review comments.
+  - Planning tab: requirements with their checks, the questions and the plan. Testing tab: the requirements as a checklist with evidence. Code review tab: the findings and the board checks. Ship tab: the commits, the push, the pull request, its checks and review comments.
   - The comment thread with a composer: "Comment" and "Comment and run".
   - A side rail with ticket facts, worktree, branch, app link and usage.
 - **Claude Code pane.** It has the same lanes and the same ticket view (stages, requirements, plan, comments, comment input).

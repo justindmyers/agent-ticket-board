@@ -100,9 +100,10 @@ flowchart TD
   TESTAGAIN --> TEST
   TEST --> G2{"You: Approve for code review"}:::human
 
-  G2 --> REVIEW["CODE REVIEW<br/>reviewers, fixes,<br/>board checks, commits,<br/>pre-push gate"]:::agent
-  REVIEW --> G3{"You: approve the push"}:::planned
-  G3 --> PR["Push, draft pull request,<br/>screenshots attached"]:::planned
+  G2 --> REVIEW["CODE REVIEW<br/>reviewers, fixes,<br/>board checks"]:::agent
+  REVIEW --> SHIP["SHIP<br/>commits, prepare the push,<br/>preview the push"]:::agent
+  SHIP --> G3{"You: approve the push"}:::human
+  G3 --> PR["Push, then the draft pull request,<br/>screenshots attached"]:::planned
   PR --> FOLLOW["Follow checks, reviews and comments<br/>until the merge"]:::planned
   FOLLOW --> JIRAMOVE{"You: approve the Jira move"}:::human
   JIRAMOVE --> DONE["Closed"]
@@ -115,7 +116,7 @@ flowchart TD
   classDef planned fill:#222,stroke:#777,stroke-dasharray:5 4,color:#aaa
 ```
 
-Check it: the field `stage` of `agents/KEY.json` is `planning`, `development`, `testing` or `code-review`. The field `need` is the one line and the buttons you see. Moves and approvals are in the audit log: `testing.approved`, `start-over`.
+Check it: the field `stage` of `agents/KEY.json` is `planning`, `development`, `testing`, `code-review` or `ship`. The field `need` is the one line and the buttons you see. Moves and approvals are in the audit log: `testing.approved`, `start-over`.
 
 ## 4. The life of one agent run
 
@@ -184,7 +185,7 @@ flowchart TD
 
 Check it: `steps` in the record show each step as todo, current or done. `gate` shows the board's own check result, step by step. `evidence` has one entry for each requirement, with its screenshot paths. Screenshots are in `tickets/KEY/shots/`. Each entry also has `data`: `real`, `fake` or `none`. `writeRuns` lists each approved write with `made` and its result. A pass on fake data still lets you approve. The decision text names the fake data and the writes that were not made.
 
-## 6. Code review, commits and the pre-push gate
+## 6. Code review
 
 ```mermaid
 flowchart TD
@@ -201,10 +202,23 @@ flowchart TD
   CHOOSE --> FIXCH["FIX RUN: agent fixes only the chosen findings<br/>no new review, no commit"]:::agent
   FIXCH --> CHK
 
-  CHK["BOARD CHECKS on the uncommitted change<br/>contracts, type checks, eslint, prettier,<br/>changed tests, comment and import checks<br/>only on lines the ticket changed"]:::board
+  CHK["BOARD CHECKS on the uncommitted change<br/>contracts, type checks, eslint,<br/>changed tests, comment and import checks<br/>only on lines the ticket changed"]:::board
   CHK -->|"fail"| FIXRV["Fix and review again<br/>the failing output goes to the agent"]:::agent
   FIXRV --> R
-  CHK -->|"pass"| PREP
+  CHK -->|"pass"| DONE["Review done<br/>button: Plan the commits<br/>the ticket moves to Ship"]:::human
+
+  classDef human fill:#3d2f06,stroke:#f5b82e,color:#fff
+  classDef agent fill:#2a1f4d,stroke:#9b7bf0,color:#fff
+  classDef board fill:#0f2f4a,stroke:#4aa3e8,color:#fff
+```
+
+Check it: `codeReview.findings` lists each finding as `fixed`, `open` or `dropped`, with the reviewer, file and line. A finding that you chose has `decision`: `fix` or `dismiss`. A dismissed finding never blocks. Audit event: `finding`. `gate` with `verify` set is the last run of the board checks. Audit events: `verify.started`, `gate.done`.
+
+## 7. Ship
+
+```mermaid
+flowchart TD
+  START["You press Plan the commits<br/>the ticket moves to Ship"]:::human --> PREP
 
   PREP["Before-commit commands<br/>generators, new-component test rule"]:::board
   PREP -->|"fail"| PREPFIX["Fix it, plan again"]:::human
@@ -220,12 +234,16 @@ flowchart TD
   COMMIT -->|"a hook refuses"| HOOKFAIL["Stops there, keeps earlier commits,<br/>shows the hook output"]:::human
   COMMIT --> GATE
 
-  GATE["PRE-PUSH GATE<br/>1 worktree is clean<br/>2 fetch origin/main<br/>3 run the checks, unless they passed on this exact content before the commits<br/>4 merge origin/main, never rebase<br/>5 run the checks again if the merge changed anything"]:::board
+  GATE["PREPARE THE PUSH, the pre-push gate<br/>1 worktree is clean<br/>2 fetch origin/main<br/>3 run the checks, unless they passed on this exact content before the commits<br/>4 merge origin/main, never rebase<br/>5 run the checks again if the merge changed anything"]:::board
   GATE -->|"merge conflict"| UNDO["Merge is undone, tree stays clean"]:::human
-  GATE -->|"pass"| PUSH
+  GATE -->|"pass"| SHOW
 
-  PUSH{"You: approve the push"}:::planned
-  PUSH --> PR["git push origin HEAD:branch<br/>draft pull request, 6 screenshots attached"]:::planned
+  SHOW["PREVIEW THE PUSH, a dry run<br/>branch, commits, the command,<br/>git push --dry-run, changes nothing"]:::board
+  SHOW --> PUSH
+
+  PUSH{"You: approve the push"}:::human
+  PUSH --> DOPUSH["git push origin HEAD:branch<br/>only if the branch is still the one you saw<br/>never a bare push, never a force"]:::board
+  DOPUSH --> PR["Draft pull request, 6 screenshots attached"]:::planned
   PR --> TRACK["Follow checks, reviews, comments to the merge<br/>fixes go through comment and re-plan"]:::planned
 
   classDef human fill:#3d2f06,stroke:#f5b82e,color:#fff
@@ -234,11 +252,11 @@ flowchart TD
   classDef planned fill:#222,stroke:#777,stroke-dasharray:5 4,color:#aaa
 ```
 
-Not built yet (grey): the push, the draft pull request, and the pull request tracking. Today the flow ends after the pre-push gate.
+Not built yet (grey): the draft pull request and the pull request tracking. Today the flow ends after the push.
 
-Check it: `codeReview.findings` lists each finding as `fixed`, `open` or `dropped`, with the reviewer, file and line. A finding that you chose has `decision`: `fix` or `dismiss`. A dismissed finding never blocks. Audit event: `finding`. `gate.steps` lists each check and its output. `gate.tree` is the fingerprint of the content that the checks passed on. The step "Checks before the merge" says when the gate skipped the repeat pass. `commits.done` lists each commit and its short hash. Audit events: `verify.started`, `gate.done`, `before-commit`, `commit.made`, `commit.failed`.
+Check it: `stage` is `ship` from the commit plan on. A record from before this stage moves to Ship by itself once it has commits, a gate, a push or a pull request. `gate.steps` lists each check: `name` is its description in plain words, `command` is what ran, and `note` is its output. An older result, with only the command as its name, gets a description when it is shown. `push` holds the branch, the commits, the command and the dry run that you saw, and `pushedAt` after the push. Audit events: `push.planned`, `push.done`, `push.failed`. The push refuses the base branch, a dirty tree, and a commit that the checks did not pass. `gate.head` is that commit. `gate.tree` is the fingerprint of the content that the checks passed on. The step "Checks before the merge" says when the gate skipped the repeat pass. `commits.done` lists each commit and its short hash. Audit events: `before-commit`, `commit.made`, `commit.failed`, `gate.done`.
 
-## 7. What the board may write
+## 8. What the board may write
 
 ```mermaid
 flowchart LR

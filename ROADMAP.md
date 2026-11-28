@@ -82,7 +82,9 @@ Build:
 - [x] A clean review starts the checks by itself (`atb verify <KEY>`), on the change before the commits. A failure offers "Fix and review again": the next review gets the output.
 - [x] Pre-push gate: `atb gate <KEY>` runs the checks of `repo.checks` in order, merges the base branch and runs them again. No agent runs, and the first failure stops it.
 - [x] Atomic commits: `atb commit-plan <KEY>` has an agent group the change by topic, with titles `type(scope): description (KEY)`. The developer reads the plan. `atb commit <KEY>` makes the commits with the hooks of the repository.
-- [ ] Next for Code review: the push, the draft pull request and its live state.
+- [x] Push: `atb push-plan <KEY>` shows the branch, the commits and a dry run. `atb push <KEY>` pushes exactly that to `HEAD:<branch>`, and refuses the base branch, a dirty tree and a commit that the checks did not pass.
+- [x] Ship stage: the commits, "Prepare the push", the push and the pull request have their own stage and tab after Code review. A record from before the stage moves to Ship by itself.
+- [ ] Next for Ship: the draft pull request and its live state.
 - [ ] "Comment and resume" sends the comment to the agent session.
 - [x] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
 - [x] `atb handback <KEY>` records the result of a chat. The ticket page shows "Changed in chat".
@@ -95,7 +97,7 @@ Build:
 - [ ] Testing tab with evidence for each requirement: test results and screenshots.
 - [ ] Agent review loop with a filter for false findings, and the final gate (type check, lint, tests).
 - [ ] After approval: commit, push, CI and a draft pull request with screenshots.
-- [ ] Code review tab with the review state from GitHub, until the merge.
+- [ ] Ship tab with the review state from GitHub, until the merge.
 
 ## M4: Workflow settings
 

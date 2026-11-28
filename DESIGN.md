@@ -94,7 +94,7 @@ components:
 
 Reference look (v0.0.8): the owner's product "model" view. The ground is near-black. Glass panels have a tint of one accent colour (a 160° gradient from the accent into the ground). Square icon tiles have a radial accent fill and a soft glow. Small orbs glow. Group labels are uppercase with a dot. The stages use a segmented pill control. Text is white at set opacities. The font is the VS Code UI font (a test without Poppins, v0.0.10).
 
-Accent palette: blue `#3A86FE` (Planning), aqua `#64E4ED` (Development), amber `#FFBE0C` (Testing), green `#1EC46E` (Code review), violet `#A78BFA` (the agent asks you something), red `#FA4045` (a problem), neutral `#96969D` (not started). A panel glows strongly only when the ticket waits for the developer.
+Accent palette: blue `#3A86FE` (Planning), aqua `#64E4ED` (Development), amber `#FFBE0C` (Testing), green `#1EC46E` (Code review), rose `#F472B6` (Ship), violet `#A78BFA` (the agent asks you something), red `#FA4045` (a problem), neutral `#96969D` (not started). A panel glows strongly only when the ticket waits for the developer.
 
 An operations tool that sits inside the editor. The developer looks at it many times an hour, acts in one or two keystrokes and goes back to code. Quality bar: Linear for speed, density and keyboard flow. Look: dark glass surfaces on a near-black ground, thin low-contrast borders, and a soft glow only on items that need the developer.
 
@@ -182,7 +182,11 @@ Line 1: dot, key and points (or the step count). Line 2: the full title, which w
 One line: what the agent needs, in the agent's own short words or in fixed text ("Ready to test. 4 of 4 requirements have evidence."). Then the actions. No other agent text shows in the views.
 
 ### Stage tabs
-Planning, Development, Testing, Code review. A finished stage has a check mark. The current stage has the accent underline and opens by default. A stage with no data yet shows a one-line empty state, not a blank tab.
+Planning, Development, Testing, Code review, Ship. A finished stage has a check mark. The current stage has the accent underline and opens by default. A stage with no data yet shows a one-line empty state, not a blank tab.
+
+### Sections
+
+A section with content has a chevron beside its title. The title is a button: it collapses the section to its title, its caption and its count. Buttons in the header stay in view. The choice is saved for each section title. The Claude Code pane has the same toggle, with ▾ and ▸.
 
 ### Buttons
 Primary: accent background. Needs-you action: state-color text and border. Secondary: border only. Every button has a visible focus ring (2px accent, 2px offset).

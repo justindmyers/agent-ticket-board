@@ -1,6 +1,6 @@
 # Agent Ticket Board
 
-Agent Ticket Board shows your Jira sprint as a queue, a ticket page and a board. Each ticket can have an agent session. The agent moves the ticket through four stages: Planning, Development, Testing and Code review. You approve the plan and the tested change. The board runs the repository checks, and you read the commit plan before the board commits.
+Agent Ticket Board shows your Jira sprint as a queue, a ticket page and a board. Each ticket can have an agent session. The agent moves the ticket through five stages: Planning, Development, Testing, Code review and Ship. You approve the plan and the tested change. The board runs the repository checks, and you read the commit plan before the board commits.
 
 The board has these clients:
 
@@ -21,11 +21,12 @@ The board plans, builds, tests and reviews a ticket, makes atomic commits, and r
 
 1. **The parts.** The clients, the shared core library, the board service, the store and the agent sessions.
 2. **How tickets arrive.** The board reads your sprint with `acli`, the pull requests with `gh`, and the local work with git. It shows the cache first and fills in the details one by one.
-3. **The stages and who decides.** Four stages, three of them with an approval from you. You can start a ticket over at any time.
+3. **The stages and who decides.** Five stages. You approve the plan, the tested change and the push. You can start a ticket over at any time.
 4. **One agent run.** A button starts a run. The service queues it, starts a Claude agent with a command allowlist and a cost cap, and writes the result into the ticket record. A guard refuses a push and every write to GitHub or Jira.
 5. **Development and Testing.** The agent builds the plan in a new worktree. Then the board runs the checks of your repository. A failure goes back to the agent. Testing opens the app and a browser for the ticket, and the agent collects evidence for each requirement. Each result says whether real or fake data was used. Each approved write says whether it was made.
-6. **Code review.** Reviewers read the change, and the agent fixes each finding that the code shows. You can choose to fix any finding, also a dropped one, or to dismiss it. The board runs the checks again. An agent plans atomic commits, and you read the plan. The board makes the commits with your git hooks. The last step is the pre-push gate, with the button "Prepare the push". It merges the base branch and checks the result. The checks that passed before the commits do not run again on the same content.
-7. **What the board may write.** Agents edit files in the worktree of their ticket. Only you approve a plan, a code review or a Jira move.
+6. **Code review.** Reviewers read the change, and the agent fixes each finding that the code shows. You can choose to fix any finding, also a dropped one, or to dismiss it. The board runs the checks again. The button "Plan the commits" moves the ticket to Ship.
+7. **Ship.** An agent plans atomic commits, and you read the plan. The board makes the commits with your git hooks. The button "Prepare the push" merges the base branch and checks the result. The checks that passed before the commits do not run again on the same content. "Preview the push" runs `git push --dry-run` and shows the branch, the commits and the command. "Approve the push" makes exactly that push to `HEAD:<branch>`, and only if the branch has not changed since you looked.
+8. **What the board may write.** Agents edit files in the worktree of their ticket. Only you approve a plan, a tested change, a push or a Jira move.
 
 Each ticket has one record, `~/.agent-ticket-board/agents/KEY.json`. The audit log is `tickets/KEY/events.jsonl`. Each agent run has its own folder in `tickets/KEY/runs/`. Run `atb audit KEY` to read the log.
 
