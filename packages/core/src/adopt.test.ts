@@ -43,7 +43,7 @@ describe('adoptOffer', () => {
     });
   });
 
-  it('proposes code review when the branch has an open pull request', () => {
+  it('proposes the Ship stage when the branch has an open pull request', () => {
     agents.PRS['PROJ-12'] = {
       number: 7,
       url: 'https://example.com/7',
@@ -54,7 +54,7 @@ describe('adoptOffer', () => {
       reviews: '',
       comments: 0
     };
-    expect(adopt.adoptOffer('PROJ-12')?.stage).toBe('code-review');
+    expect(adopt.adoptOffer('PROJ-12')?.stage).toBe('ship');
   });
 
   it('offers nothing for a finished ticket, a ticket with an agent record, or no local work', () => {

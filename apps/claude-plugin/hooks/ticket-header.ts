@@ -12,7 +12,7 @@ export function ticketPlace(d: Detail) {
   const f = d.flow;
   const si = f?.closed ? STAGES.length : f ? STAGES.findIndex((s) => s.id === f.stage) : -1;
   const stage = f?.closed ? null : si >= 0 ? STAGES[si] : null;
-  const tab = store.tabs[d.ticket.key] ?? stage?.id ?? (f?.closed ? 'code-review' : 'planning');
+  const tab = store.tabs[d.ticket.key] ?? stage?.id ?? (f?.closed ? 'ship' : 'planning');
   return { si, stage, tab, ti: STAGES.findIndex((s) => s.id === tab) };
 }
 

@@ -50,6 +50,7 @@ import {
   type Ticket,
   loadFlow,
   moveToTesting,
+  pushLinks,
   setFindingDecision
 } from '@agent-ticket-board/core';
 
@@ -396,6 +397,25 @@ async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext)
   }
   if (id === 'startCodeReview') {
     return startRun(key, 'review').catch((e: unknown) => showError(key, e));
+  }
+  if (id.startsWith('openPush:')) {
+    // Only the addresses of this ticket's pushed branch, never an address that the webview sends.
+    const links = pushLinks(f?.push);
+    const [, what, sha] = id.split(':');
+    const url =
+      what === 'branch'
+        ? links?.branch
+        : what === 'pr'
+          ? links?.pullRequest
+          : what === 'commit' && sha
+            ? links?.commit(sha)
+            : null;
+    return url ? open(url) : vscode.window.showInformationMessage(`${key}: nothing to open yet.`);
+  }
+  if (id === 'showPush' || id === 'approvePush') {
+    return startRun(key, id === 'showPush' ? 'push-plan' : 'push').catch((err: unknown) =>
+      showError(key, err)
+    );
   }
   if (id === 'approveTesting') {
     // Through the service: it also closes the ticket's test browser.

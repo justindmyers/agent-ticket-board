@@ -11,7 +11,7 @@ export function runBox(
   ctx: Ctx,
   key: string,
   f: Flow | null,
-  stage: 'planning' | 'development' | 'testing' | 'code-review'
+  stage: 'planning' | 'development' | 'testing' | 'code-review' | 'ship'
 ): RenderElement[] {
   if (!f?.run || f.run.stage !== stage || !runActive(f)) {
     return [];

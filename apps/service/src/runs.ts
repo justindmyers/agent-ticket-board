@@ -267,7 +267,7 @@ export class Runs {
     task: 'gate' | 'verify' | 'commit',
     refuse: (f: Flow | null) => string | null,
     work: (f: Flow, cwd: string, ac: AbortController) => Promise<Flow>,
-    stage: 'development' | 'code-review' = 'code-review'
+    stage: 'development' | 'code-review' | 'ship' = 'code-review'
   ) {
     if (this.active.has(key)) {
       throw new Error(`${key}: a run is active already.`);
@@ -318,6 +318,7 @@ export class Runs {
             key,
             {
               ...STAGE_SPECS['code-review'],
+              stage,
               retry:
                 task === 'gate' ? 'startGate' : task === 'verify' ? 'startVerify' : 'approveCommits'
             },
@@ -473,7 +474,7 @@ export class Runs {
               }
             };
       },
-      build ? 'development' : 'code-review'
+      build ? 'development' : verify ? 'code-review' : 'ship'
     );
   }
 
@@ -525,7 +526,8 @@ export class Runs {
           await this.write(key, cur);
         }
         return commitsDone(cur);
-      }
+      },
+      'ship'
     );
   }
 

@@ -6,6 +6,7 @@ import type { Act } from '../types/ticket';
 import { CodeReviewStage } from './CodeReviewStage';
 import { DevelopmentStage } from './DevelopmentStage';
 import { PlanningStage } from './PlanningStage';
+import { ShipStage } from './ShipStage';
 import { TestingStage } from './TestingStage';
 
 type Props = { id: StageId; d: Detail; act: Act; theme: Theme };
@@ -30,5 +31,8 @@ export function StageBody({ id, d, act, theme }: Props) {
   if (id === 'testing') {
     return <TestingStage f={f} act={act} theme={theme} />;
   }
-  return <CodeReviewStage f={f} act={act} theme={theme} />;
+  if (id === 'code-review') {
+    return <CodeReviewStage f={f} act={act} theme={theme} />;
+  }
+  return <ShipStage f={f} act={act} theme={theme} />;
 }

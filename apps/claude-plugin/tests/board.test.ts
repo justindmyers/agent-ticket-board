@@ -1,5 +1,5 @@
 import type { On } from 'claude-code';
-import { expect, test } from 'claude-code/testing';
+import { expect, test, type Engine } from 'claude-code/testing';
 
 const BOARD = {
   command: 'board',
@@ -702,6 +702,185 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await ui.press({ key: 'audit-bundle' });
     await tick();
     expect(calls).toContainEqual(['audit', 'PROJ-102', '--bundle']);
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`${surface}: the commits and the push are in Ship, the findings are in Code review`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      codeReview: {
+        at: 'n',
+        summary: 'One fixed.',
+        checks: [],
+        findings: [
+          {
+            id: 'F1',
+            reviewer: 'correctness',
+            file: 'a.ts',
+            line: 3,
+            problem: 'The list can be empty.',
+            fix: 'Guard it.',
+            severity: 'blocking',
+            state: 'fixed',
+            note: ''
+          }
+        ]
+      },
+      commits: { plan: [], done: [{ title: 'feat(edges): add a sort (PROJ-1)', sha: 'abc1234' }] },
+      gate: { at: 'n', ok: true, merged: false, steps: [{ name: 'Merge origin/main', ok: true }] }
+    };
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      return printed(
+        a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : { ok: true }
+      );
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect({
+      commit: !!(await ui.find({ type: 'Text', text: /feat\(edges\): add a sort/ })),
+      gate: !!(await ui.find({ type: 'Text', text: /Merge origin\/main/ })),
+      finding: !!(await ui.find({ type: 'Text', text: /The list can be empty\./ }))
+    }).toEqual({ commit: true, gate: true, finding: false });
+    await ui.press({ key: 'tab-code-review' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect({
+      commit: !!(await ui.find({ type: 'Text', text: /feat\(edges\): add a sort/ })),
+      finding: !!(await ui.find({ type: 'Text', text: /The list can be empty\./ }))
+    }).toEqual({ commit: false, finding: true });
+    await ui.unmount();
+  });
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  const pushed = (pushedAt?: string) => {
+    const sha = 'a'.repeat(40);
+    return {
+      sha,
+      flow: {
+        stage: 'ship',
+        push: {
+          branch: 'feature/PROJ-1-edge',
+          head: sha,
+          commits: [{ sha, short: 'aaaaaaa', title: 'feat(edges): add a sort (PROJ-1)' }],
+          command: 'git push origin HEAD:feature/PROJ-1-edge',
+          dryRun: 'To x\n * [new branch]  HEAD -> feature/PROJ-1-edge',
+          url: 'https://github.com/org/repo',
+          at: 'n',
+          ...(pushedAt ? { pushedAt } : {})
+        }
+      }
+    };
+  };
+  const openShip = async ($: Engine, on: On, flow: unknown) => {
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      return printed(
+        a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : { ok: true }
+      );
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    return ui;
+  };
+
+  test(`${surface}: the Push section shows the dry run in rows, and has no links yet`, async ($, on) => {
+    const ui = await openShip($, on, pushed().flow);
+    expect({
+      title: !!(await ui.find({ type: 'Text', text: /Push/ })),
+      branch: !!(await ui.find({ type: 'Text', text: /feature\/PROJ-1-edge/ })),
+      words: !!(await ui.find({
+        type: 'Text',
+        text: /Creates the branch feature\/PROJ-1-edge on origin\./
+      })),
+      command: !!(await ui.find({
+        type: 'Text',
+        text: /git push origin HEAD:feature\/PROJ-1-edge/
+      })),
+      commit: !!(await ui.find({ type: 'Text', text: /feat\(edges\): add a sort/ })),
+      links: !!(await ui.find({
+        type: 'Link',
+        text: /Open the branch|Open a pull request|aaaaaaa/
+      }))
+    }).toEqual({
+      title: true,
+      branch: true,
+      words: true,
+      command: true,
+      commit: true,
+      links: false
+    });
+    await ui.unmount();
+  });
+
+  test(`${surface}: after the push, the branch, the commits and a new pull request are links`, async ($, on) => {
+    const p = pushed('n2');
+    const ui = await openShip($, on, p.flow);
+    const hrefs = (await ui.findAll({ type: 'Link' })).map((l) => String(l.props.href));
+    expect(hrefs).toContain(`https://github.com/org/repo/commit/${p.sha}`);
+    expect(hrefs).toContain('https://github.com/org/repo/tree/feature/PROJ-1-edge');
+    expect(hrefs).toContain('https://github.com/org/repo/pull/new/feature/PROJ-1-edge');
+    await ui.unmount();
+  });
+
+  test(`${surface}: the push is shown first, and approved as a second step`, async ($, on) => {
+    const calls: string[][] = [];
+    const flow = {
+      stage: 'code-review',
+      need: {
+        kind: 'decision',
+        ask: 'Ready to push 2 commits to origin as feature/x.',
+        detail: 'Command: git push origin HEAD:feature/x',
+        actions: [
+          { id: 'approvePush', label: 'Approve the push' },
+          { id: 'showPush', label: 'Refresh the preview' }
+        ]
+      }
+    };
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      return printed(
+        a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : { ok: true }
+      );
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(
+      await ui.find({ type: 'Text', text: /Command: git push origin HEAD:feature\/x/ })
+    ).toBeDefined();
+    await ui.press({ key: 'act-showPush' });
+    await tick();
+    expect(calls).toContainEqual(['push-plan', 'PROJ-102']);
+    expect(calls).not.toContainEqual(['push', 'PROJ-102']);
+    await ui.press({ key: 'act-approvePush' });
+    await tick();
+    expect(calls).toContainEqual(['push', 'PROJ-102']);
     await ui.unmount();
   });
 }

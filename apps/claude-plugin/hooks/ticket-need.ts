@@ -1,5 +1,5 @@
 import type { EngineInterface } from 'claude-code';
-import { agentRun, approveTested, toTesting } from './cli';
+import { agentRun, approveTested, pushStep, toTesting } from './cli';
 import { hex, notBuilt, type Ctx } from './kit';
 import { store } from './store';
 import type { Flow, Row } from './types';
@@ -54,6 +54,8 @@ export function ticketNeed($: EngineInterface, ctx: Ctx, t: Row, need: NonNullab
                 void agentRun($, t.key, 'gate');
               } else if (x.id === 'startCodeReview') {
                 void agentRun($, t.key, 'review');
+              } else if (x.id === 'showPush' || x.id === 'approvePush') {
+                void pushStep($, t.key, x.id === 'showPush' ? 'push-plan' : 'push');
               } else if (x.id === 'approveTesting') {
                 void approveTested($, t.key);
               } else if (x.id === 'toTesting') {

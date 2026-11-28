@@ -1,4 +1,10 @@
-import { mdiClipboardTextOutline, mdiCodeBraces, mdiFlaskOutline, mdiSourcePull } from '@mdi/js';
+import {
+  mdiClipboardTextOutline,
+  mdiCodeBraces,
+  mdiFlaskOutline,
+  mdiRocketLaunchOutline,
+  mdiSourcePull
+} from '@mdi/js';
 import { STAGES as SHARED_STAGES, type Stage } from '@agent-ticket-board/core/look';
 import type { Flow } from '../types/host';
 
@@ -6,7 +12,8 @@ const ICONS: Record<Stage, string> = {
   planning: mdiClipboardTextOutline,
   development: mdiCodeBraces,
   testing: mdiFlaskOutline,
-  'code-review': mdiSourcePull
+  'code-review': mdiSourcePull,
+  ship: mdiRocketLaunchOutline
 };
 
 /** The shared stage list from core, with the icon that the webview draws for each stage. */

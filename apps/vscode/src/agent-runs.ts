@@ -29,6 +29,8 @@ export async function startRun(
     | 'commit-plan'
     | 'commit'
     | 'approve-testing'
+    | 'push-plan'
+    | 'push'
     | 'change' = 'plan',
   body: Record<string, unknown> = {}
 ) {

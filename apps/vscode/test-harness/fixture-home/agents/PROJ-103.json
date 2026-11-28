@@ -1,4 +1,29 @@
 {
-  "stage": "code-review",
-  "branch": "feature/PROJ-103-mobile-nav"
+  "stage": "ship",
+  "branch": "feature/PROJ-103-mobile-nav",
+  "push": {
+    "branch": "feature/PROJ-103-mobile-nav",
+    "head": "bfe23713e5a1c2d3e4f5061728394a5b6c7d8e9f",
+    "commits": [
+      {
+        "sha": "bfe23713e5a1c2d3e4f5061728394a5b6c7d8e9f",
+        "short": "bfe2371",
+        "title": "feat(nav): add the mobile drawer (PROJ-103)"
+      },
+      {
+        "sha": "934aa04135b6c7d8e9f01a2b3c4d5e6f708192a3",
+        "short": "934aa04",
+        "title": "feat(nav): add the drawer toggle hook (PROJ-103)"
+      },
+      {
+        "sha": "ee45a427e0a1b2c3d4e5f60718293a4b5c6d7e8f",
+        "short": "ee45a42",
+        "title": "feat(form): add errorClassName to FormTextInput (PROJ-103)"
+      }
+    ],
+    "command": "git push origin HEAD:feature/PROJ-103-mobile-nav",
+    "dryRun": "To https://github.com/example/app.git\n * [new branch]      HEAD -> feature/PROJ-103-mobile-nav\n",
+    "url": "https://github.com/example/app",
+    "at": "2026-11-27T22:00:00.000Z"
+  }
 }

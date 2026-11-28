@@ -26,6 +26,7 @@ import {
   serviceInfo
 } from '@agent-ticket-board/core';
 import { Processes } from './processes';
+import { doPush, planPush } from './push';
 import { handback, writeHandoff } from './handoff';
 import { Runs } from './runs';
 import { createApi } from './server';
@@ -170,6 +171,17 @@ export async function serve() {
       const f = await approveTesting(key!);
       await runs.closeBrowser(key!);
       await runs.review(key!);
+      return f;
+    },
+    // The push, in two steps: the dry run shows it, the approval makes exactly that push.
+    'POST /tickets/:key/push-plan': async ({ key }) => {
+      const f = await planPush(key!);
+      events.send({ key });
+      return f;
+    },
+    'POST /tickets/:key/push': async ({ key }) => {
+      const f = await doPush(key!);
+      events.send({ key });
       return f;
     },
     'POST /tickets/:key/review': async ({ key }) => runs.review(key!),

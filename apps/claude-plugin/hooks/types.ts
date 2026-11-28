@@ -75,6 +75,16 @@ export type Flow = {
     checks: { name: string; ok: boolean; note?: string }[];
   };
   writeRuns?: { method: string; path: string; made: boolean; result: string }[];
+  push?: {
+    branch: string;
+    head: string;
+    commits: { sha: string; short: string; title: string }[];
+    command: string;
+    dryRun: string;
+    url?: string;
+    at: string;
+    pushedAt?: string;
+  };
   commits?: {
     plan: { title: string; files: string[] }[];
     done: { title: string; sha: string }[];

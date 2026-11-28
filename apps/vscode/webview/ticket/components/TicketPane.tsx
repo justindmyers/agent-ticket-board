@@ -38,7 +38,7 @@ export function TicketPane({ d, tab, setTab, draft, setDraft, onBack, theme }: P
   // A finished ticket (Jira done, or its PR merged) shows every stage as done.
   const si = f?.closed ? STAGES.length : stageIndex(f);
   const stage = f?.closed ? null : si >= 0 ? STAGES[si] : null;
-  const current: StageId = tab ?? stage?.id ?? (f?.closed ? 'code-review' : 'planning');
+  const current: StageId = tab ?? stage?.id ?? (f?.closed ? 'ship' : 'planning');
   const accent: Accent =
     need?.kind === 'problem'
       ? 'red'

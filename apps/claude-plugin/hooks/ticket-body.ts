@@ -4,6 +4,7 @@ import { STAGES } from './look.gen';
 import { stageDevelopment } from './stage-development';
 import { stagePlanning } from './stage-planning';
 import { stageReview } from './stage-review';
+import { stageShip } from './stage-ship';
 import { stageTesting } from './stage-testing';
 import { ticketPlace } from './ticket-header';
 import type { Detail } from './types';
@@ -27,5 +28,8 @@ export function ticketBody($: EngineInterface, ctx: Ctx, d: Detail): RenderEleme
   if (tab === 'testing') {
     return stageTesting($, ctx, f);
   }
-  return stageReview($, ctx, f);
+  if (tab === 'code-review') {
+    return stageReview($, ctx, f);
+  }
+  return stageShip($, ctx, f);
 }

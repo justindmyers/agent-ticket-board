@@ -6,7 +6,7 @@ import { reconcile } from './reconcile';
 import { afterMergeFor } from './after-merge';
 import { audit, recordChanges, type Source } from './audit';
 import { runActive } from './look';
-import { withNextStep } from './next-step';
+import { migrateStage, withNextStep } from './next-step';
 import { answerEarlier, answerQuestion } from './planning';
 import type { Flow, Pr } from './types';
 
@@ -103,6 +103,11 @@ export async function refreshPrs(
 }
 
 export function flowFor(key: string, status = STATUS[key]): Flow | null {
-  const f = reconcile(FLOWS[key] ?? null, status, PRS[key], afterMergeFor(key, PRS[key]));
+  const f = reconcile(
+    FLOWS[key] ? migrateStage(FLOWS[key]!) : null,
+    status,
+    PRS[key],
+    afterMergeFor(key, PRS[key])
+  );
   return f && withNextStep(f);
 }

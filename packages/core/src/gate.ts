@@ -76,7 +76,7 @@ export function applyGate(f: Flow, g: Gate): Flow {
       : {
           kind: 'decision',
           ask: `Every check passes${g.merged ? ' after the merge' : ''}.`,
-          actions: [open]
+          actions: [{ id: 'showPush', label: 'Preview the push' }, open]
         };
   return { ...f, gate: g, need: withFixAction(need, f.codeReview?.findings) };
 }

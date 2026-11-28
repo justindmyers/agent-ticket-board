@@ -23,7 +23,17 @@ export type GateInput = {
 /** The last lines of a command's output: the error is at the end. */
 const tail = (out: string, n = 12) => out.trim().split('\n').slice(-n).join('\n').slice(-1200);
 
+/** The gate, with the commit that it checked: a push is only for that commit. */
 export async function runGate(i: GateInput): Promise<Gate> {
+  const g = await gateSteps(i);
+  if (i.verify) {
+    return g;
+  }
+  const head = await i.exec('git rev-parse HEAD', false);
+  return head.code ? g : { ...g, head: head.out.trim() };
+}
+
+async function gateSteps(i: GateInput): Promise<Gate> {
   const steps: Gate['steps'] = [];
   const git = (cmd: string) => i.exec(`git ${cmd}`, false);
   let tree: string | undefined;

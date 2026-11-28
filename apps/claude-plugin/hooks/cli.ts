@@ -159,6 +159,16 @@ export async function approveTested($: EngineInterface, key: string) {
   watchRun($, key);
 }
 
+/** The push, in two steps: `push-plan` shows it, `push` makes it. Both run in the service. */
+export async function pushStep($: EngineInterface, key: string, verb: 'push-plan' | 'push') {
+  try {
+    await atb($, [verb, key]);
+  } catch (e) {
+    $.ui.toast(`${key}: ${errorText(e)}`);
+  }
+  await reloadTicket($, key);
+}
+
 /** Opens one of the ticket's screenshots in the system viewer. The CLI checks that the evidence lists it. */
 export async function openShot($: EngineInterface, key: string, path: string) {
   try {

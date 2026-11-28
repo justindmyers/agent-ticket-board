@@ -367,7 +367,50 @@ function page(theme, mode) {
   kb.shotSent = await rh.evaluate(() => window.__sent.find((m) => m.type === 'action'));
   await rh.click('[role=option][data-key="PROJ-108"]');
   await rh.waitForTimeout(300);
-  // Code review: each finding with what became of it, and the repository checks.
+  // A finished ticket opens on Ship: the commits, the checks before the push, and the pull request.
+  kb.ship = await rh.evaluate(() => ({
+    tab: document.querySelector('[role=tab][aria-selected=true]')?.textContent.trim(),
+    commitRows: document.querySelectorAll('[aria-label="Commits"] li').length,
+    gateRows: document.querySelectorAll('[aria-label="Checks before a push"] li').length,
+    reviewRows: document.querySelectorAll('[aria-label="Review"] li').length
+  }));
+  kb.pushed = await rh.evaluate(() => {
+    const s = document.querySelector('[aria-label="Push"]');
+    return s
+      ? {
+          text: s.textContent.replace(/\s+/g, ' ').trim().slice(0, 400),
+          rows: s.querySelectorAll('li').length,
+          openButtons: [...s.querySelectorAll('button')].map((b) => b.textContent.trim())
+        }
+      : null;
+  });
+  await rh
+    .locator('[aria-label="Push"]')
+    .screenshot({ path: path.join(OUT, 'ticket-push-pushed.png') });
+  await axe(rh, 'dark/ticket-ship');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-ship.png') });
+  // A push that is only a dry run: no links, because GitHub has nothing to show yet.
+  await rh.click('[role=option][data-key="PROJ-103"]');
+  await rh.waitForTimeout(300);
+  kb.dryRun = await rh.evaluate(() => {
+    const s = document.querySelector('[aria-label="Push"]');
+    return s
+      ? {
+          text: s.textContent.replace(/\s+/g, ' ').trim().slice(0, 400),
+          rows: s.querySelectorAll('li').length,
+          openButtons: [...s.querySelectorAll('button')].map((b) => b.textContent.trim())
+        }
+      : null;
+  });
+  await rh
+    .locator('[aria-label="Push"]')
+    .screenshot({ path: path.join(OUT, 'ticket-push-dryrun.png') });
+  await axe(rh, 'dark/ticket-push-dryrun');
+  await rh.click('[role=option][data-key="PROJ-108"]');
+  await rh.waitForTimeout(300);
+  // Code review: each finding with what became of it. The commits and the push are not here.
+  await rh.getByRole('tab', { name: /Code review/ }).click();
+  await rh.waitForTimeout(200);
   kb.codeReview = await rh.evaluate(() => ({
     rows: document.querySelectorAll('[aria-label="Review"] li').length,
     fixed: document.body.textContent.includes('Fixed'),

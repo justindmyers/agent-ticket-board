@@ -64,6 +64,19 @@ export type Evidence = {
 /** What Testing did with an approved write: made against the backend, or not made, and why. */
 export type WriteRun = { method: string; path: string; made: boolean; result: string };
 
+/** The push of the branch: what the developer saw, and when it ran. */
+export type Push = {
+  branch: string;
+  head: string;
+  commits: { sha: string; short: string; title: string }[];
+  command: string;
+  dryRun: string;
+  /** The web address of the repository on origin, when it is on GitHub. Links need it. */
+  url?: string;
+  at: string;
+  pushedAt?: string;
+};
+
 export type Step = {
   n: number;
   text: string;
@@ -106,6 +119,8 @@ export type Gate = {
   verify?: true;
   /** A fingerprint of the content that the checks passed on. The pre-push gate skips a repeat pass on it. */
   tree?: string;
+  /** The commit that the pre-push gate checked, after its merge. A push needs the same commit. */
+  head?: string;
   steps: { name: string; ok: boolean; note?: string }[];
 };
 
@@ -174,6 +189,8 @@ export type Flow = {
   evidence?: Record<string, Evidence>;
   /** The result of each approved write, from the last test run. */
   writeRuns?: WriteRun[];
+  /** Code review: the push, shown as a dry run first, and then made. */
+  push?: Push;
   /** Code review: what the reviewers found and what the agent fixed. */
   codeReview?: CodeReview;
   /** Code review: the last run of the pre-push checks. */

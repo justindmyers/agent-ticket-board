@@ -878,7 +878,7 @@ describe('Runs.gate', () => {
     const query = vi.fn();
     const { r } = runs(query as unknown as QueryFn);
     const run = await r.gate('PROJ-72');
-    expect(run).toMatchObject({ task: 'gate', stage: 'code-review', state: 'running' });
+    expect(run).toMatchObject({ task: 'gate', stage: 'ship', state: 'running' });
     await vi.waitFor(async () => expect((await loadFlow('PROJ-72'))?.run?.state).toBe('done'), {
       timeout: 5000
     });
@@ -955,7 +955,8 @@ describe('Runs.commitPlan and Runs.commit', () => {
     expect(o.tools).not.toContain('Edit');
     expect(calls[0]!.prompt).toContain('- a.ts');
     const f = await loadFlow('PROJ-80');
-    expect(f?.run).toMatchObject({ task: 'commit-plan', state: 'done', stage: 'code-review' });
+    expect(f?.run).toMatchObject({ task: 'commit-plan', state: 'done', stage: 'ship' });
+    expect(f?.stage).toBe('ship');
     expect(f?.commits?.plan.map((c) => c.title)).toEqual([
       'feat(edges): add a (PROJ-80)',
       'test(edges): cover a (PROJ-80)'

@@ -1,7 +1,7 @@
 // The stage list, the colors and the accent rule that every client shares. This file has no imports,
 // because the Claude Code plugin gets a verbatim copy of it (hooks/look.gen.ts) and cannot import core.
 
-export type Stage = 'planning' | 'development' | 'testing' | 'code-review';
+export type Stage = 'planning' | 'development' | 'testing' | 'code-review' | 'ship';
 
 export type AgentKind = 'problem' | 'decision' | 'running' | 'waiting' | 'finished';
 
@@ -14,6 +14,7 @@ export const PALETTE = {
   amber: { hex: '#FFBE0C', text: '#7d5700' },
   green: { hex: '#1EC46E', text: '#13804a' },
   violet: { hex: '#A78BFA', text: '#6d28d9' },
+  rose: { hex: '#F472B6', text: '#be185d' },
   red: { hex: '#FA4045', text: '#c8262b' },
   neutral: { hex: '#96969D', text: '#55555c' }
 } as const;
@@ -24,7 +25,8 @@ export const STAGES: { id: Stage; label: string; accent: Accent }[] = [
   { id: 'planning', label: 'Planning', accent: 'blue' },
   { id: 'development', label: 'Development', accent: 'aqua' },
   { id: 'testing', label: 'Testing', accent: 'amber' },
-  { id: 'code-review', label: 'Code review', accent: 'green' }
+  { id: 'code-review', label: 'Code review', accent: 'green' },
+  { id: 'ship', label: 'Ship', accent: 'rose' }
 ];
 
 /** The color of a ticket with no agent record: grey not started, blue active, red blocked, green finished. */
@@ -87,7 +89,7 @@ type RunLike = {
 export function runText(run: RunLike): {
   title: string;
   caption: string;
-  accent: 'blue' | 'aqua' | 'amber' | 'green';
+  accent: 'blue' | 'aqua' | 'amber' | 'green' | 'rose';
 } {
   const accent =
     run.stage === 'development'
@@ -96,7 +98,9 @@ export function runText(run: RunLike): {
         ? 'amber'
         : run.stage === 'code-review'
           ? 'green'
-          : 'blue';
+          : run.stage === 'ship'
+            ? 'rose'
+            : 'blue';
   if (run.state === 'queued') {
     return {
       title: 'Queued',
@@ -264,4 +268,40 @@ export function isHeavy(cmd: string) {
   return /(check:types|typecheck|\btsc\b|test:once|\bvitest\b|\bjest\b|\beslint\b|\blint\b|\bbuild\b)/.test(
     cmd.replace(/\bcat\s+\S+/g, '')
   );
+}
+
+/** The part of a push record that the links need. The pane cannot import core, so the type is here. */
+type PushLike = {
+  branch: string;
+  url?: string;
+  pushedAt?: string;
+  commits: { sha: string }[];
+};
+
+/** What the dry run says, in plain words. */
+export function dryRunText(dryRun: string, branch: string): string {
+  if (/\[new branch\]/.test(dryRun)) {
+    return `Creates the branch ${branch} on origin.`;
+  }
+  if (/up-to-date/i.test(dryRun)) {
+    return 'Origin has these commits already.';
+  }
+  if (/\.\.\./.test(dryRun) || /[0-9a-f]{7,}\.\.[0-9a-f]{7,}/.test(dryRun)) {
+    return `Adds the commits to ${branch} on origin.`;
+  }
+  return 'The dry run reports no problem.';
+}
+
+/** The links of a pushed branch. Before the push GitHub has none of it, so there are none. */
+export function pushLinks(p: PushLike | undefined) {
+  if (!p?.url || !p.pushedAt) {
+    return null;
+  }
+  const url = p.url;
+  const branch = p.branch.split('/').map(encodeURIComponent).join('/');
+  return {
+    branch: `${url}/tree/${branch}`,
+    pullRequest: `${url}/pull/new/${branch}`,
+    commit: (sha: string) => (p.commits.some((c) => c.sha === sha) ? `${url}/commit/${sha}` : null)
+  };
 }

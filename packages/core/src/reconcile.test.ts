@@ -47,10 +47,8 @@ describe('reconcile', () => {
   });
 
   it('shows failing checks as a problem and clears it when they pass', () => {
-    expect(reconcile({ stage: 'code-review' }, 'Code Review', pr('Open', 2))!.need?.kind).toBe(
-      'problem'
-    );
-    expect(reconcile({ stage: 'code-review' }, 'Code Review', pr('Open'))!.need).toBeUndefined();
+    expect(reconcile({ stage: 'ship' }, 'Code Review', pr('Open', 2))!.need?.kind).toBe('problem');
+    expect(reconcile({ stage: 'ship' }, 'Code Review', pr('Open'))!.need).toBeUndefined();
   });
 
   it('does not change open work that has no pull request', () => {

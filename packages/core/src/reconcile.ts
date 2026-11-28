@@ -18,7 +18,7 @@ export function reconcile(
     !!status && CONFIG.tracker.finished.some((s) => s.toLowerCase() === status.toLowerCase());
 
   if (finished || merged) {
-    out.stage = 'code-review';
+    out.stage = 'ship';
     out.closed = finished
       ? {
           reason: 'tracker',
@@ -68,7 +68,7 @@ export function reconcile(
     };
     return out;
   }
-  if (f.stage === 'code-review' && pr) {
+  if (f.stage === 'ship' && pr) {
     out.checks = undefined;
     if (pr.failing) {
       out.need = {

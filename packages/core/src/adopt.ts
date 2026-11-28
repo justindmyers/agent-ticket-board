@@ -14,7 +14,7 @@ export function adoptOffer(key: string): AdoptOffer | null {
     return null;
   }
   const pr = PRS[key];
-  const stage: Stage = pr && pr.state === 'Open' ? 'code-review' : 'development';
+  const stage: Stage = pr && pr.state === 'Open' ? 'ship' : 'development';
   const where = w.worktree ? `${localLabel(w)}, on branch ${w.branch}` : localLabel(w);
   return { stage, stageLabel: STAGES.find((s) => s.id === stage)!.label, text: `${where}.` };
 }

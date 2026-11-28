@@ -22,6 +22,7 @@ import type {
   Commits,
   Finding,
   Gate,
+  Push,
   Question,
   WriteRun
 } from '@agent-ticket-board/core/types';
@@ -34,6 +35,7 @@ export type {
   Evidence,
   Finding,
   Gate,
+  Push,
   Question,
   TrackerState,
   WriteRun
@@ -68,7 +70,7 @@ export type Need = {
 export type Write = { method: string; path: string; why: string };
 
 export type Flow = {
-  stage: 'planning' | 'development' | 'testing' | 'code-review';
+  stage: 'planning' | 'development' | 'testing' | 'code-review' | 'ship';
   need?: Need;
   requirements?: {
     id: string;
@@ -92,6 +94,7 @@ export type Flow = {
   codeReview?: CodeReview;
   gate?: Gate;
   writeRuns?: WriteRun[];
+  push?: Push;
   commits?: Commits;
   approved?: string;
   spent?: number;

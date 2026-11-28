@@ -269,13 +269,13 @@ export const STAGE_SPECS: Record<StageId, StageSpec> = {
     })
   },
   'commit-plan': {
-    stage: 'code-review',
+    stage: 'ship',
     task: 'commit-plan',
     model: 'sonnet',
     budgetUsd: 1,
     retry: 'startCommitPlan',
     refuse: canPlanCommits,
-    begin: (f) => withoutNeed(f!),
+    begin: (f) => ({ ...withoutNeed(f!), stage: 'ship' }),
     prompt: (t, f) => commitPrompt(t, f, changedIn(f.worktree!), commandsOf(COMMIT_PLAN_ALLOWED)),
     tools: [...READ_ONLY_TOOLS, 'Bash'],
     allowed: COMMIT_PLAN_ALLOWED,

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   accentOf,
   activityText,
+  dryRunText,
+  pushLinks,
   planStartable,
   runActive,
   runLine,
@@ -40,7 +42,8 @@ describe('the shared look', () => {
       ['planning', 'blue'],
       ['development', 'aqua'],
       ['testing', 'amber'],
-      ['code-review', 'green']
+      ['code-review', 'green'],
+      ['ship', 'rose']
     ]);
     expect(Object.keys(STATE_ACCENT)).toEqual(['todo', 'active', 'blocked', 'done']);
   });
@@ -142,5 +145,52 @@ describe('writesText', () => {
     expect(writesText('planning', 0)).toMatch(/^None/);
     expect(writesText('testing', 1)).toMatch(/refuses every other write/);
     expect(writesText('testing', 0)).toMatch(/^No writes approved/);
+  });
+});
+
+describe('dryRunText', () => {
+  it('says in plain words what the dry run shows', () => {
+    expect(dryRunText('To x.git\n * [new branch]      HEAD -> feature/a', 'feature/a')).toBe(
+      'Creates the branch feature/a on origin.'
+    );
+    expect(dryRunText('To x.git\n   1a2b3c4..5d6e7f8  HEAD -> feature/a', 'feature/a')).toBe(
+      'Adds the commits to feature/a on origin.'
+    );
+    expect(dryRunText('Everything up-to-date', 'feature/a')).toBe(
+      'Origin has these commits already.'
+    );
+    expect(dryRunText('', 'feature/a')).toBe('The dry run reports no problem.');
+  });
+});
+
+describe('pushLinks', () => {
+  const pushed = {
+    branch: 'feature/PROJ-1-edge controls',
+    url: 'https://github.com/org/repo',
+    pushedAt: 'n',
+    commits: [{ sha: 'a'.repeat(40) }]
+  };
+
+  it('has no links before the push: GitHub has nothing to show', () => {
+    expect(pushLinks({ ...pushed, pushedAt: undefined })).toBeNull();
+    expect(pushLinks(undefined)).toBeNull();
+  });
+
+  it('has no links without the address of the repository', () => {
+    expect(pushLinks({ ...pushed, url: undefined })).toBeNull();
+  });
+
+  it('links the branch, a new pull request and each commit that the push holds', () => {
+    const l = pushLinks(pushed)!;
+    expect(l.branch).toBe('https://github.com/org/repo/tree/feature/PROJ-1-edge%20controls');
+    expect(l.pullRequest).toBe(
+      'https://github.com/org/repo/pull/new/feature/PROJ-1-edge%20controls'
+    );
+    expect(l.commit('a'.repeat(40))).toBe(`https://github.com/org/repo/commit/${'a'.repeat(40)}`);
+  });
+
+  it('refuses a commit that is not in the push, so no other address can be opened', () => {
+    expect(pushLinks(pushed)!.commit('b'.repeat(40))).toBeNull();
+    expect(pushLinks(pushed)!.commit('../../evil')).toBeNull();
   });
 });

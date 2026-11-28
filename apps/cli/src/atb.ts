@@ -81,6 +81,8 @@ const USAGE = `usage:
   atb shots <KEY> <NAME> [--focus=<T>]   screenshots of the test browser's page, light and dark, each size;
                                          --focus scrolls a heading text or CSS selector to the top first
   atb open-shot <KEY> <PATH>             open a screenshot from the ticket's evidence
+  atb push-plan <KEY>                    preview the push: the branch, the commits and a dry run
+  atb push <KEY>                         make the push that push-plan showed
   atb approve-testing <KEY>              approve a tested change: the code review starts
   atb review <KEY>                       run the code review again
   atb commit-plan <KEY>                  an agent plans the commits of the change
@@ -229,6 +231,10 @@ async function main() {
     }
     const info = await ensureService(process.argv[1]!);
     return out(await callService(info, `/tickets/${key}/restart`, {}));
+  }
+  if ((cmd === 'push-plan' || cmd === 'push') && key) {
+    const info = await ensureService(process.argv[1]!);
+    return out(await callService(info, `/tickets/${key}/${cmd}`, {}));
   }
   if (cmd === 'approve-testing' && key) {
     const info = await ensureService(process.argv[1]!);
