@@ -355,3 +355,8 @@ export function stepView(s: { name: string; command?: string }): {
   const label = checkLabel(base);
   return label ? { label: label + (m?.[2] ?? ''), command: base } : { label: s.name };
 }
+
+// Work done outside the board, as the pane and the webview draw it.
+/** The mark of a file in a list, as in a diff: M changed, + new, − deleted. */
+export const outsideMark = (kind: 'changed' | 'new' | 'deleted') =>
+  kind === 'new' ? '+' : kind === 'deleted' ? '−' : 'M';

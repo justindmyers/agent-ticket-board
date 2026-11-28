@@ -1,5 +1,6 @@
 import type { EngineInterface, RenderElement } from 'claude-code';
 import { kit, type Ctx } from './kit';
+import { outsideRows } from './outside-rows';
 import { STAGES } from './look.gen';
 import { stageDevelopment } from './stage-development';
 import { stagePlanning } from './stage-planning';
@@ -22,14 +23,15 @@ export function ticketBody($: EngineInterface, ctx: Ctx, d: Detail): RenderEleme
     const before = STAGES[ti - 1]?.label.toLowerCase() ?? '';
     return [dim(later + ' starts after ' + before + '.')];
   }
+  const outside = outsideRows(ctx, d.outside);
   if (tab === 'development') {
-    return stageDevelopment($, ctx, f);
+    return [...outside, ...stageDevelopment($, ctx, f)];
   }
   if (tab === 'testing') {
-    return stageTesting($, ctx, f);
+    return [...outside, ...stageTesting($, ctx, f)];
   }
   if (tab === 'code-review') {
-    return stageReview($, ctx, f);
+    return [...outside, ...stageReview($, ctx, f)];
   }
-  return stageShip($, ctx, f);
+  return [...outside, ...stageShip($, ctx, f)];
 }

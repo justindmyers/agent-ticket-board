@@ -84,6 +84,8 @@ export type Flow = {
     url?: string;
     at: string;
     pushedAt?: string;
+    /** The branch changed after this preview. */
+    stale?: boolean;
   };
   commits?: {
     plan: { title: string; files: string[] }[];
@@ -137,6 +139,11 @@ export type Detail = {
   flow: Flow | null;
   tracker?: { state: TrackerState; label: string; notice: string | null };
   adopt?: { stage: string; stageLabel: string; text: string } | null;
+  /** Files and commits that came from outside the board. Null or empty when there are none. */
+  outside?: {
+    files: { path: string; kind: 'changed' | 'new' | 'deleted' }[];
+    commits: { sha: string; short: string; title: string }[];
+  } | null;
   comments: { id: string; text: string; ran?: boolean }[];
   sections: { title: string | null; kind: string; md: string }[] | null;
   jira?: Jira;

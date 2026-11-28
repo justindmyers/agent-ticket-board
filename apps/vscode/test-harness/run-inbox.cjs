@@ -98,6 +98,26 @@ function page(theme, mode) {
               text: 'Worktree proj-107-example, 6 changed files, on branch feat/PROJ-107-example.'
             }
           : d.adopt,
+      // Work done outside the board, on one ticket.
+      outside:
+        k === 'PROJ-108'
+          ? {
+              files: [
+                { path: 'apps/web/src/Edges/EdgesList.tsx', kind: 'changed' },
+                { path: 'apps/web/src/Edges/EdgeDetails.tsx', kind: 'changed' },
+                { path: 'apps/web/src/Edges/EdgeSort.tsx', kind: 'new' },
+                { path: 'apps/web/src/Edges/components/EdgeCard.tsx', kind: 'changed' },
+                { path: 'apps/web/src/Edges/utils/old-helper.ts', kind: 'deleted' }
+              ],
+              commits: [
+                {
+                  sha: 'c0ffee1234567890c0ffee1234567890c0ffee12',
+                  short: 'c0ffee123',
+                  title: 'fix(edges): keep the sort when the list reloads (PROJ-108)'
+                }
+              ]
+            }
+          : null,
       comments: d.comments,
       jira: d.jira
     };
@@ -422,6 +442,14 @@ function page(theme, mode) {
     expanded: await toggle.getAttribute('aria-expanded'),
     rows: await rh.locator(`${gate} li`).count()
   };
+  const out = '[aria-label="Changes outside the board"]';
+  kb.outside = {
+    shown: await rh.locator(out).count(),
+    rows: await rh.locator(`${out} li`).count(),
+    aside: (await rh.locator(out).textContent()).includes('5 files changed and 1 commit'),
+    lines: await rh.locator(`${out} li`).allTextContents(),
+    height: Math.round((await rh.locator(`${out} ul`).boundingBox()).height)
+  };
   await axe(rh, 'dark/ticket-ship');
   await rh.screenshot({ path: path.join(OUT, 'ticket-ship.png') });
   // A push that is only a dry run: no links, because GitHub has nothing to show yet.
@@ -440,6 +468,41 @@ function page(theme, mode) {
   await rh
     .locator('[aria-label="Push"]')
     .screenshot({ path: path.join(OUT, 'ticket-push-dryrun.png') });
+  // The same preview after the branch moved: out of date, and a banner with the live count.
+  await rh.evaluate(async () => {
+    const d = await window.__detail('PROJ-103');
+    d.flow = {
+      ...d.flow,
+      push: { ...d.flow.push, stale: true },
+      need: {
+        kind: 'decision',
+        ask: 'The branch changed after the preview: it has 5 commits beyond origin/main now, and the preview showed 3.',
+        detail:
+          '2 commits were made outside the board. Prepare the push again so the checks cover the branch as it is now.',
+        actions: [
+          { id: 'startGate', label: 'Prepare the push again' },
+          { id: 'openWorktree', label: 'Open worktree' }
+        ]
+      }
+    };
+    window.postMessage(d, '*');
+  });
+  await rh.waitForTimeout(300);
+  kb.stalePush = await rh.evaluate(() => {
+    const s = document.querySelector('[aria-label="Push"]');
+    const buttons = [...document.querySelectorAll('button')].map((b) => b.textContent.trim());
+    return {
+      pill: s ? /Out of date/.test(s.textContent) : null,
+      caption: s ? /changed after this preview/.test(s.textContent) : null,
+      banner: /it has 5 commits beyond origin\/main now, and the preview showed 3/.test(
+        document.body.textContent
+      ),
+      approve: buttons.some((t) => /Approve the push/.test(t)),
+      prepare: buttons.some((t) => /Prepare the push again/.test(t))
+    };
+  });
+  await axe(rh, 'dark/ticket-push-stale');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-push-stale.png') });
   await axe(rh, 'dark/ticket-push-dryrun');
   await rh.click('[role=option][data-key="PROJ-108"]');
   await rh.waitForTimeout(300);

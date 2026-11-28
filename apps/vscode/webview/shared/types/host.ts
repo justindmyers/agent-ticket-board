@@ -139,6 +139,11 @@ export type Detail = {
   flow: Flow | null;
   tracker?: { state: TrackerState; label: string; notice: string | null };
   adopt?: { stage: Flow['stage']; stageLabel: string; text: string } | null;
+  /** Files and commits that came from outside the board. Null or empty when there are none. */
+  outside?: {
+    files: { path: string; kind: 'changed' | 'new' | 'deleted' }[];
+    commits: { sha: string; short: string; title: string }[];
+  } | null;
   comments: { id: string; text: string; at: string; ran?: boolean }[];
   jira?: JiraInfo;
   fresh: boolean;

@@ -37,19 +37,21 @@ export function PushSection({ push, act, theme }: Props) {
       caption={
         pushed
           ? 'The branch is on origin.'
-          : 'This is a dry run. Nothing is pushed until you approve.'
+          : push.stale
+            ? 'The branch changed after this preview. Prepare the push again to see it as it is now.'
+            : 'This is a dry run. Nothing is pushed until you approve.'
       }
       aside={
         <span className="flex items-center gap-2">
           {links && (
             <OpenLinkButton label="Open a pull request" onPress={() => act('openPush:pr')} />
           )}
-          <Pill accent={pushed ? 'green' : 'rose'} theme={theme}>
-            {pushed ? 'Pushed' : 'Dry run'}
+          <Pill accent={pushed ? 'green' : push.stale ? 'amber' : 'rose'} theme={theme}>
+            {pushed ? 'Pushed' : push.stale ? 'Out of date' : 'Dry run'}
           </Pill>
         </span>
       }
-      accent={pushed ? 'green' : 'rose'}
+      accent={pushed ? 'green' : push.stale ? 'amber' : 'rose'}
       theme={theme}
     >
       <div className="grid grid-cols-1 gap-2 pt-1">

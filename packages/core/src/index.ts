@@ -33,7 +33,7 @@ export * from './diff-scope';
 export * from './findings';
 export * from './gate';
 export * from './push';
-export { checkLabel, dryRunText, pushLinks, stepView } from './look';
+export { checkLabel, dryRunText, outsideMark, pushLinks, stepView } from './look';
 export * from './restart';
 export * from './review';
 export * from './testing';
@@ -53,3 +53,15 @@ export * from './memory';
 export * from './writes';
 export * from './heavy-lock';
 export * from './handoff';
+export {
+  findOutside,
+  hasOutside,
+  outsideCommits,
+  changesCode,
+  outsideFiles,
+  snapshotWorktree,
+  withOutside,
+  type OutsideCommit,
+  type OutsideFile,
+  type OutsideWork
+} from './outside';

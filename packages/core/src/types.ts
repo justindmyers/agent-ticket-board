@@ -65,6 +65,9 @@ export type Evidence = {
 export type WriteRun = { method: string; path: string; made: boolean; result: string };
 
 /** The push of the branch: what the developer saw, and when it ran. */
+/** What the worktree looked like when the board last looked: the commit, and a hash for each changed file. */
+export type Seen = { head: string; files: Record<string, string> };
+
 export type Push = {
   branch: string;
   head: string;
@@ -75,6 +78,8 @@ export type Push = {
   url?: string;
   at: string;
   pushedAt?: string;
+  /** Set on the copy that is shown, never saved: the branch changed after this preview. */
+  stale?: boolean;
 };
 
 export type Step = {
@@ -206,6 +211,8 @@ export type Flow = {
   app?: string;
   pr?: Pr;
   branch?: string;
+  /** The worktree as the last board run left it. What differs from it came from outside the board. */
+  seen?: Seen;
   worktree?: string;
   adopted?: string;
   /** The last hand-back from a Claude Code chat: what changed there. */

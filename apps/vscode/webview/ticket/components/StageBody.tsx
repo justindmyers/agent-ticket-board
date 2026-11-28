@@ -5,6 +5,7 @@ import { stageIndex, STAGES } from '../../shared/utils/stages';
 import type { Act } from '../types/ticket';
 import { CodeReviewStage } from './CodeReviewStage';
 import { DevelopmentStage } from './DevelopmentStage';
+import { OutsideSection } from './OutsideSection';
 import { PlanningStage } from './PlanningStage';
 import { ShipStage } from './ShipStage';
 import { TestingStage } from './TestingStage';
@@ -25,14 +26,21 @@ export function StageBody({ id, d, act, theme }: Props) {
       </p>
     );
   }
-  if (id === 'development') {
-    return <DevelopmentStage f={f} act={act} theme={theme} />;
-  }
-  if (id === 'testing') {
-    return <TestingStage f={f} act={act} theme={theme} />;
-  }
-  if (id === 'code-review') {
-    return <CodeReviewStage f={f} act={act} theme={theme} />;
-  }
-  return <ShipStage f={f} act={act} theme={theme} />;
+  const outside = d.outside ? <OutsideSection outside={d.outside} theme={theme} /> : null;
+  const stage =
+    id === 'development' ? (
+      <DevelopmentStage f={f} act={act} theme={theme} />
+    ) : id === 'testing' ? (
+      <TestingStage f={f} act={act} theme={theme} />
+    ) : id === 'code-review' ? (
+      <CodeReviewStage f={f} act={act} theme={theme} />
+    ) : (
+      <ShipStage f={f} act={act} theme={theme} />
+    );
+  return (
+    <>
+      {outside}
+      {stage}
+    </>
+  );
 }

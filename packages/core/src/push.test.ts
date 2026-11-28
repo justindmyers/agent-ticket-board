@@ -68,8 +68,8 @@ describe('approvalProblem', () => {
   it('needs the preview, the same branch and the same commit, and one push only', () => {
     expect(approvalProblem(f(), 'b', 'h')).toMatch(/Preview the push first/);
     expect(approvalProblem(f({}), 'b', 'h')).toBeNull();
-    expect(approvalProblem(f({}), 'other', 'h')).toMatch(/Refresh the preview/);
-    expect(approvalProblem(f({}), 'b', 'h2')).toMatch(/Refresh the preview/);
+    expect(approvalProblem(f({}), 'other', 'h')).toMatch(/Show the push again/);
+    expect(approvalProblem(f({}), 'b', 'h2')).toMatch(/Show the push again/);
     expect(approvalProblem(f({ pushedAt: 'n' }), 'b', 'h')).toMatch(/pushed already/);
   });
 });

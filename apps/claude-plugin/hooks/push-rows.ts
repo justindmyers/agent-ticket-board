@@ -25,11 +25,18 @@ export function pushRows(ctx: Ctx, f: Flow): RenderElement[] {
       ]
     });
   return [
-    sectionTitle('push', 'Push', hex(pushed ? 'green' : 'rose'), pushed ? 'Pushed' : 'Dry run'),
+    sectionTitle(
+      'push',
+      'Push',
+      hex(pushed ? 'green' : p.stale ? 'amber' : 'rose'),
+      pushed ? 'Pushed' : p.stale ? 'Out of date' : 'Dry run'
+    ),
     dim(
       pushed
         ? 'The branch is on origin.'
-        : 'This is a dry run. Nothing is pushed until you approve.'
+        : p.stale
+          ? 'The branch changed after this preview. Prepare the push again to see it as it is now.'
+          : 'This is a dry run. Nothing is pushed until you approve.'
     ),
     fact('Branch', p.branch),
     ...(pushed ? [] : [fact('Dry run', dryRunText(p.dryRun, p.branch))]),

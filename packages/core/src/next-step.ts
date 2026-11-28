@@ -99,7 +99,7 @@ export function migrateStage(input: Flow): Flow {
     f = { ...f, need: { ...f.need, detail: DRY_RUN_NOTE } };
   }
   // The preview button changed its words. A saved next step keeps the old ones, so it is renamed here.
-  const word = f.push ? 'Refresh the preview' : 'Preview the push';
+  const word = f.push ? 'Show the push again' : 'Preview the push';
   if (f.need?.actions.some((a) => a.id === 'showPush' && a.label !== word)) {
     f = {
       ...f,

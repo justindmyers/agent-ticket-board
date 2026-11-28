@@ -27,6 +27,7 @@ import {
   shellQuote,
   audit,
   branchName,
+  changesCode,
   CONFIG,
   ensureWorktree,
   errorData,
@@ -36,6 +37,7 @@ import {
   pruneRuns,
   RunLog,
   saveFlow,
+  snapshotWorktree,
   withNextStep,
   withoutNeed,
   type AgentRun,
@@ -329,6 +331,8 @@ export class Runs {
         }
       } finally {
         this.active.delete(key);
+        // The merge and the commits of the board's own jobs are its work, not outside work.
+        await this.markSeen(key);
       }
     })();
     return FLOWS[key]!.run!;
@@ -629,6 +633,10 @@ export class Runs {
         model: spec.model
       }
     });
+    // A run that only reads saw the code as it is now. Edits after this are not in its result.
+    if (!changesCode(spec)) {
+      await this.markSeen(key);
+    }
     this.queue
       .add(() => this.execute(key, spec, ac), { signal: ac.signal })
       .catch(() => undefined)
@@ -636,6 +644,10 @@ export class Runs {
         this.active.delete(key);
         this.logs.delete(key);
         void pruneRuns(key);
+        // A run that wrote code leaves it as its own work. Only edits after this are from outside.
+        if (changesCode(spec)) {
+          void this.markSeen(key);
+        }
         // A clean review leads to the checks: the board runs them, not the agent. A failure goes
         // back to the agent with the output.
         const f = FLOWS[key];
@@ -1097,6 +1109,21 @@ export class Runs {
     const f = FLOWS[key];
     if (f?.run) {
       await this.write(key, { ...f, run: { ...f.run, ...patch } });
+    }
+  }
+
+  /** Records the worktree as it is now. What differs from it later came from outside the board. */
+  private async markSeen(key: string) {
+    const f = FLOWS[key];
+    const dir = f && (await worktreeOf(f));
+    if (!f || !dir) {
+      return;
+    }
+    try {
+      const seen = await snapshotWorktree(dir);
+      await this.write(key, { ...FLOWS[key]!, seen });
+    } catch {
+      // Without a snapshot the worktree is read as unseen: more is shown, never less.
     }
   }
 

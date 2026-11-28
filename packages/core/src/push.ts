@@ -75,7 +75,7 @@ export function planPushFlow(f: Flow, p: PushPlan, at: string): Flow {
       detail: DRY_RUN_NOTE,
       actions: [
         { id: 'approvePush', label: 'Approve the push' },
-        { id: 'showPush', label: 'Refresh the preview' },
+        { id: 'showPush', label: 'Show the push again' },
         { id: 'openWorktree', label: 'Open worktree' }
       ]
     }
@@ -91,7 +91,7 @@ export function approvalProblem(f: Flow, branch: string | null, head: string): s
     return `${f.push.branch} was pushed already.`;
   }
   if (f.push.branch !== branch || f.push.head !== head) {
-    return 'The branch changed after you looked at the push. Refresh the preview.';
+    return 'The branch changed after you looked at the push. Show the push again.';
   }
   return null;
 }

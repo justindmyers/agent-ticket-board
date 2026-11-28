@@ -783,11 +783,15 @@ for (const surface of ['desktop', 'terminal'] as const) {
       }
     };
   };
-  const openShip = async ($: Engine, on: On, flow: unknown) => {
+  const openShip = async ($: Engine, on: On, flow: unknown, extra: object = {}) => {
     on('process.run', ($, e) => {
       const a = e.argv.slice(2);
       return printed(
-        a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : { ok: true }
+        a[0] === 'sprint'
+          ? SPRINT
+          : a[0] === 'ticket'
+            ? { ...TICKET, flow, ...extra }
+            : { ok: true }
       );
     });
     on('session.surfaces', () => ({ value: [surface] }));
@@ -801,6 +805,88 @@ for (const surface of ['desktop', 'terminal'] as const) {
     ui = await $.ui.mount({ ...PANE, surface });
     return ui;
   };
+
+  test(`${surface}: changes made outside the board are shown, and only when there are some`, async ($, on) => {
+    const flow = { stage: 'development', worktree: '/tmp/wt' };
+    const outside = {
+      files: [
+        { path: 'apps/nq/src/Edges.tsx', kind: 'changed' },
+        { path: 'apps/nq/src/New.tsx', kind: 'new' },
+        { path: 'apps/nq/src/parts/Old.tsx', kind: 'deleted' }
+      ],
+      commits: [{ sha: 'f'.repeat(40), short: 'fffffffff', title: 'fix(edges): by hand (PROJ-1)' }]
+    };
+    const seen = async (ui: Awaited<ReturnType<typeof openShip>>) => ({
+      title: !!(await ui.find({ key: 'toggle-outside' })),
+      aside: !!(await ui.find({ type: 'Text', text: /3 files changed and 1 commit/ })),
+      changed: !!(await ui.find({ type: 'Text', text: /^M apps\/nq\/src\/Edges\.tsx/ })),
+      added: !!(await ui.find({ type: 'Text', text: /^\+ apps\/nq\/src\/New\.tsx/ })),
+      deleted: !!(await ui.find({ type: 'Text', text: /^− apps\/nq\/src\/parts\/Old\.tsx/ })),
+      commit: !!(await ui.find({ type: 'Text', text: /^◆ fix\(edges\): by hand.*fffffffff/ }))
+    });
+    const ui = await openShip($, on, flow, { outside });
+    expect(await seen(ui)).toEqual({
+      title: true,
+      aside: true,
+      changed: true,
+      added: true,
+      deleted: true,
+      commit: true
+    });
+    await ui.unmount();
+  });
+
+  test(`${surface}: with nothing outside the board there is no section for it`, async ($, on) => {
+    const flow = { stage: 'development', worktree: '/tmp/wt' };
+    const ui = await openShip($, on, flow, { outside: { files: [], commits: [] } });
+    expect(await ui.find({ key: 'toggle-outside' })).toBeUndefined();
+    await ui.unmount();
+  });
+
+  test(`${surface}: a push preview that the branch has left says so, and has no approval`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      push: {
+        branch: 'feature/PROJ-1-x',
+        head: 'h3',
+        commits: [{ sha: 'a'.repeat(40), short: 'aaaaaaaaa', title: 'feat(x): one (PROJ-1)' }],
+        command: 'git push origin HEAD:feature/PROJ-1-x',
+        dryRun: 'To origin\n * [new branch] HEAD -> feature/PROJ-1-x',
+        at: 'n',
+        stale: true
+      },
+      need: {
+        kind: 'decision',
+        ask: 'The branch changed after the preview: it has 3 commits beyond origin/main now, and the preview showed 1.',
+        detail:
+          '2 commits were made outside the board. Prepare the push again so the checks cover the branch as it is now.',
+        actions: [
+          { id: 'startGate', label: 'Prepare the push again' },
+          { id: 'openWorktree', label: 'Open worktree' }
+        ]
+      }
+    };
+    const ui = await openShip($, on, flow);
+    expect({
+      pill: !!(await ui.find({ key: 'toggle-push', text: /Push/ })),
+      aside: !!(await ui.find({ type: 'Text', text: /Out of date/ })),
+      caption: !!(await ui.find({ type: 'Text', text: /changed after this preview/ })),
+      banner: !!(await ui.find({
+        type: 'Text',
+        text: /it has 3 commits beyond origin\/main now, and the preview showed 1/
+      })),
+      prepare: !!(await ui.find({ type: 'Button', text: /Prepare the push again/ })),
+      approve: !!(await ui.find({ type: 'Button', text: /Approve the push/ }))
+    }).toEqual({
+      pill: true,
+      aside: true,
+      caption: true,
+      banner: true,
+      prepare: true,
+      approve: false
+    });
+    await ui.unmount();
+  });
 
   test(`${surface}: a section collapses to its title and expands again`, async ($, on) => {
     const flow = {
@@ -917,7 +1003,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
         detail: 'Command: git push origin HEAD:feature/x',
         actions: [
           { id: 'approvePush', label: 'Approve the push' },
-          { id: 'showPush', label: 'Refresh the preview' }
+          { id: 'showPush', label: 'Show the push again' }
         ]
       }
     };

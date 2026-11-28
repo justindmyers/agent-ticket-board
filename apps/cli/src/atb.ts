@@ -41,6 +41,8 @@ import {
   LOCAL,
   refreshLocalWork,
   adoptOffer,
+  findOutside,
+  withOutside,
   adoptWork,
   ignoreWork,
   isStage,
@@ -122,14 +124,16 @@ async function ticket(key: string) {
   if (!flags.has('--cached')) {
     await refreshPrs(findPr, [key]);
   }
+  const outside = await findOutside(flowFor(key));
   const sections = t.description ? mdSections(t.description) : t.description === null ? [] : null;
   return {
     ticket: t,
     group: groupOf(t, agentFor(key)),
     agent: agentFor(key),
-    flow: flowFor(key),
+    flow: withOutside(flowFor(key), outside),
     tracker: trackerInfo(t.status, LOCAL[key]),
     adopt: adoptOffer(key),
+    outside,
     comments: await listComments(key),
     jira: await jiraPanel(key, PRS[key]),
     sections,

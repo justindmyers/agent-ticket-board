@@ -16,6 +16,7 @@ vi.hoisted(() => {
 import {
   approveTesting,
   CONFIG,
+  findOutside,
   FLOWS,
   listComments,
   loadFlow,
@@ -1118,6 +1119,42 @@ describe('Runs.verify', () => {
     expect(f?.gate).toMatchObject({ ok: true, verify: true, merged: false });
     expect(f?.gate?.steps.map((s) => s.name)).toEqual(['echo {changed} > seen.txt']);
     expect(f?.need?.actions[0]?.id).toBe('startCommitPlan');
+    CONFIG.repo.checks = [];
+  });
+
+  it('records the worktree when the job ends, so only later edits are from outside the board', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'atb-seen-'));
+    git(root, 'init', '--bare', '-b', 'main', 'origin.git');
+    git(root, 'clone', join(root, 'origin.git'), 'wt');
+    const wt = join(root, 'wt');
+    writeFileSync(join(wt, 'a.txt'), 'a\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    git(wt, 'push', 'origin', 'HEAD:main');
+    git(wt, 'fetch', 'origin');
+    writeFileSync(join(wt, 'a.txt'), 'changed by the agent\n');
+    writeFileSync(join(wt, 'new.ts'), 'new by the agent\n');
+    CONFIG.repo.checks = ['true'];
+    await saveFlow('PROJ-96', {
+      stage: 'code-review',
+      worktree: wt,
+      codeReview: { at: 'now', summary: 'Done.', findings: [], checks: [] }
+    });
+    expect((await findOutside(await loadFlow('PROJ-96')))?.files).toHaveLength(2);
+    const { r } = runs(fakeQuery([]).query);
+    await r.verify('PROJ-96');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-96'))?.seen).toBeDefined(), {
+      timeout: 8000
+    });
+    expect(Object.keys((await loadFlow('PROJ-96'))!.seen!.files).sort()).toEqual([
+      'a.txt',
+      'new.ts'
+    ]);
+    expect((await findOutside(await loadFlow('PROJ-96')))?.files).toEqual([]);
+    writeFileSync(join(wt, 'new.ts'), 'edited by hand\n');
+    expect((await findOutside(await loadFlow('PROJ-96')))?.files).toEqual([
+      { path: 'new.ts', kind: 'new' }
+    ]);
     CONFIG.repo.checks = [];
   });
 });

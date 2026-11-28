@@ -43,6 +43,8 @@ import {
   localView,
   refreshLocalWork,
   adoptOffer,
+  findOutside,
+  withOutside,
   adoptWork,
   ignoreWork,
   type Stage,
@@ -249,17 +251,21 @@ async function sendTicket(key: string, cachedOnly = false) {
     return;
   }
   const w = inbox.webview;
-  const msg = async (t: Ticket, fresh: boolean) =>
-    w.postMessage({
+  const msg = async (t: Ticket, fresh: boolean) => {
+    const flow = flowFor(key, t.status);
+    const outside = await findOutside(flow);
+    return w.postMessage({
       type: 'ticket',
       fresh,
       ticket: t,
-      flow: flowFor(key, t.status),
+      flow: withOutside(flow, outside),
       tracker: trackerInfo(t.status, LOCAL[key]),
       adopt: adoptOffer(key),
+      outside,
       comments: await listComments(key),
       jira: await jiraPanel(key, PRS[key])
     });
+  };
   if (!cache) {
     const c = await readCache();
     if (c.tickets.length) {

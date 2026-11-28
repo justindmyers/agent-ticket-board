@@ -69,7 +69,7 @@ describe('migrateStage', () => {
         need: need('Show the push again')
       })
     );
-    expect(again.need?.actions[0]?.label).toBe('Refresh the preview');
+    expect(again.need?.actions[0]?.label).toBe('Show the push again');
   });
 
   it('reads a preview whose commits were saved as one string each', () => {
