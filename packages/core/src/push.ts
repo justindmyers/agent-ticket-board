@@ -75,7 +75,6 @@ export function planPushFlow(f: Flow, p: PushPlan, at: string): Flow {
       detail: DRY_RUN_NOTE,
       actions: [
         { id: 'approvePush', label: 'Approve the push' },
-        { id: 'showPush', label: 'Show the push again' },
         { id: 'openWorktree', label: 'Open worktree' }
       ]
     }
@@ -91,7 +90,7 @@ export function approvalProblem(f: Flow, branch: string | null, head: string): s
     return `${f.push.branch} was pushed already.`;
   }
   if (f.push.branch !== branch || f.push.head !== head) {
-    return 'The branch changed after you looked at the push. Show the push again.';
+    return 'The branch changed after you looked at the push. Update the push preview.';
   }
   return null;
 }
@@ -106,8 +105,11 @@ export function pushedFlow(f: Flow, at: string): Flow {
       kind: 'decision',
       ask: `Pushed ${p.branch} to origin (${p.head.slice(0, 7)}).`,
       detail:
-        'The board does not make the draft pull request yet. Open the branch on GitHub to make it.',
-      actions: [{ id: 'openWorktree', label: 'Open worktree' }]
+        'Show the pull request to see its title, body and screenshots before the draft is made.',
+      actions: [
+        { id: 'showPr', label: 'Show the pull request' },
+        { id: 'openWorktree', label: 'Open worktree' }
+      ]
     }
   };
 }

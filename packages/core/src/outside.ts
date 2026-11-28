@@ -197,12 +197,28 @@ export function withOutside(f: Flow | null, o: OutsideWork | null): Flow | null 
 
   const shown = f.push;
   const checked = f.gate?.ok && !f.gate.verify ? f.gate.head : undefined;
-  const reference = shown?.head ?? checked;
-  if (!reference) {
+  if (!shown && !checked) {
     return f;
   }
   const dirty = files ? `${count(files, 'file is', 'files are')} changed and not committed.` : '';
-  if (reference !== o.head) {
+  const previewOld = !!shown && shown.head !== o.head;
+  // The checks passed on the branch as it is now, and only the preview is old. The checks are done:
+  // the next step is to show the push again, not to run the checks again.
+  if (previewOld && checked === o.head) {
+    return {
+      ...f,
+      push: { ...shown, stale: true },
+      need: {
+        kind: 'decision',
+        ask: `The checks passed on the branch as it is now, but the preview is old: it showed ${count(shown.commits.length, 'commit', 'commits')}, and the branch has ${o.ahead} beyond origin/${base}.`,
+        detail: [dirty, 'Update the push preview to see the commits that the push sends.']
+          .filter(Boolean)
+          .join(' '),
+        actions: [{ id: 'showPush', label: 'Update the push preview' }, open]
+      }
+    };
+  }
+  if (previewOld || (!shown && checked !== o.head)) {
     const made = o.commits.length;
     return {
       ...f,

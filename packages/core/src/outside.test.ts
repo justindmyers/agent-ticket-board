@@ -290,6 +290,18 @@ describe('withOutside', () => {
       '1 commit was made outside the board. 1 file is changed and not committed. Prepare the push again so the checks cover the branch as it is now.'
     );
   });
+  it('says only the preview is old when the checks passed on the branch as it is now', () => {
+    const f = previewed();
+    const out = withOutside(
+      { ...f, gate: gate('h5') },
+      now({ head: 'h5', ahead: 5, commits: [commit(4), commit(5)] })
+    )!;
+    expect(out.need?.ask).toBe(
+      'The checks passed on the branch as it is now, but the preview is old: it showed 3 commits, and the branch has 5 beyond origin/main.'
+    );
+    expect(out.need?.actions.map((a) => a.id)).toEqual(['showPush', 'openWorktree']);
+    expect(out.push?.stale).toBe(true);
+  });
   it('handles a passed gate with no preview yet', () => {
     const f: Flow = {
       stage: 'ship',
