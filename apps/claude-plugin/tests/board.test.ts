@@ -232,7 +232,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await ui.find({ type: 'Text', text: /Agent needs you/ })).toBeDefined();
     expect({
       approve: !!(await ui.find({ key: 'act-approveTesting' })),
-      evidence: !!(await ui.find({ type: 'Text', text: /Evidence/ })),
+      evidence: !!(await ui.find({ type: 'Button', text: /Evidence/ })),
       seen: !!(await ui.find({ type: 'Text', text: /The map is back at the zoom it had\./ })),
       shot: !!(await ui.find({ key: 'shot-R1-0-0' })),
       spent: !!(await ui.find({ type: 'Text', text: /\$6\.67 so far/ }))
@@ -250,7 +250,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await ui.press({ key: 'tab-planning' });
     await ui.unmount();
     ui = await $.ui.mount({ ...PANE, surface });
-    expect(await ui.find({ type: 'Text', text: /Claude's take/ })).toBeDefined();
+    expect(await ui.find({ type: 'Button', text: /Claude's take/ })).toBeDefined();
     await ui.input({ key: 'comment', text: 'Forward is wrong on Safari', kind: 'change' });
     await ui.press({ key: 'comment-run' });
     expect(calls.find((c) => c[0] === 'change')).toEqual([
@@ -802,6 +802,45 @@ for (const surface of ['desktop', 'terminal'] as const) {
     return ui;
   };
 
+  test(`${surface}: a section collapses to its title and expands again`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      commits: {
+        plan: [],
+        done: [{ title: 'feat(edges): add a sort (PROJ-1)', sha: 'abc1234' }]
+      },
+      gate: {
+        at: 'n',
+        ok: true,
+        merged: false,
+        steps: [{ name: 'Merge origin/main', command: 'git merge --no-edit origin/main', ok: true }]
+      }
+    };
+    const shown = async (ui: Awaited<ReturnType<typeof openShip>>) => ({
+      commit: !!(await ui.find({ type: 'Text', text: /feat\(edges\): add a sort/ })),
+      commitsTitle: !!(await ui.find({ type: 'Button', text: /Commits/ })),
+      gate: !!(await ui.find({ type: 'Text', text: /Merge origin\/main/ }))
+    });
+    let ui = await openShip($, on, flow);
+    expect(await shown(ui)).toEqual({ commit: true, commitsTitle: true, gate: true });
+    expect((await ui.find({ key: 'toggle-commits' }))?.text).toMatch(/^▾ Commits/);
+
+    await ui.press({ key: 'toggle-commits' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    // The commits are hidden, and only they: the title stays, and the next section is untouched.
+    expect(await shown(ui)).toEqual({ commit: false, commitsTitle: true, gate: true });
+    expect((await ui.find({ key: 'toggle-commits' }))?.text).toMatch(/^▸ Commits/);
+
+    await ui.press({ key: 'toggle-commits' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect(await shown(ui)).toEqual({ commit: true, commitsTitle: true, gate: true });
+    await ui.unmount();
+  });
+
   test(`${surface}: a check is described in words, with its command under it`, async ($, on) => {
     const ui = await openShip($, on, {
       stage: 'ship',
@@ -832,7 +871,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
   test(`${surface}: the Push section shows the dry run in rows, and has no links yet`, async ($, on) => {
     const ui = await openShip($, on, pushed().flow);
     expect({
-      title: !!(await ui.find({ type: 'Text', text: /Push/ })),
+      title: !!(await ui.find({ type: 'Button', text: /Push/ })),
       branch: !!(await ui.find({ type: 'Text', text: /feature\/PROJ-1-edge/ })),
       words: !!(await ui.find({
         type: 'Text',

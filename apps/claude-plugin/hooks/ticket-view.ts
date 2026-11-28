@@ -1,7 +1,7 @@
 import { runLine } from './look.gen';
 import { ticketAudit } from './ticket-audit';
 import type { EngineInterface } from 'claude-code';
-import { kit, type Ctx } from './kit';
+import { collapsible, kit, type Ctx } from './kit';
 import { store } from './store';
 import { ticketBody } from './ticket-body';
 import { ticketComments } from './ticket-comments';
@@ -44,11 +44,11 @@ export function ticketView($: EngineInterface, ctx: Ctx, key: string) {
       }),
       ticketHeader($, ctx, d),
       ...(move?.key === d.ticket.key ? [ticketConfirm($, ctx, move)] : []),
-      ...ticketBody($, ctx, d),
+      ...collapsible(ticketBody($, ctx, d)),
       rule(),
-      ...ticketJira($, ctx, d.ticket.key, d.jira),
+      ...collapsible(ticketJira($, ctx, d.ticket.key, d.jira)),
       rule(),
-      ...ticketComments($, ctx, d),
+      ...collapsible(ticketComments($, ctx, d)),
       ...(runLine(d.flow?.run) ? [dim(runLine(d.flow?.run)!)] : []),
       ...ticketAudit($, ctx, d.ticket.key)
     ]

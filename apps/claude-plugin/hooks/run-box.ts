@@ -17,7 +17,7 @@ export function runBox(
     return [];
   }
   const { Box, Button, Text } = ctx.els;
-  const { dim, sectionTitle } = kit(ctx);
+  const { dim, heading } = kit(ctx);
   const queued = f.run.state === 'queued';
   const { title, caption: text, accent } = runText(f.run);
   const color = hex(accent);
@@ -34,7 +34,7 @@ export function runBox(
           flexDirection: 'row',
           columnGap: 1,
           children: [
-            Box({ key: 'run-title', flexGrow: 1, children: [sectionTitle('run-t', title, color)] }),
+            Box({ key: 'run-title', flexGrow: 1, children: [heading('run-t', title, color)] }),
             Button({ key: 'stop-run', label: 'Stop', onPress: () => void agentRun($, key, 'stop') })
           ]
         }),

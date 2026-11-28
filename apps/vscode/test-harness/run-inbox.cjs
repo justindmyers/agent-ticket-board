@@ -55,7 +55,7 @@ function page(theme, mode) {
     file,
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Agent Ticket Board</title><style>:root{${t.vars}}</style>
 <link rel="stylesheet" href="../../media/webview/inbox.css"></head><body class="${t.cls}" data-mode="${mode}"><div id="root"></div>
-<script>window.__sent=[];window.__hooks=[];window.acquireVsCodeApi=()=>({postMessage:m=>{window.__sent.push(m);window.__hooks.forEach(h=>h(m))},getState:()=>null,setState:()=>{}});</script><script type="module" src="../../media/webview/inbox.js"></script></body></html>`
+<script>window.__sent=[];window.__hooks=[];window.__state=null;window.acquireVsCodeApi=()=>({postMessage:m=>{window.__sent.push(m);window.__hooks.forEach(h=>h(m))},getState:()=>window.__state,setState:s=>{window.__state=s}});</script><script type="module" src="../../media/webview/inbox.js"></script></body></html>`
   );
   return 'http://127.0.0.1:' + PORT + '/test-harness/out/' + path.basename(file);
 }
@@ -396,6 +396,32 @@ function page(theme, mode) {
   await rh
     .locator('[aria-label="Checks before a push"]')
     .screenshot({ path: path.join(OUT, 'ticket-gate.png') });
+  // A section collapses to its title and expands again, by mouse and by keyboard.
+  const gate = '[aria-label="Checks before a push"]';
+  const toggle = rh.locator(`${gate} button[aria-expanded]`);
+  kb.collapse = {
+    before: await toggle.getAttribute('aria-expanded'),
+    rowsBefore: await rh.locator(`${gate} li`).count()
+  };
+  await toggle.click();
+  kb.collapse.after = await toggle.getAttribute('aria-expanded');
+  kb.collapse.rowsAfter = await rh.locator(`${gate} li`).count();
+  kb.collapse.titleStillThere = await rh.locator(`${gate} h3`).isVisible();
+  kb.collapse.asideStillThere = (await rh.locator(`${gate}`).textContent()).includes('9 of 9');
+  await axe(rh, 'dark/ticket-collapsed');
+  await rh.screenshot({ path: path.join(OUT, 'ticket-collapsed.png') });
+  // It stays collapsed when another ticket is opened and this one again.
+  await rh.click('[role=option][data-key="PROJ-103"]');
+  await rh.waitForTimeout(200);
+  await rh.click('[role=option][data-key="PROJ-108"]');
+  await rh.waitForTimeout(300);
+  kb.collapse.afterReopen = await toggle.getAttribute('aria-expanded');
+  await toggle.focus();
+  await rh.keyboard.press('Enter');
+  kb.collapse.keyboard = {
+    expanded: await toggle.getAttribute('aria-expanded'),
+    rows: await rh.locator(`${gate} li`).count()
+  };
   await axe(rh, 'dark/ticket-ship');
   await rh.screenshot({ path: path.join(OUT, 'ticket-ship.png') });
   // A push that is only a dry run: no links, because GitHub has nothing to show yet.
