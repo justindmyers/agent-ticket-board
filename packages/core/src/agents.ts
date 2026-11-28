@@ -30,20 +30,41 @@ export async function loadAgents() {
   return FLOWS;
 }
 
+// How many times each record was saved in this process. A read of the file that was started before a
+// save must not replace the record that the save made.
+const saves: Record<string, number> = {};
+// How many saves of each record are still being written. While there is one, the file is older.
+const writing: Record<string, number> = {};
+
 /** Writes one agent record and logs the fields that changed. The service and explicit actions call this. */
 export async function saveFlow(key: string, f: Flow, source: Source = 'board') {
   const before = FLOWS[key] ?? (await readJson<Flow | null>(join(AGENTS_DIR, `${key}.json`), null));
   FLOWS[key] = f;
-  await writeJson(join(AGENTS_DIR, `${key}.json`), f);
+  saves[key] = (saves[key] ?? 0) + 1;
+  writing[key] = (writing[key] ?? 0) + 1;
+  try {
+    await writeJson(join(AGENTS_DIR, `${key}.json`), f);
+  } finally {
+    writing[key] = writing[key]! - 1;
+  }
   const changes = recordChanges(before, f);
   if (changes.length) {
     await audit(key, source, 'record', { fields: changes.map((c) => c.field), changes });
   }
 }
 
-/** Reads one agent record from disk again, because another process may have changed it. */
+/**
+ * Reads one agent record from disk again, because another process may have changed it. When this
+ * process has a save of the record that is not on disk yet, or saved it while the file was being read,
+ * the file is older than the record in memory: the record in memory stays, and is the answer.
+ */
 export async function loadFlow(key: string) {
+  const seen = saves[key] ?? 0;
+  const behind = (writing[key] ?? 0) > 0;
   const f = await readJson<Flow | null>(join(AGENTS_DIR, `${key}.json`), null);
+  if (behind || (saves[key] ?? 0) !== seen || (writing[key] ?? 0) > 0) {
+    return FLOWS[key] ?? f;
+  }
   if (f) {
     FLOWS[key] = f;
   } else {
