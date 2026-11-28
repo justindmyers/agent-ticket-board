@@ -305,3 +305,53 @@ export function pushLinks(p: PushLike | undefined) {
     commit: (sha: string) => (p.commits.some((c) => c.sha === sha) ? `${url}/commit/${sha}` : null)
   };
 }
+
+/**
+ * A check command in plain words, from the tool that it runs. null for a command that it does not
+ * know: the command is then its own name. Nothing here is specific to one repository.
+ */
+export function checkLabel(command: string): string | null {
+  const c = command.trim();
+  const pkg = /--filter\s+(\S+)/.exec(c)?.[1];
+  const folder = /^if\b.*grep -q(?:E)? '\^?([\w./-]+\/)'/.exec(c)?.[1];
+  const when = /^if\b/.test(c)
+    ? folder
+      ? ` (only if ${folder} changed)`
+      : /\.\(md\|mdx\)/.test(c)
+        ? ' (only if a document changed)'
+        : ''
+    : '';
+  const kind = /check-comment-bloat/.test(c)
+    ? 'Comment length check, on the changed lines only'
+    : /check-legacy-imports/.test(c)
+      ? 'Legacy import check on the changed files'
+      : /lint-docs/.test(c)
+        ? 'Documentation style check'
+        : /check:contracts|gen:contracts/.test(c)
+          ? 'Generated contract files are up to date'
+          : /vitest/.test(c)
+            ? `Tests of the changed files${pkg ? ` in ${pkg}` : ''}`
+            : /eslint/.test(c)
+              ? 'Lint of the changed files: ESLint rules, formatting included'
+              : /prettier/.test(c)
+                ? 'Format check of the changed files'
+                : /check:types|\btsc\b|typecheck/.test(c)
+                  ? `Type check${pkg ? ` of ${pkg}` : ''}: the code compiles without type errors`
+                  : null;
+  return kind ? kind + when : null;
+}
+
+/** A gate step as the screens show it: a description, and the command in small text when there is one. */
+export function stepView(s: { name: string; command?: string }): {
+  label: string;
+  command?: string;
+} {
+  if (s.command) {
+    return { label: s.name, command: s.command };
+  }
+  // A step saved before descriptions existed has the command as its name.
+  const m = /^([\s\S]*?)( \(after the merge\))?$/.exec(s.name);
+  const base = m?.[1] ?? s.name;
+  const label = checkLabel(base);
+  return label ? { label: label + (m?.[2] ?? ''), command: base } : { label: s.name };
+}

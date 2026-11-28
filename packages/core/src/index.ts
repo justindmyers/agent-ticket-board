@@ -33,7 +33,7 @@ export * from './diff-scope';
 export * from './findings';
 export * from './gate';
 export * from './push';
-export { dryRunText, pushLinks } from './look';
+export { checkLabel, dryRunText, pushLinks, stepView } from './look';
 export * from './restart';
 export * from './review';
 export * from './testing';

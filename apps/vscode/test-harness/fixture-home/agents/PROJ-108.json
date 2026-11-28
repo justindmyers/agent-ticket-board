@@ -80,25 +80,49 @@
     "steps": [
       {
         "name": "Clean worktree",
+        "command": "git status --porcelain",
         "ok": true
       },
       {
         "name": "Fetch origin/main",
+        "command": "git fetch origin main",
         "ok": true
       },
       {
-        "name": "pnpm check:types",
+        "name": "Generated contract files are up to date",
+        "command": "pnpm --filter web check:contracts",
         "ok": true
+      },
+      {
+        "name": "Type check of web: the code compiles without type errors",
+        "command": "pnpm --filter web check:types",
+        "ok": true
+      },
+      {
+        "name": "Type check of ui: the code compiles without type errors (only if libs/ui/ changed)",
+        "command": "if (git diff --name-only origin/main; git ls-files --others --exclude-standard) | grep -q '^libs/ui/'; then pnpm --filter ui check:types; fi",
+        "ok": true
+      },
+      {
+        "name": "Lint of the changed files: ESLint rules, formatting included",
+        "command": "pnpm exec eslint --no-warn-ignored --quiet {changed}",
+        "ok": true
+      },
+      {
+        "name": "pnpm --filter web exec vitest run --maxWorkers=2 {tests:apps/web/}",
+        "ok": true
+      },
+      {
+        "name": "Comment length check, on the changed lines only",
+        "command": "out=$(node .claude/hooks/check-comment-bloat.mjs --all {changed} | {atb} diff-scope); echo \"$out\"; ! echo \"$out\" | grep -v \"^No comment-bloat findings\\.$\" | grep -q .",
+        "ok": true,
+        "note": "No comment-bloat findings."
       },
       {
         "name": "Merge origin/main",
+        "command": "git merge --no-edit origin/main",
         "ok": true,
-        "note": "The merge brought changes: the checks run again."
-      },
-      {
-        "name": "pnpm check:types (after the merge)",
-        "ok": false,
-        "note": "src/SignIn.tsx(42,7): error TS2322: Type 'string' is not assignable to type 'number'."
+        "note": "Already up to date."
       }
     ]
   },

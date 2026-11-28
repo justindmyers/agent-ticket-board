@@ -387,6 +387,15 @@ function page(theme, mode) {
   await rh
     .locator('[aria-label="Push"]')
     .screenshot({ path: path.join(OUT, 'ticket-push-pushed.png') });
+  kb.gateText = await rh.evaluate(() =>
+    document
+      .querySelector('[aria-label="Checks before a push"]')
+      ?.textContent.replace(/\s+/g, ' ')
+      .slice(0, 330)
+  );
+  await rh
+    .locator('[aria-label="Checks before a push"]')
+    .screenshot({ path: path.join(OUT, 'ticket-gate.png') });
   await axe(rh, 'dark/ticket-ship');
   await rh.screenshot({ path: path.join(OUT, 'ticket-ship.png') });
   // A push that is only a dry run: no links, because GitHub has nothing to show yet.

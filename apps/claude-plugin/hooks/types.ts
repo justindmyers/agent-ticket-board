@@ -95,7 +95,7 @@ export type Flow = {
     ok: boolean;
     merged: boolean;
     verify?: true;
-    steps: { name: string; ok: boolean; note?: string }[];
+    steps: { name: string; command?: string; ok: boolean; note?: string }[];
   };
   evidence?: Record<
     string,

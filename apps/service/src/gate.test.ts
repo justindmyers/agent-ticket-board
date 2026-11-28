@@ -236,3 +236,30 @@ describe('runGate after the checks passed before the commits', () => {
     ]);
   });
 });
+
+describe('runGate descriptions', () => {
+  it('names a known check in plain words, keeps the command, and gives the git steps their commands', async () => {
+    const { wt } = repo();
+    const ran: string[] = [];
+    const g = await runGate(
+      input(wt, ran, { checks: ['echo eslint {changed}', 'echo vitest {tests}', 'echo mystery'] })
+    );
+    expect(g.steps.map((s) => [s.name, s.command])).toEqual([
+      ['Clean worktree', 'git status --porcelain'],
+      ['Fetch origin/main', 'git fetch origin main'],
+      ['Lint of the changed files: ESLint rules, formatting included', 'echo eslint {changed}'],
+      ['Tests of the changed files', 'echo vitest {tests}'],
+      ['echo mystery', undefined],
+      ['Merge origin/main', 'git merge --no-edit origin/main']
+    ]);
+  });
+
+  it('adds the suffix to the description after a merge that brings changes', async () => {
+    const { wt, advance } = repo();
+    advance('other.txt', 'x\n');
+    const g = await runGate(input(wt, [], { checks: ['echo eslint {changed}'] }));
+    expect(g.steps.map((s) => s.name)).toContain(
+      'Lint of the changed files: ESLint rules, formatting included (after the merge)'
+    );
+  });
+});

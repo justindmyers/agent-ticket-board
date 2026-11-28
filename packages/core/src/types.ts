@@ -121,7 +121,8 @@ export type Gate = {
   tree?: string;
   /** The commit that the pre-push gate checked, after its merge. A push needs the same commit. */
   head?: string;
-  steps: { name: string; ok: boolean; note?: string }[];
+  /** `name` is the description. `command` is what ran, when the name is not already the command. */
+  steps: { name: string; command?: string; ok: boolean; note?: string }[];
 };
 
 /** The commits of Code review: the plan that the developer approves, and the commits made. */

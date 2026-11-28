@@ -802,6 +802,33 @@ for (const surface of ['desktop', 'terminal'] as const) {
     return ui;
   };
 
+  test(`${surface}: a check is described in words, with its command under it`, async ($, on) => {
+    const ui = await openShip($, on, {
+      stage: 'ship',
+      gate: {
+        at: 'n',
+        ok: true,
+        merged: false,
+        steps: [
+          { name: 'Clean worktree', command: 'git status --porcelain', ok: true },
+          {
+            name: 'Lint of the changed files: ESLint rules, formatting included',
+            command: 'pnpm exec eslint --quiet {changed}',
+            ok: true
+          },
+          { name: 'pnpm --filter web exec vitest run {tests:apps/web/}', ok: true }
+        ]
+      }
+    });
+    expect({
+      words: !!(await ui.find({ type: 'Text', text: /Lint of the changed files: ESLint rules/ })),
+      command: !!(await ui.find({ type: 'Text', text: /pnpm exec eslint --quiet \{changed\}/ })),
+      git: !!(await ui.find({ type: 'Text', text: /git status --porcelain/ })),
+      oldRecord: !!(await ui.find({ type: 'Text', text: /Tests of the changed files in web/ }))
+    }).toEqual({ words: true, command: true, git: true, oldRecord: true });
+    await ui.unmount();
+  });
+
   test(`${surface}: the Push section shows the dry run in rows, and has no links yet`, async ($, on) => {
     const ui = await openShip($, on, pushed().flow);
     expect({

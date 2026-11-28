@@ -1,4 +1,10 @@
-import { boardCommand, expandCommand, isTestFile, type Gate } from '@agent-ticket-board/core';
+import {
+  boardCommand,
+  checkLabel,
+  expandCommand,
+  isTestFile,
+  type Gate
+} from '@agent-ticket-board/core';
 
 // The pre-push gate. It runs the checks of the repository in the order of its config, merges the
 // base branch (never a rebase), and runs the checks again when the merge changed anything. It
@@ -45,10 +51,19 @@ async function gateSteps(i: GateInput): Promise<Gate> {
     ...(tree ? { tree } : {}),
     steps
   });
-  const step = async (name: string, run: () => Promise<{ ok: boolean; note?: string }>) => {
+  const step = async (
+    name: string,
+    run: () => Promise<{ ok: boolean; note?: string }>,
+    command?: string
+  ) => {
     i.step?.(name);
     const r = await run();
-    steps.push({ name, ok: r.ok, ...(r.note ? { note: r.note } : {}) });
+    steps.push({
+      name,
+      ...(command ? { command } : {}),
+      ok: r.ok,
+      ...(r.note ? { note: r.note } : {})
+    });
     return r.ok;
   };
   const base = `origin/${i.base}`;
@@ -56,20 +71,27 @@ async function gateSteps(i: GateInput): Promise<Gate> {
   const dirty = await git('status --porcelain');
   if (
     !i.verify &&
-    !(await step('Clean worktree', async () =>
-      dirty.out.trim()
-        ? { ok: false, note: `Commit or discard these changes first:\n${tail(dirty.out)}` }
-        : { ok: true }
+    !(await step(
+      'Clean worktree',
+      async () =>
+        dirty.out.trim()
+          ? { ok: false, note: `Commit or discard these changes first:\n${tail(dirty.out)}` }
+          : { ok: true },
+      'git status --porcelain'
     ))
   ) {
     return done(false);
   }
   if (
     !i.verify &&
-    !(await step(`Fetch ${base}`, async () => {
-      const r = await git(`fetch origin ${i.base}`);
-      return r.code ? { ok: false, note: tail(r.out) } : { ok: true };
-    }))
+    !(await step(
+      `Fetch ${base}`,
+      async () => {
+        const r = await git(`fetch origin ${i.base}`);
+        return r.code ? { ok: false, note: tail(r.out) } : { ok: true };
+      },
+      `git fetch origin ${i.base}`
+    ))
   ) {
     return done(false);
   }
@@ -103,15 +125,21 @@ async function gateSteps(i: GateInput): Promise<Gate> {
   const runChecks = async (suffix: string) => {
     const lists = await files();
     for (const cmd of i.checks) {
-      const name = cmd + suffix;
+      // A command that the board knows has a description. The command stays under it in small text.
+      const label = checkLabel(cmd);
+      const name = (label ?? cmd) + suffix;
       const x = expandCommand(cmd, lists, boardCommand());
-      const ok = await step(name, async () => {
-        if ('skip' in x) {
-          return { ok: true, note: x.skip };
-        }
-        const r = await i.exec(x.run, true);
-        return r.code ? { ok: false, note: tail(r.out) } : { ok: true };
-      });
+      const ok = await step(
+        name,
+        async () => {
+          if ('skip' in x) {
+            return { ok: true, note: x.skip };
+          }
+          const r = await i.exec(x.run, true);
+          return r.code ? { ok: false, note: tail(r.out) } : { ok: true };
+        },
+        label ? cmd : undefined
+      );
       if (!ok) {
         return false;
       }
@@ -147,14 +175,18 @@ async function gateSteps(i: GateInput): Promise<Gate> {
   }
 
   const before = (await git('rev-parse HEAD')).out.trim();
-  const merge = await step(`Merge ${base}`, async () => {
-    const r = await git(`merge --no-edit ${base}`);
-    if (r.code) {
-      await git('merge --abort');
-      return { ok: false, note: `The merge stopped. It is undone.\n${tail(r.out)}` };
-    }
-    return { ok: true };
-  });
+  const merge = await step(
+    `Merge ${base}`,
+    async () => {
+      const r = await git(`merge --no-edit ${base}`);
+      if (r.code) {
+        await git('merge --abort');
+        return { ok: false, note: `The merge stopped. It is undone.\n${tail(r.out)}` };
+      }
+      return { ok: true };
+    },
+    `git merge --no-edit ${base}`
+  );
   if (!merge) {
     return done(false);
   }

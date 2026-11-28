@@ -2,6 +2,7 @@ import { mdiSourceMerge } from '@mdi/js';
 import { Section } from '../../shared/components/Section';
 import type { Gate } from '../../shared/types/host';
 import type { Theme } from '../../shared/types/theme';
+import { stepView } from '@agent-ticket-board/core/look';
 import { TicketRow } from './TicketRow';
 import { TicketRows } from './TicketRows';
 
@@ -23,20 +24,32 @@ export function GateSection({ gate, theme }: Props) {
       theme={theme}
     >
       <TicketRows>
-        {gate.steps.map((s) => (
-          <TicketRow
-            key={s.name}
-            state={s.ok ? 'done' : 'fail'}
-            theme={theme}
-            sub={
-              s.note ? (
-                <span className="font-mono text-[11.5px] whitespace-pre-wrap">{s.note}</span>
-              ) : undefined
-            }
-          >
-            <span className="font-mono text-[12px]">{s.name}</span>
-          </TicketRow>
-        ))}
+        {gate.steps.map((s) => {
+          const v = stepView(s);
+          return (
+            <TicketRow
+              key={s.name}
+              state={s.ok ? 'done' : 'fail'}
+              theme={theme}
+              sub={
+                v.command || s.note ? (
+                  <span className="flex min-w-0 flex-col gap-1">
+                    {v.command && (
+                      <code className="font-mono text-[11px] [overflow-wrap:anywhere] text-muted">
+                        {v.command}
+                      </code>
+                    )}
+                    {s.note && (
+                      <span className="font-mono text-[11.5px] whitespace-pre-wrap">{s.note}</span>
+                    )}
+                  </span>
+                ) : undefined
+              }
+            >
+              {v.label}
+            </TicketRow>
+          );
+        })}
       </TicketRows>
     </Section>
   );

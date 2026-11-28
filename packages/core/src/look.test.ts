@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accentOf,
   activityText,
+  checkLabel,
   dryRunText,
   pushLinks,
   planStartable,
@@ -10,6 +11,7 @@ import {
   runText,
   shotLabel,
   spentText,
+  stepView,
   STAGES,
   STATE_ACCENT,
   writesText
@@ -192,5 +194,73 @@ describe('pushLinks', () => {
   it('refuses a commit that is not in the push, so no other address can be opened', () => {
     expect(pushLinks(pushed)!.commit('b'.repeat(40))).toBeNull();
     expect(pushLinks(pushed)!.commit('../../evil')).toBeNull();
+  });
+});
+
+describe('checkLabel', () => {
+  it.each([
+    ['pnpm --filter web check:types', 'Type check of web: the code compiles without type errors'],
+    ['pnpm exec tsc --noEmit', 'Type check: the code compiles without type errors'],
+    [
+      'pnpm exec eslint --quiet {changed}',
+      'Lint of the changed files: ESLint rules, formatting included'
+    ],
+    ['pnpm exec prettier --check {changed}', 'Format check of the changed files'],
+    ['pnpm --filter web exec vitest run {tests:apps/web/}', 'Tests of the changed files in web'],
+    ['pnpm --filter web check:contracts', 'Generated contract files are up to date'],
+    [
+      'node hooks/check-comment-bloat.mjs --all {changed}',
+      'Comment length check, on the changed lines only'
+    ],
+    [
+      'node hooks/check-legacy-imports.mjs --all {changed}',
+      'Legacy import check on the changed files'
+    ],
+    ['node hooks/lint-docs.mjs --base origin/main', 'Documentation style check']
+  ])('describes %s', (cmd, want) => {
+    expect(checkLabel(cmd)).toBe(want);
+  });
+
+  it('says when a check runs only for some changes', () => {
+    expect(
+      checkLabel(
+        "if git diff --name-only origin/main | grep -q '^libs/ui/'; then pnpm --filter ui check:types; fi"
+      )
+    ).toBe('Type check of ui: the code compiles without type errors (only if libs/ui/ changed)');
+    expect(
+      checkLabel("if git diff --name-only | grep -qE '\\.(md|mdx)$'; then node lint-docs.mjs; fi")
+    ).toBe('Documentation style check (only if a document changed)');
+  });
+
+  it('knows nothing about a command that it does not know: the command stays its own name', () => {
+    expect(checkLabel('make verify')).toBeNull();
+    expect(checkLabel('echo hello')).toBeNull();
+  });
+});
+
+describe('stepView', () => {
+  it('shows a recorded description with its command', () => {
+    expect(
+      stepView({ name: 'Format check of the changed files', command: 'prettier --check a' })
+    ).toEqual({
+      label: 'Format check of the changed files',
+      command: 'prettier --check a'
+    });
+  });
+
+  it('describes a step that was saved with the command as its name, and keeps the merge suffix', () => {
+    expect(stepView({ name: 'pnpm exec eslint --quiet {changed}' })).toEqual({
+      label: 'Lint of the changed files: ESLint rules, formatting included',
+      command: 'pnpm exec eslint --quiet {changed}'
+    });
+    expect(stepView({ name: 'pnpm --filter web check:types (after the merge)' })).toEqual({
+      label: 'Type check of web: the code compiles without type errors (after the merge)',
+      command: 'pnpm --filter web check:types'
+    });
+  });
+
+  it('leaves a step that is not a command as it is', () => {
+    expect(stepView({ name: 'Clean worktree' })).toEqual({ label: 'Clean worktree' });
+    expect(stepView({ name: 'make verify' })).toEqual({ label: 'make verify' });
   });
 });
