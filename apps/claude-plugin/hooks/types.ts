@@ -87,6 +87,20 @@ export type Flow = {
     /** The branch changed after this preview. */
     stale?: boolean;
   };
+  prPlan?: {
+    title: string;
+    body: string;
+    base: string;
+    head: string;
+    attach: { path: string; name: string; alt: string }[];
+    commits: number;
+    at: string;
+    createdAt?: string;
+    updatedAt?: string;
+    update?: boolean;
+    url?: string;
+    warning?: string;
+  };
   commits?: {
     plan: { title: string; files: string[] }[];
     done: { title: string; sha: string }[];

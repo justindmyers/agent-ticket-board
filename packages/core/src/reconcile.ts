@@ -38,7 +38,7 @@ export function reconcile(
           ask: `Pull request #${pr.number} merged, but Jira still says ${jira}.`,
           actions: [
             { id: `move:${target.to}`, label: `Move to ${target.to}` },
-            { id: 'openPr', label: 'Open PR' }
+            { id: 'openPr', label: 'View the PR' }
           ]
         };
       } else {
@@ -49,7 +49,7 @@ export function reconcile(
           ask: `Pull request #${pr.number} merged from ${pr.branch ?? 'its branch'}. Pick the Jira status (now ${jira}).`,
           actions: [
             ...CONFIG.tracker.finished.map((s) => ({ id: `move:${s}`, label: `Move to ${s}` })),
-            { id: 'openPr', label: 'Open PR' }
+            { id: 'openPr', label: 'View the PR' }
           ]
         };
       }
@@ -62,7 +62,7 @@ export function reconcile(
       kind: 'problem',
       ask: `Pull request #${pr.number} closed without a merge.`,
       actions: [
-        { id: 'openPr', label: 'Open PR' },
+        { id: 'openPr', label: 'View the PR' },
         { id: 'replan', label: 'Re-plan' }
       ]
     };
@@ -76,10 +76,11 @@ export function reconcile(
         ask: `CI: ${pr.checks} on pull request #${pr.number}.`,
         actions: [
           { id: 'fix', label: 'Fix' },
-          { id: 'openPr', label: 'Open PR' }
+          { id: 'openPr', label: 'View the PR' }
         ]
       };
-    } else {
+    } else if (!f.need?.actions.some((a) => a.id === 'createPr')) {
+      // An update that waits for approval stays: it is the step that the developer is in.
       delete out.need;
     }
   }

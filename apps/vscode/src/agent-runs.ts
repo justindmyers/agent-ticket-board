@@ -31,6 +31,8 @@ export async function startRun(
     | 'approve-testing'
     | 'push-plan'
     | 'push'
+    | 'pr-plan'
+    | 'pr'
     | 'change' = 'plan',
   body: Record<string, unknown> = {}
 ) {

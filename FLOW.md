@@ -103,7 +103,7 @@ flowchart TD
   G2 --> REVIEW["CODE REVIEW<br/>reviewers, fixes,<br/>board checks"]:::agent
   REVIEW --> SHIP["SHIP<br/>commits, prepare the push,<br/>preview the push"]:::agent
   SHIP --> G3{"You: approve the push"}:::human
-  G3 --> PR["Push, then the draft pull request,<br/>screenshots attached"]:::planned
+  G3 --> PR["Push, then the draft pull request,<br/>shown first, then opened as a draft<br/>screenshots attached"]:::board
   PR --> FOLLOW["Follow checks, reviews and comments<br/>until the merge"]:::planned
   FOLLOW --> JIRAMOVE{"You: approve the Jira move"}:::human
   JIRAMOVE --> DONE["Closed"]
@@ -243,8 +243,10 @@ flowchart TD
 
   PUSH{"You: approve the push"}:::human
   PUSH --> DOPUSH["git push origin HEAD:branch<br/>only if the branch is still the one you saw<br/>never a bare push, never a force"]:::board
-  DOPUSH --> PR["Draft pull request, 6 screenshots attached"]:::planned
-  PR --> TRACK["Follow checks, reviews, comments to the merge<br/>fixes go through comment and re-plan"]:::planned
+  DOPUSH --> SHOWPR["PREVIEW THE PULL REQUEST<br/>title from the commits, body from the template,<br/>the screenshots. Changes nothing."]:::board
+  SHOWPR --> PRAPPROVE{"You: open the draft"}:::human
+  PRAPPROVE --> MAKEPR["gh pr create --draft<br/>only if the branch is still the one you saw<br/>never ready for review, never Jira"]:::board
+  MAKEPR --> TRACK["Follow checks, reviews, comments to the merge<br/>fixes go through comment and re-plan"]:::planned
 
   classDef human fill:#3d2f06,stroke:#f5b82e,color:#fff
   classDef agent fill:#2a1f4d,stroke:#9b7bf0,color:#fff
@@ -252,9 +254,24 @@ flowchart TD
   classDef planned fill:#222,stroke:#777,stroke-dasharray:5 4,color:#aaa
 ```
 
-Not built yet (grey): the draft pull request and the pull request tracking. Today the flow ends after the push.
+Not built yet (grey): the follow-up of the pull request until the merge, and the fixes that come from review comments.
 
-Check it: `stage` is `ship` from the commit plan on. A record from before this stage moves to Ship by itself once it has commits, a gate, a push or a pull request. `gate.steps` lists each check: `name` is its description in plain words, `command` is what ran, and `note` is its output. An older result, with only the command as its name, gets a description when it is shown. `push` holds the branch, the commits, the command and the dry run that you saw, and `pushedAt` after the push. Audit events: `push.planned`, `push.done`, `push.failed`. The push refuses the base branch, a dirty tree, and a commit that the checks did not pass. `gate.head` is that commit. `gate.tree` is the fingerprint of the content that the checks passed on. The step "Checks before the merge" says when the gate skipped the repeat pass. `commits.done` lists each commit and its short hash. Audit events: `before-commit`, `commit.made`, `commit.failed`, `gate.done`.
+**Nothing is silent, and the previews come by themselves.** The checks, the push preview, the push, the pull request preview and the draft are board jobs. Each shows as a running job on the ticket, with what it does, and stops at a problem with a button to try again. When the checks pass, the board shows the push by itself. When the push is made, the board builds the pull request by itself. Both are previews and change nothing. The Ship page lists the newest step first, so the step that you approve is on top. You press only for the writes: prepare the push, approve the push, open the draft.
+
+**The draft pull request** has two steps, like the push. The board builds the preview after the push, and "Show the pull request" builds it again. Building changes nothing. "Create the draft pull request" makes exactly what you saw.
+
+- **The title** comes from the commits, never from the Jira summary. It is the first commit of the area with the most commits. When areas tie, the last area wins. It follows the commit rule: the description has 72 characters at most.
+- **The body** is the template of the repository, `.github/pull_request_template.md`. The board fills four parts. The description has the commit summary and the commit titles. The type of change ticks the boxes that the commit types name. The Jira part links the ticket. The validation part lists each requirement with its result and its screenshots. A requirement that was tested with mocked data says so. Any other heading stays as it is.
+- **The screenshots** are few: one for each view, six at most. A view that many requirements show counts once. They sit under the checklist. A requirement has no image of its own. The body names each file by a short name, never by a path on your machine.
+- **Only current screenshots.** A screenshot that is older than the newest change of the code is left out. A change counts when it is committed, not only when it waits in the worktree. The preview says what was left out. If every screenshot is old, none are attached, and the preview says to run Testing again.
+- **The command** is `gh pr create --draft`, with `--attach` for each screenshot. It runs on copies of the screenshots in a temporary folder. The folder is deleted afterwards.
+- **What it refuses:** a branch that is not pushed, a branch that changed after the push, a branch that has a pull request already, and a remote that is not on GitHub. If GitHub cannot say whether a pull request exists, nothing is made.
+- **If a screenshot fails to upload,** GitHub still makes the pull request and gh exits with an error. The board reads the address from the output, keeps it, and shows a warning.
+- **One card.** Once GitHub has the pull request, the card is "Pull request #N". It shows the state, the checks, the reviews and the comments from GitHub. The title and the body fold below, and open while an update waits for approval. Before that, the card is "Draft pull request". A pull request that the board did not make shows the state only.
+- **Update, by itself.** The board remembers what GitHub got last: the title, the body and each screenshot file. After a push, and after a job that could change them, it builds the title and the body again and compares. If they differ, the banner offers "Update the pull request", with the new title and body below. If they match, nothing shows. The building reads GitHub and changes nothing there. "Update the pull request" in the banner runs `gh pr edit` on that pull request. It changes the title and the body only. The board updates only a pull request that it opened. Any other is left alone. A problem or a question on the ticket stays on top, and the update waits in the card.
+- **The board never marks the pull request ready,** never writes to Jira, and never makes a second one.
+
+Check it: `stage` is `ship` from the commit plan on. A record from before this stage moves to Ship by itself once it has commits, a gate, a push or a pull request. `gate.steps` lists each check: `name` is its description in plain words, `command` is what ran, and `note` is its output. An older result, with only the command as its name, gets a description when it is shown. `push` holds the branch, the commits, the command and the dry run that you saw, and `pushedAt` after the push. Audit events: `push.planned`, `push.done`, `push.failed`. The push refuses the base branch, a dirty tree, and a commit that the checks did not pass. `gate.head` is that commit. `prPlan` holds the title, the body, the branches and the screenshots that you saw, and `createdAt` and `url` once GitHub made the draft. Audit events: `pr.planned`, `pr.created`, `pr.updated`, `pr.failed`. `gate.tree` is the fingerprint of the content that the checks passed on. The step "Checks before the merge" says when the gate skipped the repeat pass. `commits.done` lists each commit and its short hash. Audit events: `before-commit`, `commit.made`, `commit.failed`, `gate.done`.
 
 ### Work done outside the board
 

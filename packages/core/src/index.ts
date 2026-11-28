@@ -65,3 +65,18 @@ export {
   type OutsideFile,
   type OutsideWork
 } from './outside';
+export {
+  DEFAULT_TEMPLATE,
+  dropPendingPr,
+  madePrFlow,
+  MAX_SHOTS,
+  parseTitle,
+  pickShots,
+  planPrFlow,
+  prBody,
+  prProblem,
+  prTitle,
+  prTitleProblem,
+  prUrlOf,
+  type BodyFacts
+} from './pull-request';

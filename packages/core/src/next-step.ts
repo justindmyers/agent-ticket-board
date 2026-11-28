@@ -46,7 +46,19 @@ export function restingNeed(f: Flow): Need | null {
       verify: ['The checks were stopped.', 'startVerify', 'Run the checks again'],
       'commit-plan': ['Planning the commits was stopped.', 'startCommitPlan', 'Plan the commits'],
       'review-fix': ['The fixes were stopped.', 'startReviewFix', 'Fix the chosen findings'],
-      commit: ['Making the commits was stopped.', 'startCommitPlan', 'Plan the commits again']
+      commit: ['Making the commits was stopped.', 'startCommitPlan', 'Plan the commits again'],
+      'push-plan': ['Showing the push was stopped.', 'showPush', 'Show the push'],
+      push: [
+        'The push was stopped. Check the branch on origin before you push again.',
+        'showPush',
+        'Show the push'
+      ],
+      'pr-plan': ['Building the pull request was stopped.', 'showPr', 'Show the pull request'],
+      pr: [
+        'Opening the pull request was stopped. Check GitHub before you try again.',
+        'showPr',
+        'Show the pull request'
+      ]
     }[f.run.task];
     return {
       kind: 'decision',
@@ -99,7 +111,15 @@ export function migrateStage(input: Flow): Flow {
     f = { ...f, need: { ...f.need, detail: DRY_RUN_NOTE } };
   }
   // The preview button changed its words. A saved next step keeps the old ones, so it is renamed here.
-  const word = f.push ? 'Show the push again' : 'Preview the push';
+  // A fresh preview offers the approval only. The button to show it again is for a preview that the
+  // branch has left, and the banner of that case has its own.
+  if (f.push && !f.push.pushedAt && f.need?.actions.some((a) => a.id === 'approvePush')) {
+    f = {
+      ...f,
+      need: { ...f.need, actions: f.need.actions.filter((a) => a.id !== 'showPush') }
+    };
+  }
+  const word = f.push ? 'Update the push preview' : 'Preview the push';
   if (f.need?.actions.some((a) => a.id === 'showPush' && a.label !== word)) {
     f = {
       ...f,
@@ -165,6 +185,27 @@ export function withNextStep(input: Flow): Flow {
         }
       };
     }
+  }
+  // A push from before the pull request step ends with only "Open worktree". The pull request is next.
+  if (
+    f.stage === 'ship' &&
+    f.push?.pushedAt &&
+    !f.prPlan &&
+    !f.pr &&
+    !runActive(f) &&
+    f.need?.kind === 'decision' &&
+    f.need.ask.startsWith('Pushed ') &&
+    !f.need.actions.some((a) => a.id === 'showPr')
+  ) {
+    return {
+      ...f,
+      need: {
+        ...f.need,
+        detail:
+          'Show the pull request to see its title, body and screenshots before the draft is made.',
+        actions: [{ id: 'showPr', label: 'Show the pull request' }, ...f.need.actions]
+      }
+    };
   }
   const need = restingNeed(f);
   return need ? { ...f, need } : f;

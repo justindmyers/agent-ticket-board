@@ -897,6 +897,80 @@ describe('Runs.gate', () => {
     CONFIG.repo.checks = [];
   });
 
+  it('shows the push again by itself when the checks pass on a branch that has a preview', async () => {
+    CONFIG.repo.checks = ['true'];
+    CONFIG.repo.baseBranch = 'main';
+    const wt = worktree();
+    git(wt, 'checkout', '-b', 'feature/PROJ-74-x');
+    writeFileSync(join(wt, 'one.ts'), '1\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'feat(x): one (PROJ-74)');
+    const old = git(wt, 'rev-parse', 'HEAD').trim();
+    writeFileSync(join(wt, 'two.ts'), '2\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'feat(x): two (PROJ-74)');
+    const head = git(wt, 'rev-parse', 'HEAD').trim();
+    await saveFlow('PROJ-74', {
+      ...reviewed(wt),
+      push: {
+        branch: 'feature/PROJ-74-x',
+        head: old,
+        commits: [{ sha: old, short: old.slice(0, 9), title: 'feat(x): one (PROJ-74)' }],
+        command: 'git push origin HEAD:feature/PROJ-74-x',
+        dryRun: '',
+        at: 'before'
+      }
+    });
+    const { r } = runs(fakeQuery([]).query);
+    await r.gate('PROJ-74');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-74'))?.push?.head).toBe(head), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-74');
+    expect(f?.gate).toMatchObject({ ok: true, head });
+    expect(f?.push?.commits).toHaveLength(2);
+    expect(f?.need?.ask).toBe('Ready to push 2 commits to origin as feature/PROJ-74-x.');
+    expect(f?.need?.actions.map((a) => a.id)).toContain('approvePush');
+    CONFIG.repo.checks = [];
+  });
+
+  it('shows the push by itself when the checks pass, also when there was no preview', async () => {
+    CONFIG.repo.checks = ['true'];
+    CONFIG.repo.baseBranch = 'main';
+    const wt = worktree();
+    git(wt, 'checkout', '-b', 'feature/PROJ-75-x');
+    writeFileSync(join(wt, 'one.ts'), '1\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'feat(x): one (PROJ-75)');
+    await saveFlow('PROJ-75', reviewed(wt));
+    const { r } = runs(fakeQuery([]).query);
+    await r.gate('PROJ-75');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-75'))?.run?.state).toBe('done'), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-75');
+    expect(f?.push?.commits).toHaveLength(1);
+    expect(f?.need?.ask).toBe('Ready to push 1 commit to origin as feature/PROJ-75-x.');
+    expect(f?.need?.actions.map((a) => a.id)).toEqual(['approvePush', 'openWorktree']);
+    CONFIG.repo.checks = [];
+  });
+
+  it('leaves Preview the push to press when the preview cannot be made', async () => {
+    CONFIG.repo.checks = ['true'];
+    CONFIG.repo.baseBranch = 'main';
+    const wt = worktree();
+    await saveFlow('PROJ-78', reviewed(wt));
+    const { r } = runs(fakeQuery([]).query);
+    await r.gate('PROJ-78');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-78'))?.run?.state).toBe('done'), {
+      timeout: 8000
+    });
+    const f = await loadFlow('PROJ-78');
+    expect(f?.push).toBeUndefined();
+    expect(f?.need?.actions.map((a) => a.id)).toContain('showPush');
+    CONFIG.repo.checks = [];
+  });
+
   it('records a failing check as a problem with its output and a retry', async () => {
     CONFIG.repo.checks = ['echo broken >&2; exit 3'];
     await saveFlow('PROJ-73', reviewed(worktree()));
@@ -909,6 +983,192 @@ describe('Runs.gate', () => {
     expect(f?.need).toMatchObject({ kind: 'problem', detail: expect.stringContaining('broken') });
     expect(f?.need?.actions[0]?.id).toBe('startGate');
     CONFIG.repo.checks = [];
+  });
+});
+
+describe('The push and the pull request, as jobs', () => {
+  const git = (cwd: string, ...a: string[]) =>
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.com', ...a], {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    }).trim();
+  /** A branch with two commits of the ticket, checked. Origin is on GitHub for reading, local for pushing. */
+  const ticketOf = async (key: string) => {
+    CONFIG.repo.baseBranch = 'main';
+    const root = mkdtempSync(join(tmpdir(), 'atb-ship-'));
+    git(root, 'init', '--bare', '-b', 'main', 'origin.git');
+    git(root, 'clone', join(root, 'origin.git'), 'wt');
+    const wt = join(root, 'wt');
+    writeFileSync(join(wt, 'a.txt'), 'a\n');
+    git(wt, 'add', '.');
+    git(wt, 'commit', '-m', 'base');
+    git(wt, 'push', 'origin', 'HEAD:main');
+    git(wt, 'checkout', '-b', `feature/${key}-x`);
+    for (const [f, t] of [
+      ['one.ts', `feat(x): one (${key})`],
+      ['two.ts', `feat(y): two (${key})`]
+    ]) {
+      writeFileSync(join(wt, f!), 'x\n');
+      git(wt, 'add', f!);
+      git(wt, 'commit', '-m', t!);
+    }
+    git(wt, 'remote', 'set-url', 'origin', 'https://github.com/acme/web.git');
+    git(wt, 'remote', 'set-url', '--push', 'origin', join(root, 'origin.git'));
+    await saveFlow(key, {
+      stage: 'ship',
+      worktree: wt,
+      codeReview: { at: 'now', summary: 'Done.', findings: [], checks: [] },
+      gate: { at: 'n', ok: true, merged: false, steps: [], head: git(wt, 'rev-parse', 'HEAD') }
+    });
+    return { wt, root, origin: join(root, 'origin.git') };
+  };
+  const fakeGh = (o: { listFails?: boolean; existing?: string } = {}) => {
+    const calls: string[][] = [];
+    const gh = async (args: string[]) => {
+      calls.push(args);
+      if (args[1] === 'list') {
+        return o.listFails
+          ? { code: 1, out: 'gh: not logged in' }
+          : { code: 0, out: o.existing ? JSON.stringify([{ url: o.existing }]) : '[]' };
+      }
+      return { code: 0, out: 'https://github.com/acme/web/pull/7\n' };
+    };
+    return { gh, calls };
+  };
+  const done = (key: string) =>
+    vi.waitFor(
+      async () => expect(['done', 'failed']).toContain((await loadFlow(key))?.run?.state),
+      {
+        timeout: 10_000
+      }
+    );
+
+  it('shows the push as a running job, then the preview', async () => {
+    await ticketOf('PROJ-81');
+    const { r } = runs(fakeQuery([]).query, { gh: fakeGh().gh });
+    const run = await r.pushPlan('PROJ-81');
+    expect(run).toMatchObject({ task: 'push-plan', stage: 'ship', state: 'running' });
+    await done('PROJ-81');
+    const f = await loadFlow('PROJ-81');
+    expect(f?.run?.state).toBe('done');
+    expect(f?.need?.ask).toBe('Ready to push 2 commits to origin as feature/PROJ-81-x.');
+  });
+
+  it('pushes, and then builds the pull request by itself, without opening anything', async () => {
+    const { origin } = await ticketOf('PROJ-82');
+    const g = fakeGh();
+    const { r } = runs(fakeQuery([]).query, { gh: g.gh });
+    await r.pushPlan('PROJ-82');
+    await done('PROJ-82');
+    const run = await r.push('PROJ-82');
+    expect(run).toMatchObject({ task: 'push', state: 'running' });
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-82'))?.prPlan).toBeDefined(), {
+      timeout: 10_000
+    });
+    await done('PROJ-82');
+    const f = await loadFlow('PROJ-82');
+    expect(f?.push?.pushedAt).toBeDefined();
+    expect(git(origin, 'branch', '--list', 'feature/PROJ-82-x')).toContain('feature/PROJ-82-x');
+    expect(f?.prPlan?.title).toBe('feat(y): two (PROJ-82)');
+    expect(f?.prPlan?.createdAt).toBeUndefined();
+    expect(f?.need?.ask).toBe(
+      'Ready to create a draft pull request from feature/PROJ-82-x into main.'
+    );
+    expect(f?.need?.actions.map((a) => a.id)).toEqual(['createPr', 'showPr', 'openWorktree']);
+    expect(g.calls.every((c) => c[1] === 'list')).toBe(true);
+  });
+
+  it('opens the draft only when the developer approves it', async () => {
+    await ticketOf('PROJ-83');
+    const g = fakeGh();
+    const { r } = runs(fakeQuery([]).query, { gh: g.gh });
+    await r.pushPlan('PROJ-83');
+    await done('PROJ-83');
+    await r.push('PROJ-83');
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-83'))?.prPlan).toBeDefined(), {
+      timeout: 10_000
+    });
+    await done('PROJ-83');
+    expect(g.calls.some((c) => c[1] === 'create')).toBe(false);
+    const run = await r.pr('PROJ-83');
+    expect(run).toMatchObject({ task: 'pr', state: 'running' });
+    await vi.waitFor(async () => expect((await loadFlow('PROJ-83'))?.prPlan?.url).toBeDefined(), {
+      timeout: 10_000
+    });
+    expect((await loadFlow('PROJ-83'))?.prPlan?.url).toBe('https://github.com/acme/web/pull/7');
+    expect(g.calls.filter((c) => c[1] === 'create')).toHaveLength(1);
+  });
+
+  it('builds the update by itself when a job ends, and shows it only when it differs from GitHub', async () => {
+    const key = 'PROJ-97';
+    await ticketOf(key);
+    const first = runs(fakeQuery([]).query, { gh: fakeGh().gh }).r;
+    await first.pushPlan(key);
+    await done(key);
+    await first.push(key);
+    await vi.waitFor(async () => expect((await loadFlow(key))?.prPlan).toBeDefined(), {
+      timeout: 10_000
+    });
+    await done(key);
+    await first.pr(key);
+    await vi.waitFor(async () => expect((await loadFlow(key))?.prPlan?.url).toBeDefined(), {
+      timeout: 10_000
+    });
+    await done(key);
+
+    const g = fakeGh({ existing: 'https://github.com/acme/web/pull/7' });
+    const { r } = runs(fakeQuery([]).query, { gh: g.gh });
+    // A job ends, and nothing that GitHub got has changed: no update is shown. Pressing create on a
+    // pull request that is open fails, and the job still ends, which is all that this needs.
+    await r.pr(key);
+    await done(key);
+    await vi.waitFor(() => expect(g.calls.length).toBeGreaterThan(0), { timeout: 10_000 });
+    expect((await loadFlow(key))?.prPlan?.update).toBeUndefined();
+
+    // The summary of the commits is in the body. The next job end shows the difference.
+    const f = (await loadFlow(key))!;
+    await saveFlow(key, { ...f, commits: { plan: [], done: [], summary: 'Another summary.' } });
+    await r.pr(key);
+    await done(key);
+    await vi.waitFor(async () => expect((await loadFlow(key))?.prPlan?.update).toBe(true), {
+      timeout: 10_000
+    });
+    expect((await loadFlow(key))?.prPlan?.body).toContain('Another summary.');
+    expect(g.calls.every((c) => c[1] === 'list')).toBe(true);
+  });
+
+  it('keeps the push and says why when the pull request cannot be built', async () => {
+    await ticketOf('PROJ-84');
+    const { r } = runs(fakeQuery([]).query, { gh: fakeGh({ listFails: true }).gh });
+    await r.pushPlan('PROJ-84');
+    await done('PROJ-84');
+    await r.push('PROJ-84');
+    await vi.waitFor(
+      async () => expect((await loadFlow('PROJ-84'))?.push?.pushedAt).toBeDefined(),
+      {
+        timeout: 10_000
+      }
+    );
+    await done('PROJ-84');
+    const f = await loadFlow('PROJ-84');
+    expect(f?.prPlan).toBeUndefined();
+    expect(f?.need?.detail).toMatch(/could not be built yet.*did not say whether/s);
+    expect(f?.need?.actions.map((a) => a.id)).toContain('showPr');
+  });
+
+  it('turns a refusal into a problem with a button to try again', async () => {
+    await ticketOf('PROJ-85');
+    const { r } = runs(fakeQuery([]).query, { gh: fakeGh().gh });
+    await r.push('PROJ-85');
+    await done('PROJ-85');
+    const f = await loadFlow('PROJ-85');
+    expect(f?.run?.state).toBe('failed');
+    expect(f?.need).toMatchObject({
+      kind: 'problem',
+      ask: expect.stringMatching(/Preview the push first/)
+    });
+    expect(f?.need?.actions[0]?.id).toBe('approvePush');
   });
 });
 

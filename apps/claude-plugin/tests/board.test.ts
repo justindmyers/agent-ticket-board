@@ -783,9 +783,16 @@ for (const surface of ['desktop', 'terminal'] as const) {
       }
     };
   };
-  const openShip = async ($: Engine, on: On, flow: unknown, extra: object = {}) => {
+  const openShip = async (
+    $: Engine,
+    on: On,
+    flow: unknown,
+    extra: object = {},
+    calls: string[][] = []
+  ) => {
     on('process.run', ($, e) => {
       const a = e.argv.slice(2);
+      calls.push(a);
       return printed(
         a[0] === 'sprint'
           ? SPRINT
@@ -970,7 +977,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
       commit: !!(await ui.find({ type: 'Text', text: /feat\(edges\): add a sort/ })),
       links: !!(await ui.find({
         type: 'Link',
-        text: /Open the branch|Open a pull request|aaaaaaa/
+        text: /View the branch|Create it on GitHub|aaaaaaa/
       }))
     }).toEqual({
       title: true,
@@ -993,6 +1000,219 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await ui.unmount();
   });
 
+  test(`${surface}: the draft pull request is shown first, and made as a second step`, async ($, on) => {
+    const calls: string[][] = [];
+    const flow = {
+      stage: 'ship',
+      push: {
+        branch: 'feature/PROJ-1-x',
+        head: 'h1',
+        commits: [],
+        command: 'git push origin HEAD:feature/PROJ-1-x',
+        dryRun: '',
+        at: 'n',
+        pushedAt: 'p'
+      },
+      prPlan: {
+        title: 'feat(edges): add update controls (PROJ-1)',
+        body: '## Description\n\nEdge update controls.\n\n## Validation Steps\n\n- [x] The card shows the version\n  ![The card](./1-card.png)\n',
+        base: 'main',
+        head: 'feature/PROJ-1-x',
+        attach: [{ path: '/s/card.png', name: '1-card.png', alt: 'The card' }],
+        commits: 3,
+        at: 'n'
+      },
+      need: {
+        kind: 'decision',
+        ask: 'Ready to create a draft pull request from feature/PROJ-1-x into main.',
+        actions: [
+          { id: 'createPr', label: 'Create the draft pull request' },
+          { id: 'showPr', label: 'Show the pull request again' }
+        ]
+      }
+    };
+    on('process.run', ($, e) => {
+      const a = e.argv.slice(2);
+      calls.push(a);
+      return printed(
+        a[0] === 'sprint' ? SPRINT : a[0] === 'ticket' ? { ...TICKET, flow } : { ok: true }
+      );
+    });
+    on('session.surfaces', () => ({ value: [surface] }));
+    on('ui.open', () => ({ value: { isPlaced: true } }));
+    await $.command.run(BOARD);
+    await tick();
+    let ui = await $.ui.mount({ ...PANE, surface });
+    await ui.press({ key: 'open-PROJ-102' });
+    await tick();
+    await ui.unmount();
+    ui = await $.ui.mount({ ...PANE, surface });
+    expect({
+      section: !!(await ui.find({ key: 'toggle-pr-plan', text: /Draft pull request/ })),
+      preview: !!(await ui.find({ type: 'Text', text: /Preview/ })),
+      title: !!(await ui.find({
+        type: 'Text',
+        text: /^feat\(edges\): add update controls \(PROJ-1\)$/
+      })),
+      includes: !!(await ui.find({ type: 'Text', text: /3 commits, 1 screenshot/ })),
+      body: !!(await ui.find({ type: 'Text', text: /Edge update controls\./ })),
+      noPaths: !(await ui.find({ type: 'Text', text: /\/s\/card\.png/ }))
+    }).toEqual({
+      section: true,
+      preview: true,
+      title: true,
+      includes: true,
+      body: true,
+      noPaths: true
+    });
+    await ui.press({ key: 'act-showPr' });
+    await tick();
+    expect(calls).toContainEqual(['pr-plan', 'PROJ-102']);
+    expect(calls).not.toContainEqual(['pr', 'PROJ-102']);
+    await ui.press({ key: 'act-createPr' });
+    await tick();
+    expect(calls).toContainEqual(['pr', 'PROJ-102']);
+    await ui.unmount();
+  });
+
+  test(`${surface}: a button says what it runs, in a dim line under it`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      push: { branch: 'feature/PROJ-1-x', pushedAt: null, commits: [], ahead: 1 },
+      need: {
+        kind: 'decision',
+        ask: 'Ready to push 1 commit.',
+        actions: [{ id: 'approvePush', label: 'Approve the push' }]
+      }
+    };
+    const ui = await openShip($, on, flow);
+    expect(
+      !!(await ui.find({
+        type: 'Text',
+        text: /Approve the push: Runs git push origin HEAD:feature\/PROJ-1-x\./
+      }))
+    ).toBe(true);
+    await ui.unmount();
+  });
+
+  test(`${surface}: the pull request is one card, with GitHub's state and the body behind a toggle`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      pr: {
+        number: 7,
+        url: 'https://github.com/acme/web/pull/7',
+        state: 'Draft',
+        checks: '17 passing',
+        reviews: 'Waiting for review',
+        comments: 0,
+        failing: false
+      },
+      prPlan: {
+        title: 'feat(edges): add update controls (PROJ-1)',
+        body: 'The body text.',
+        base: 'main',
+        head: 'feature/PROJ-1-x',
+        attach: [],
+        commits: 1,
+        at: 'n',
+        createdAt: 'm',
+        url: 'https://github.com/acme/web/pull/7'
+      }
+    };
+    const ui = await openShip($, on, flow);
+    const has = async (text: RegExp) => !!(await ui.find({ type: 'Text', text }));
+    expect({
+      one: !!(await ui.find({ type: 'Button', text: /Pull request #7/ })),
+      noDraftCard: !(await ui.find({ type: 'Button', text: /Draft pull request/ })),
+      state: await has(/Checks: 17 passing/),
+      hidden: !(await has(/The body text\./))
+    }).toEqual({ one: true, noDraftCard: true, state: true, hidden: true });
+    await ui.press({ key: 'pr-body-toggle' });
+    await tick();
+    expect(await has(/The body text\./)).toBe(true);
+    await ui.unmount();
+  });
+
+  test(`${surface}: an open pull request has no button for the update, only the link`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      prPlan: {
+        title: 'feat(edges): add update controls (PROJ-1)',
+        body: 'b',
+        base: 'main',
+        head: 'feature/PROJ-1-x',
+        attach: [],
+        commits: 1,
+        at: 'n',
+        createdAt: 'm',
+        url: 'https://github.com/acme/web/pull/7'
+      }
+    };
+    const ui = await openShip($, on, flow);
+    expect({
+      pill: !!(await ui.find({ type: 'Text', text: /Draft open/ })),
+      link: !!(await ui.find({ type: 'Link', text: /View the pull request/ })),
+      noButton: !(await ui.find({ key: 'act-showPr' }))
+    }).toEqual({ pill: true, link: true, noButton: true });
+    await ui.unmount();
+  });
+
+  test(`${surface}: an update of the pull request says what it replaces, and waits for approval`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      prPlan: {
+        title: 'feat(edges): add update controls (PROJ-1)',
+        body: 'The new body.',
+        base: 'main',
+        head: 'feature/PROJ-1-x',
+        attach: [{ path: '/s/a.png', name: '1-a.png', alt: 'a' }],
+        commits: 2,
+        at: 'n',
+        createdAt: 'm',
+        update: true,
+        url: 'https://github.com/acme/web/pull/7'
+      },
+      need: {
+        kind: 'decision',
+        ask: 'Ready to update the draft pull request https://github.com/acme/web/pull/7.',
+        actions: [{ id: 'createPr', label: 'Update the pull request' }]
+      }
+    };
+    const ui = await openShip($, on, flow);
+    expect({
+      pill: !!(await ui.find({ type: 'Text', text: /Update preview/ })),
+      replaces: !!(await ui.find({ type: 'Text', text: /replaces the title and the body/ })),
+      body: !!(await ui.find({ type: 'Text', text: /The new body\./ })),
+      noUpdateButton: !(await ui.find({ key: 'act-showPr' }))
+    }).toEqual({ pill: true, replaces: true, body: true, noUpdateButton: true });
+    await ui.unmount();
+  });
+
+  test(`${surface}: an open draft shows its address, and a warning`, async ($, on) => {
+    const flow = {
+      stage: 'ship',
+      prPlan: {
+        title: 'feat(edges): add update controls (PROJ-1)',
+        body: 'b',
+        base: 'main',
+        head: 'feature/PROJ-1-x',
+        attach: [],
+        commits: 1,
+        at: 'n',
+        createdAt: 'm',
+        url: 'https://github.com/acme/web/pull/7',
+        warning: 'The draft is open, but a screenshot did not upload.'
+      }
+    };
+    const ui = await openShip($, on, flow);
+    expect({
+      open: !!(await ui.find({ type: 'Text', text: /Draft open/ })),
+      warning: !!(await ui.find({ type: 'Text', text: /screenshot did not upload/ })),
+      link: !!(await ui.find({ type: 'Link', text: /View the pull request/ }))
+    }).toEqual({ open: true, warning: true, link: true });
+    await ui.unmount();
+  });
+
   test(`${surface}: the push is shown first, and approved as a second step`, async ($, on) => {
     const calls: string[][] = [];
     const flow = {
@@ -1003,7 +1223,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
         detail: 'Command: git push origin HEAD:feature/x',
         actions: [
           { id: 'approvePush', label: 'Approve the push' },
-          { id: 'showPush', label: 'Show the push again' }
+          { id: 'showPush', label: 'Update the push preview' }
         ]
       }
     };

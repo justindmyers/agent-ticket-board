@@ -84,7 +84,8 @@ Build:
 - [x] Atomic commits: `atb commit-plan <KEY>` has an agent group the change by topic, with titles `type(scope): description (KEY)`. The developer reads the plan. `atb commit <KEY>` makes the commits with the hooks of the repository.
 - [x] Push: `atb push-plan <KEY>` shows the branch, the commits and a dry run. `atb push <KEY>` pushes exactly that to `HEAD:<branch>`, and refuses the base branch, a dirty tree and a commit that the checks did not pass.
 - [x] Ship stage: the commits, "Prepare the push", the push and the pull request have their own stage and tab after Code review. A record from before the stage moves to Ship by itself.
-- [ ] Next for Ship: the draft pull request and its live state.
+- [x] Draft pull request: `atb pr-plan <KEY>` shows the title, the body and the screenshots. `atb pr <KEY>` creates exactly that as a draft with `gh pr create --draft`. It refuses a branch that is not pushed, that changed after the push, or that has a pull request that the board did not open. The body has at most six current screenshots, one for each view. The card updates the open pull request in two steps.
+- [ ] Next for Ship: follow the pull request to the merge, and fix review comments through comment and re-plan.
 - [ ] "Comment and resume" sends the comment to the agent session.
 - [x] "Continue in chat" writes the handoff file and opens a panel chat with the prompt typed in.
 - [x] `atb handback <KEY>` records the result of a chat. The ticket page shows "Changed in chat".

@@ -26,7 +26,6 @@ import {
   serviceInfo
 } from '@agent-ticket-board/core';
 import { Processes } from './processes';
-import { doPush, planPush } from './push';
 import { handback, writeHandoff } from './handoff';
 import { Runs } from './runs';
 import { createApi } from './server';
@@ -174,16 +173,11 @@ export async function serve() {
       return f;
     },
     // The push, in two steps: the dry run shows it, the approval makes exactly that push.
-    'POST /tickets/:key/push-plan': async ({ key }) => {
-      const f = await planPush(key!);
-      events.send({ key });
-      return f;
-    },
-    'POST /tickets/:key/push': async ({ key }) => {
-      const f = await doPush(key!);
-      events.send({ key });
-      return f;
-    },
+    'POST /tickets/:key/push-plan': async ({ key }) => runs.pushPlan(key!),
+    'POST /tickets/:key/push': async ({ key }) => runs.push(key!),
+    // The draft pull request, in two steps like the push.
+    'POST /tickets/:key/pr-plan': async ({ key }) => runs.prPlan(key!),
+    'POST /tickets/:key/pr': async ({ key }) => runs.pr(key!),
     'POST /tickets/:key/review': async ({ key }) => runs.review(key!),
     'POST /tickets/:key/gate': async ({ key }) => runs.gate(key!),
     'POST /tickets/:key/restart': async ({ key }) => runs.startOver(key!),

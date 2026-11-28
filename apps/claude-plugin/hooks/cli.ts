@@ -159,8 +159,12 @@ export async function approveTested($: EngineInterface, key: string) {
   watchRun($, key);
 }
 
-/** The push, in two steps: `push-plan` shows it, `push` makes it. Both run in the service. */
-export async function pushStep($: EngineInterface, key: string, verb: 'push-plan' | 'push') {
+/** The push and the draft pull request, each in two steps: the plan shows it, the other makes it. Both run in the service. */
+export async function pushStep(
+  $: EngineInterface,
+  key: string,
+  verb: 'push-plan' | 'push' | 'pr-plan' | 'pr'
+) {
   try {
     await atb($, [verb, key]);
   } catch (e) {

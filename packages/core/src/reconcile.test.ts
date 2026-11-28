@@ -51,6 +51,25 @@ describe('reconcile', () => {
     expect(reconcile({ stage: 'ship' }, 'Code Review', pr('Open'))!.need).toBeUndefined();
   });
 
+  it('keeps an update of the pull request that waits for approval, and clears any other note', () => {
+    const waiting: Flow = {
+      stage: 'ship',
+      need: {
+        kind: 'decision',
+        ask: 'Ready to update the draft pull request.',
+        actions: [{ id: 'createPr', label: 'Update the pull request' }]
+      }
+    };
+    expect(reconcile(waiting, 'Code Review', pr('Open'))!.need?.actions[0]?.id).toBe('createPr');
+    const note: Flow = {
+      stage: 'ship',
+      need: { kind: 'decision', ask: 'Pushed.', actions: [{ id: 'showPr', label: 'Show' }] }
+    };
+    expect(reconcile(note, 'Code Review', pr('Open'))!.need).toBeUndefined();
+    // Failing checks still come first: they are a problem.
+    expect(reconcile(waiting, 'Code Review', pr('Open', 2))!.need?.kind).toBe('problem');
+  });
+
   it('does not change open work that has no pull request', () => {
     expect(reconcile(dev, 'In Progress', null)).toEqual(dev);
   });

@@ -501,6 +501,195 @@ function page(theme, mode) {
       prepare: buttons.some((t) => /Prepare the push again/.test(t))
     };
   });
+  // The draft pull request: first what GitHub will get, then the open draft with its address.
+  const draft = (made, live = false) =>
+    rh.evaluate(
+      async ([made, live]) => {
+        const d = await window.__detail('PROJ-103');
+        const prPlan = {
+          title: 'feat(nav): add the mobile drawer (PROJ-103)',
+          body: '## Description\n\nA drawer for small screens.\n\n- feat(nav): add the mobile drawer\n- feat(nav): add the drawer toggle hook\n\n## What type of change is this?\n\n- [x] Feature\n- [ ] Bug Fix\n\n## Jira Ticket(s)\n\n[PROJ-103](https://example.atlassian.net/browse/PROJ-103)\n\n## Validation Steps\n\n- [x] The drawer opens on a phone\n  ![The drawer opens](./1-drawer.png)\n- [ ] The toggle saves (tested with mocked data)\n',
+          base: 'main',
+          head: 'feature/PROJ-103-mobile-nav',
+          attach: [
+            {
+              path: '/Users/someone/shots/drawer.png',
+              name: '1-drawer.png',
+              alt: 'The drawer opens'
+            }
+          ],
+          commits: 3,
+          at: 'n',
+          ...(made
+            ? {
+                createdAt: 'm',
+                url: 'https://github.com/acme/web/pull/7',
+                warning: 'The draft is open, but a screenshot did not upload. Add it on GitHub.'
+              }
+            : {})
+        };
+        d.flow = {
+          ...d.flow,
+          push: { ...d.flow.push, pushedAt: 'p' },
+          // GitHub has no pull request until the board makes it.
+          pr: live
+            ? {
+                number: 7,
+                url: 'https://github.com/acme/web/pull/7',
+                state: 'Draft',
+                checks: '17 passing',
+                reviews: 'Waiting for review',
+                comments: 0,
+                failing: false
+              }
+            : undefined,
+          prPlan,
+          need: made
+            ? {
+                kind: 'decision',
+                ask: 'The draft pull request is open: https://github.com/acme/web/pull/7',
+                actions: [{ id: 'openWorktree', label: 'Open worktree' }]
+              }
+            : {
+                kind: 'decision',
+                ask: 'Ready to create a draft pull request from feature/PROJ-103-mobile-nav into main.',
+                actions: [
+                  { id: 'createPr', label: 'Create the draft pull request' },
+                  { id: 'showPr', label: 'Show the pull request again' }
+                ]
+              }
+        };
+        window.postMessage(d, '*');
+      },
+      [made, live]
+    );
+  const readDraft = () =>
+    rh.evaluate(() => {
+      const s = document.querySelector(
+        '[aria-label="Draft pull request"], [aria-label^="Pull request #"]'
+      );
+      const buttons = [...document.querySelectorAll('button')].map((b) => b.textContent.trim());
+      return {
+        shown: !!s,
+        pill: s
+          ? s.textContent.includes('Preview')
+            ? 'Preview'
+            : s.textContent.includes('Draft open')
+              ? 'Draft open'
+              : null
+          : null,
+        title: s ? s.textContent.includes('feat(nav): add the mobile drawer (PROJ-103)') : null,
+        includes: s ? s.textContent.includes('3 commits, 1 screenshot') : null,
+        body: s ? s.textContent.includes('A drawer for small screens.') : null,
+        noLocalPath: s ? !s.textContent.includes('/Users/') : null,
+        warning: s ? s.textContent.includes('screenshot did not upload') : null,
+        create: buttons.some((t) => /Create the draft pull request/.test(t)),
+        show: buttons.some((t) => /Show the pull request again/.test(t)),
+        openLink: buttons.some((t) => /View the pull request/.test(t)),
+        update: buttons.some((t) => /^Update the pull request/.test(t)),
+        updatePill: s ? s.textContent.includes('Update preview') : null,
+        replaces: s ? s.textContent.includes('replaces the title and the body') : null,
+        // The newest step is on top: what the banner asks you to approve is the first thing you see.
+        order: [...document.querySelectorAll('section[aria-label]')]
+          .map((x) => x.getAttribute('aria-label'))
+          .filter(
+            (n) =>
+              ['Draft pull request', 'Push', 'Commits'].includes(n) || /^Pull request #/.test(n)
+          )
+      };
+    });
+  await draft(false);
+  await rh.waitForTimeout(300);
+  kb.draftPreview = await readDraft();
+  await axe(rh, 'dark/ticket-pr-preview');
+  await rh
+    .locator('[aria-label="Draft pull request"], [aria-label^="Pull request #"]')
+    .screenshot({ path: path.join(OUT, 'ticket-pr-preview.png') });
+  await draft(true);
+  await rh.waitForTimeout(300);
+  kb.draftOpen = await readDraft();
+  await axe(rh, 'dark/ticket-pr-open');
+  // GitHub has the pull request: there is one card, with GitHub's state, and the body folds.
+  const readMerged = () =>
+    rh.evaluate(() => {
+      const cards = [...document.querySelectorAll('section[aria-label]')]
+        .map((x) => x.getAttribute('aria-label'))
+        .filter((n) => /pull request/i.test(n));
+      const s = document.querySelector('section[aria-label="Pull request #7"]');
+      const d = s?.querySelector('details');
+      return {
+        cards,
+        facts: s
+          ? ['State', 'Checks', 'Reviews', 'Comments'].every((k) => s.textContent.includes(k))
+          : null,
+        folded: d ? !d.open : null,
+        buttons: [...(s?.querySelectorAll('button') ?? [])].map((b) => b.textContent.trim())
+      };
+    });
+  await draft(true, true);
+  await rh.waitForTimeout(300);
+  kb.merged = await readMerged();
+  await axe(rh, 'dark/ticket-pr-merged');
+  await rh
+    .locator('section[aria-label="Pull request #7"]')
+    .screenshot({ path: path.join(OUT, 'ticket-pr-merged.png') });
+  await rh.locator('section[aria-label="Pull request #7"] summary').click();
+  kb.merged.unfolded = await rh.evaluate(
+    () => document.querySelector('section[aria-label="Pull request #7"] details').open
+  );
+  // An update of the open pull request: shown first, and applied only on approval.
+  await rh.evaluate(async () => {
+    const d = await window.__detail('PROJ-103');
+    d.flow = {
+      ...d.flow,
+      push: { ...d.flow.push, pushedAt: 'p' },
+      prPlan: {
+        title: 'feat(nav): add the mobile drawer (PROJ-103)',
+        body: '## Description\n\nA new body.\n',
+        base: 'main',
+        head: 'feature/PROJ-103-mobile-nav',
+        attach: [],
+        commits: 3,
+        at: 'n',
+        createdAt: 'm',
+        update: true,
+        url: 'https://github.com/acme/web/pull/7',
+        warning:
+          'The screenshots are older than the code: EdgeCard.tsx changed after them. None are attached. Run Testing again to take new ones.'
+      },
+      need: {
+        kind: 'decision',
+        ask: 'Ready to update the draft pull request https://github.com/acme/web/pull/7.',
+        actions: [
+          { id: 'createPr', label: 'Update the pull request' },
+          { id: 'showPr', label: 'Build the preview again' }
+        ]
+      }
+    };
+    window.postMessage(d, '*');
+  });
+  await rh.waitForTimeout(300);
+  kb.draftUpdate = await readDraft();
+  kb.draftUpdate.staleNote = await rh.evaluate(() =>
+    document
+      .querySelector('[aria-label="Draft pull request"], [aria-label^="Pull request #"]')
+      .textContent.includes('older than the code')
+  );
+  // The banner button says what it runs. It shows on hover and on keyboard focus.
+  await rh
+    .getByRole('button', { name: /^Update the pull request/ })
+    .first()
+    .hover();
+  await rh.waitForSelector('[role="tooltip"]', { timeout: 3000 }).catch(() => null);
+  kb.draftUpdate.tooltip = await rh.evaluate(
+    () => document.querySelector('[role="tooltip"]')?.textContent ?? null
+  );
+  await rh.mouse.move(0, 0);
+  await rh.waitForTimeout(200);
+  await axe(rh, 'dark/ticket-pr-update');
+  await rh
+    .locator('[aria-label="Draft pull request"], [aria-label^="Pull request #"]')
+    .screenshot({ path: path.join(OUT, 'ticket-pr-update.png') });
   await axe(rh, 'dark/ticket-push-stale');
   await rh.screenshot({ path: path.join(OUT, 'ticket-push-stale.png') });
   await axe(rh, 'dark/ticket-push-dryrun');

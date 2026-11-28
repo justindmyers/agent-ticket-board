@@ -22,6 +22,7 @@ import type {
   Commits,
   Finding,
   Gate,
+  PrPlan,
   Push,
   Question,
   WriteRun
@@ -35,6 +36,7 @@ export type {
   Evidence,
   Finding,
   Gate,
+  PrPlan,
   Push,
   Question,
   TrackerState,
@@ -95,6 +97,7 @@ export type Flow = {
   gate?: Gate;
   writeRuns?: WriteRun[];
   push?: Push;
+  prPlan?: PrPlan;
   commits?: Commits;
   approved?: string;
   spent?: number;

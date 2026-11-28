@@ -418,6 +418,18 @@ async function runAction(key: string, id: string, ctx?: vscode.ExtensionContext)
             : null;
     return url ? open(url) : vscode.window.showInformationMessage(`${key}: nothing to open yet.`);
   }
+  if (id === 'showPr' || id === 'createPr') {
+    return startRun(key, id === 'showPr' ? 'pr-plan' : 'pr').catch((err: unknown) =>
+      showError(key, err)
+    );
+  }
+  if (id === 'openPlannedPr') {
+    // The address that GitHub gave when the draft was made, from the ticket's record.
+    const url = f?.prPlan?.url;
+    return url?.startsWith('https://github.com/')
+      ? open(url)
+      : vscode.window.showInformationMessage(`${key}: the draft pull request is not open yet.`);
+  }
   if (id === 'showPush' || id === 'approvePush') {
     return startRun(key, id === 'showPush' ? 'push-plan' : 'push').catch((err: unknown) =>
       showError(key, err)

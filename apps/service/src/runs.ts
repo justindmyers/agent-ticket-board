@@ -49,6 +49,8 @@ import {
   boardCommand
 } from '@agent-ticket-board/core';
 import { sessionOf, TestBrowser } from './browser';
+import { doPush, planPush } from './push';
+import { doPr, planPr, refreshPr, type Gh } from './pull-request';
 import { runGate } from './gate';
 import { planBase } from './plan-base';
 import type { Processes } from './processes';
@@ -85,6 +87,8 @@ export type RunDeps = {
   appTimeoutMs?: number;
   /** A desktop notification. Default: terminal-notifier, or osascript. */
   notify?: (message: string) => void;
+  /** GitHub's command line. Tests replace it: they must not reach GitHub. */
+  gh?: Gh;
   /** The ticket's test browser. Default: the board's own playwright-cli browser. */
   browser?: (key: string, cwd: string) => BrowserLike;
   /** The read-only copy of the remote's main branch for planning. Default: planBase. */
@@ -266,7 +270,7 @@ export class Runs {
    */
   private async job(
     key: string,
-    task: 'gate' | 'verify' | 'commit',
+    task: 'gate' | 'verify' | 'commit' | 'push-plan' | 'push' | 'pr-plan' | 'pr',
     refuse: (f: Flow | null) => string | null,
     work: (f: Flow, cwd: string, ac: AbortController) => Promise<Flow>,
     stage: 'development' | 'code-review' | 'ship' = 'code-review'
@@ -321,8 +325,7 @@ export class Runs {
             {
               ...STAGE_SPECS['code-review'],
               stage,
-              retry:
-                task === 'gate' ? 'startGate' : task === 'verify' ? 'startVerify' : 'approveCommits'
+              retry: RETRY[task]
             },
             e instanceof Error ? e.message : String(e),
             undefined,
@@ -333,6 +336,7 @@ export class Runs {
         this.active.delete(key);
         // The merge and the commits of the board's own jobs are its work, not outside work.
         await this.markSeen(key);
+        await this.refreshPr(key);
       }
     })();
     return FLOWS[key]!.run!;
@@ -459,7 +463,8 @@ export class Runs {
           steps: gate.steps.map((s) => `${s.name}: ${s.ok ? 'ok' : 'failed'}`)
         });
         if (!build) {
-          return applyGate(f, gate);
+          const next = applyGate(f, gate);
+          return gate.ok && !verify ? this.thenShowPush(key, next) : next;
         }
         // The board's checks decide: the agent's own gate claims do not count.
         const checked = { ...f, gate, checks: undefined };
@@ -480,6 +485,61 @@ export class Runs {
       },
       build ? 'development' : verify ? 'code-review' : 'ship'
     );
+  }
+
+  /** The push, as a job: it shows on the ticket while it runs. */
+  pushPlan(key: string) {
+    return this.job(key, 'push-plan', hasWorktree, () => planPush(key), 'ship');
+  }
+
+  /**
+   * Makes the push that was shown, and then builds the pull request, which changes nothing. The
+   * developer sees the title and the body before anything is opened on GitHub.
+   */
+  push(key: string) {
+    return this.job(
+      key,
+      'push',
+      hasWorktree,
+      async () => {
+        const pushed = await doPush(key);
+        await this.write(key, pushed);
+        await this.patchRun(key, { activity: 'Building the pull request' });
+        try {
+          if (FLOWS[key]?.prPlan?.createdAt) {
+            // The pull request is open: show an update only when it differs from what GitHub has.
+            return (
+              (await refreshPr(key, undefined, this.d.gh)) ?? { ...FLOWS[key]!, need: pushed.need }
+            );
+          }
+          return await planPr(key, undefined, this.d.gh);
+        } catch (e) {
+          const why = e instanceof Error ? e.message : String(e);
+          return {
+            ...pushed,
+            need: {
+              kind: 'decision' as const,
+              ask: pushed.need!.ask,
+              detail: `The pull request could not be built yet: ${why}`,
+              actions: [
+                { id: 'showPr', label: 'Build the pull request again' },
+                ...pushed.need!.actions
+              ]
+            }
+          };
+        }
+      },
+      'ship'
+    );
+  }
+
+  prPlan(key: string) {
+    return this.job(key, 'pr-plan', hasWorktree, () => planPr(key, undefined, this.d.gh), 'ship');
+  }
+
+  /** Opens exactly the draft that was shown. */
+  pr(key: string) {
+    return this.job(key, 'pr', hasWorktree, () => doPr(key, undefined, this.d.gh), 'ship');
   }
 
   /** The planned commits, one after the other. The hooks of the repository run: never `--no-verify`. */
@@ -644,6 +704,7 @@ export class Runs {
         this.active.delete(key);
         this.logs.delete(key);
         void pruneRuns(key);
+        void this.refreshPr(key);
         // A run that wrote code leaves it as its own work. Only edits after this are from outside.
         if (changesCode(spec)) {
           void this.markSeen(key);
@@ -1112,6 +1173,39 @@ export class Runs {
     }
   }
 
+  /**
+   * The checks passed: the board shows the push by itself. A dry run changes nothing, so the developer
+   * presses only the approval. If the preview cannot be made, the banner offers it to press, and its
+   * error says why.
+   */
+  private async thenShowPush(key: string, next: Flow): Promise<Flow> {
+    if (next.push?.pushedAt) {
+      return next;
+    }
+    await this.write(key, next);
+    await this.patchRun(key, { activity: 'Showing the push' });
+    try {
+      await planPush(key);
+    } catch {
+      // The next step on the record is Preview the push.
+    }
+    return FLOWS[key] ?? next;
+  }
+
+  /**
+   * When the pull request is open, builds the update again after work that could change it, and shows
+   * it only when it differs from what GitHub got. It changes nothing on GitHub.
+   */
+  private async refreshPr(key: string) {
+    try {
+      if (FLOWS[key]?.prPlan?.createdAt && (await refreshPr(key, undefined, this.d.gh))) {
+        this.d.changed(key);
+      }
+    } catch {
+      // A failed look is not a problem of the work. The next job looks again.
+    }
+  }
+
   /** Records the worktree as it is now. What differs from it later came from outside the board. */
   private async markSeen(key: string) {
     const f = FLOWS[key];
@@ -1132,6 +1226,19 @@ export class Runs {
     this.d.changed(key);
   }
 }
+
+/** The button that tries a job again after it failed. */
+const hasWorktree = (f: Flow | null) => (f?.worktree ? null : 'the ticket has no worktree.');
+
+const RETRY = {
+  gate: 'startGate',
+  verify: 'startVerify',
+  commit: 'approveCommits',
+  'push-plan': 'showPush',
+  push: 'approvePush',
+  'pr-plan': 'showPr',
+  pr: 'createPr'
+} as const;
 
 /** The ticket's worktree when it still exists on disk. */
 async function worktreeOf(f: Flow) {

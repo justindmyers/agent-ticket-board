@@ -13,7 +13,7 @@ All clients read the same data in `~/.agent-ticket-board`.
 
 ## Status
 
-The board plans, builds, tests and reviews a ticket, makes atomic commits, and runs the checks before a push. The push, the draft pull request and the pull request tracking are not built yet. See `ROADMAP.md` for the open work and `PLAN.md` for the design.
+The board plans, builds, tests and reviews a ticket, makes atomic commits, and runs the checks before a push. The push and the draft pull request are built. The follow-up of the pull request until the merge is not built yet. See `ROADMAP.md` for the open work and `PLAN.md` for the design.
 
 ## How it works
 

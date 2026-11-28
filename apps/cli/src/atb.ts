@@ -85,6 +85,8 @@ const USAGE = `usage:
   atb open-shot <KEY> <PATH>             open a screenshot from the ticket's evidence
   atb push-plan <KEY>                    preview the push: the branch, the commits and a dry run
   atb push <KEY>                         make the push that push-plan showed
+  atb pr-plan <KEY>                      preview the draft pull request: title, body and screenshots
+  atb pr <KEY>                           create the draft pull request that pr-plan showed
   atb approve-testing <KEY>              approve a tested change: the code review starts
   atb review <KEY>                       run the code review again
   atb commit-plan <KEY>                  an agent plans the commits of the change
@@ -236,7 +238,7 @@ async function main() {
     const info = await ensureService(process.argv[1]!);
     return out(await callService(info, `/tickets/${key}/restart`, {}));
   }
-  if ((cmd === 'push-plan' || cmd === 'push') && key) {
+  if ((cmd === 'push-plan' || cmd === 'push' || cmd === 'pr-plan' || cmd === 'pr') && key) {
     const info = await ensureService(process.argv[1]!);
     return out(await callService(info, `/tickets/${key}/${cmd}`, {}));
   }

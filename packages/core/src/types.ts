@@ -65,6 +65,32 @@ export type Evidence = {
 export type WriteRun = { method: string; path: string; made: boolean; result: string };
 
 /** The push of the branch: what the developer saw, and when it ran. */
+/** The draft pull request: what the board shows before it makes it, and where it is after. */
+export type PrPlan = {
+  title: string;
+  body: string;
+  base: string;
+  head: string;
+  /** The screenshots that go to GitHub with the body. `name` is how the body refers to the file. */
+  attach: { path: string; name: string; alt: string }[];
+  /** How many commits the pull request holds. */
+  commits: number;
+  at: string;
+  /** Set when the draft was made. */
+  createdAt?: string;
+  url?: string;
+  /** The plan changes the pull request that is open, with the title and the body shown here. */
+  update?: boolean;
+  /** Set when the open pull request was updated from a plan. */
+  updatedAt?: string;
+  /** GitHub made the pull request, but a screenshot did not upload. */
+  warning?: string;
+  /** A hash of the title, the body and the screenshot files of this plan. */
+  fingerprint?: string;
+  /** The fingerprint of what GitHub got last. A plan with another one is a change to send. */
+  sent?: string;
+};
+
 /** What the worktree looked like when the board last looked: the commit, and a hash for each changed file. */
 export type Seen = { head: string; files: Record<string, string> };
 
@@ -156,7 +182,16 @@ export type AgentRun = {
   state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
   stage: Stage;
   /** `gate`: the pre-push checks. The board runs them, with no agent. */
-  task?: 'gate' | 'verify' | 'review-fix' | 'commit-plan' | 'commit';
+  task?:
+    | 'gate'
+    | 'verify'
+    | 'review-fix'
+    | 'commit-plan'
+    | 'commit'
+    | 'push-plan'
+    | 'push'
+    | 'pr-plan'
+    | 'pr';
   started: string;
   model: string;
   ended?: string;
@@ -197,6 +232,8 @@ export type Flow = {
   writeRuns?: WriteRun[];
   /** Code review: the push, shown as a dry run first, and then made. */
   push?: Push;
+  /** Ship: the draft pull request, shown first and then made. */
+  prPlan?: PrPlan;
   /** Code review: what the reviewers found and what the agent fixed. */
   codeReview?: CodeReview;
   /** Code review: the last run of the pre-push checks. */

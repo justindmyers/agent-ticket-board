@@ -101,7 +101,7 @@ describe('planPush', () => {
     expect(f.push?.commits[0]?.sha).toMatch(/^[0-9a-f]{40}$/);
     expect(f.push?.commits[0]?.short).toMatch(/^[0-9a-f]{7,}$/);
     expect(f.need?.ask).toBe('Ready to push 2 commits to origin as feature/PUSH-1-edge.');
-    expect(f.need?.actions.map((a) => a.id)).toEqual(['approvePush', 'showPush', 'openWorktree']);
+    expect(f.need?.actions.map((a) => a.id)).toEqual(['approvePush', 'openWorktree']);
     expect(t.remote('refs/heads/feature/PUSH-1-edge')).toBeNull();
     expect((await readTimeline(t.key)).find((e) => e.type === 'push.planned')).toMatchObject({
       branch: 'feature/PUSH-1-edge',

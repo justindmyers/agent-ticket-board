@@ -325,7 +325,11 @@ function shotTimes(f: Flow) {
   return times;
 }
 
-/** The newest changed file in a worktree that can change the page: not tests or docs. */
+/**
+ * The newest changed file in a worktree that can change the page: not tests or docs. A changed file
+ * is one that differs from the base branch, committed or not. Commits do not write files, so a
+ * file's time is the last time that someone changed it, not the time of the commit.
+ */
 export function lastChangedFile(worktree: string) {
   const git = (args: string[]) => {
     try {
@@ -335,6 +339,7 @@ export function lastChangedFile(worktree: string) {
     }
   };
   const files = [
+    ...git(['diff', '--name-only', `origin/${CONFIG.repo.baseBranch}...HEAD`]),
     ...git(['diff', '--name-only', 'HEAD']),
     ...git(['ls-files', '--others', '--exclude-standard'])
   ].filter((p) => p && !/\.(test|spec|stories)\.|\.md$|(^|\/)__tests__\//.test(p));

@@ -66,10 +66,10 @@ describe('migrateStage', () => {
     const again = migrateStage(
       at({
         push: { branch: 'b', head: 'h', commits: [], command: 'c', dryRun: '', at: 'n' },
-        need: need('Show the push again')
+        need: need('Update the push preview')
       })
     );
-    expect(again.need?.actions[0]?.label).toBe('Show the push again');
+    expect(again.need?.actions[0]?.label).toBe('Update the push preview');
   });
 
   it('reads a preview whose commits were saved as one string each', () => {
@@ -144,5 +144,84 @@ describe('withNextStep after the pre-push gate passed', () => {
     ]);
     expect(ids(withNextStep(passed({ ok: false })))).toEqual(['openWorktree']);
     expect(ids(withNextStep(passed({ verify: true })))).toEqual(['openWorktree']);
+  });
+});
+
+describe('withNextStep after the push', () => {
+  const pushed = (over: Partial<Flow> = {}): Flow => ({
+    stage: 'ship',
+    push: {
+      branch: 'feature/X-1',
+      head: 'h',
+      commits: [],
+      command: 'c',
+      dryRun: '',
+      at: 'n',
+      pushedAt: 'p'
+    },
+    need: {
+      kind: 'decision',
+      ask: 'Pushed feature/X-1 to origin (abc1234).',
+      detail:
+        'The board does not make the draft pull request yet. Open the branch on GitHub to make it.',
+      actions: [{ id: 'openWorktree', label: 'Open worktree' }]
+    },
+    ...over
+  });
+  it('offers the pull request after an older push that offered nothing', () => {
+    const f = withNextStep(pushed());
+    expect(f.need?.actions.map((a) => a.id)).toEqual(['showPr', 'openWorktree']);
+    expect(f.need?.detail).toMatch(/Show the pull request/);
+  });
+  it('does not add the button twice, and leaves a pull request that is shown or open alone', () => {
+    const again = withNextStep(pushed());
+    expect(withNextStep(again).need?.actions.filter((a) => a.id === 'showPr')).toHaveLength(1);
+    const shown = pushed({
+      prPlan: { title: 't', body: 'b', base: 'main', head: 'h', attach: [], commits: 1, at: 'n' }
+    });
+    expect(withNextStep(shown).need?.actions.map((a) => a.id)).toEqual(['openWorktree']);
+    const open = pushed({
+      pr: {
+        number: 1,
+        url: 'u',
+        state: 'Open',
+        draft: true,
+        checks: '',
+        failing: 0,
+        reviews: '',
+        comments: 0
+      }
+    });
+    expect(withNextStep(open).need?.actions.map((a) => a.id)).toEqual(['openWorktree']);
+  });
+});
+
+describe('a fresh push preview', () => {
+  const previewed = (ids: string[]): Flow => ({
+    stage: 'ship',
+    push: {
+      branch: 'feature/X-1',
+      head: 'h',
+      commits: [],
+      command: 'c',
+      dryRun: '',
+      at: 'n'
+    },
+    need: {
+      kind: 'decision',
+      ask: 'Ready to push 2 commits to origin as feature/X-1.',
+      actions: ids.map((id) => ({ id, label: id }))
+    }
+  });
+  it('offers the approval, with no button to show it again', () => {
+    const f = migrateStage(previewed(['approvePush', 'showPush', 'openWorktree']));
+    expect(f.need?.actions.map((a) => a.id)).toEqual(['approvePush', 'openWorktree']);
+  });
+  it('keeps the button when there is no approval to give: the preview needs an update', () => {
+    const f = migrateStage(previewed(['showPush', 'openWorktree']));
+    expect(f.need?.actions.map((a) => [a.id, a.label])).toEqual([
+      ['showPush', 'Update the push preview'],
+      ['openWorktree', 'openWorktree']
+    ]);
   });
 });
